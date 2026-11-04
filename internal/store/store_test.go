@@ -307,3 +307,108 @@ func TestStoredTimesSortAsText(t *testing.T) {
 		t.Errorf("scan(%q) = %v, %v", texts[1], time.Time(back), err)
 	}
 }
+
+func TestCycleRuns(t *testing.T) {
+	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
+		s := openStore(t, databaseURL)
+		ctx := t.Context()
+		account := newAccount(t, s)
+		if _, found, err := s.LastCycleRun(ctx, account.ID); found || err != nil {
+			t.Fatalf("last run before any cycle = %v, %v", found, err)
+		}
+
+		failed, err := s.StartCycleRun(ctx, account.ID, TriggerScheduled, testNow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.FinishCycleRun(ctx, CycleRun{ID: failed, AccountID: account.ID, FinishedAt: testNow.Add(time.Second), Error: "SEI answered with an internal error"}); err != nil {
+			t.Fatal(err)
+		}
+		if last, _, err := s.LastCycleRun(ctx, account.ID); err != nil || last.Error != "SEI answered with an internal error" || last.Trigger != TriggerScheduled {
+			t.Errorf("failed run = %+v, %v", last, err)
+		}
+
+		manual, err := s.StartCycleRun(ctx, account.ID, TriggerManual, testNow.Add(time.Minute))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = s.ApplyCycle(ctx, CycleChanges{
+			AccountID: account.ID, RunID: manual, Now: testNow.Add(time.Minute), FinishedAt: testNow.Add(2 * time.Minute),
+			Processes: []Process{{ProcedureID: 9001, Number: "00000.000001/2026-00", UnitID: 1001}},
+			Events:    []event.Event{{Kind: event.ProcessEntered, ProcedureID: 9001, Ref: "9001:1"}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		last, found, err := s.LastCycleRun(ctx, account.ID)
+		want := CycleRun{
+			ID: manual, AccountID: account.ID, Trigger: TriggerManual,
+			StartedAt: micro(testNow.Add(time.Minute)), FinishedAt: micro(testNow.Add(2 * time.Minute)),
+			ProcessesSeen: 1, EventsCreated: 1,
+		}
+		if err != nil || !found || last != want {
+			t.Errorf("last run = %+v, %v, %v\nwant %+v", last, found, err, want)
+		}
+	})
+}
+
+func TestOnlyTheLatestCycleRunsAreKept(t *testing.T) {
+	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
+		s := openStore(t, databaseURL)
+		ctx := t.Context()
+		account := newAccount(t, s)
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var first int64
+		for i := range keptRunsPerAccount + 2 {
+			var id int64
+			err := tx.QueryRowContext(ctx, `INSERT INTO cycle_runs (account_id, "trigger", started_at, finished_at) VALUES (?, 'scheduled', ?, ?) RETURNING id`,
+				account.ID, dbTime(testNow.Add(time.Duration(i)*time.Minute)), dbTime(testNow.Add(time.Duration(i)*time.Minute))).Scan(&id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if i == 0 {
+				first = id
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
+
+		latest, err := s.StartCycleRun(ctx, account.ID, TriggerScheduled, testNow.Add(24*time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.FinishCycleRun(ctx, CycleRun{ID: latest, AccountID: account.ID, FinishedAt: testNow.Add(24 * time.Hour)}); err != nil {
+			t.Fatal(err)
+		}
+
+		var count int
+		var oldest int64
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*), MIN(id) FROM cycle_runs WHERE account_id = ?`, account.ID).Scan(&count, &oldest); err != nil {
+			t.Fatal(err)
+		}
+		if count != keptRunsPerAccount || oldest != first+3 {
+			t.Errorf("runs = %d starting at %d, want %d starting at %d", count, oldest, keptRunsPerAccount, first+3)
+		}
+	})
+}
+
+func TestAccountInfo(t *testing.T) {
+	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
+		s := openStore(t, databaseURL)
+		account := newAccount(t, s)
+		info := AccountInfo{OrgAcronym: "SEDEMO", SEIVersion: "5.0.5", WSSEIVersion: "3.0.4"}
+
+		if err := s.UpdateAccountInfo(t.Context(), account.ID, info); err != nil {
+			t.Fatal(err)
+		}
+
+		if again := newAccount(t, s); again.Info != info {
+			t.Errorf("account info = %+v, want %+v", again.Info, info)
+		}
+	})
+}

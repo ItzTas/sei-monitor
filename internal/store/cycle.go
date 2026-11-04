@@ -38,14 +38,16 @@ type Document struct {
 }
 
 type CycleChanges struct {
-	AccountID int64
-	Now       time.Time
-	Baseline  bool
-	Processes []Process
-	Left      []int64
-	Documents []Document
-	Events    []event.Event
-	Channels  []string
+	AccountID  int64
+	RunID      int64
+	Now        time.Time
+	FinishedAt time.Time
+	Baseline   bool
+	Processes  []Process
+	Left       []int64
+	Documents  []Document
+	Events     []event.Event
+	Channels   []string
 }
 
 func (s *Store) Processes(ctx context.Context, accountID int64) ([]Process, error) {
@@ -111,8 +113,17 @@ func (s *Store) ApplyCycle(ctx context.Context, changes CycleChanges) ([]event.E
 			}
 		}
 		events, err := insertEvents(ctx, tx, changes)
+		if err != nil {
+			return err
+		}
 		inserted = events
-		return err
+		if changes.RunID == 0 {
+			return nil
+		}
+		return finishRun(ctx, tx, CycleRun{
+			ID: changes.RunID, AccountID: changes.AccountID, FinishedAt: changes.FinishedAt,
+			ProcessesSeen: len(changes.Processes), EventsCreated: len(events),
+		})
 	})
 	if err != nil {
 		return nil, err

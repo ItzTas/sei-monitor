@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"slices"
 	"strings"
@@ -88,4 +90,14 @@ func unitAcronyms(units []sei.Unit) []string {
 		acronyms = append(acronyms, unit.Acronym)
 	}
 	return acronyms
+}
+
+func generateToken(cmd *cobra.Command, _ []string) error {
+	random := make([]byte, 32)
+	if _, err := rand.Read(random); err != nil {
+		return err
+	}
+	out := &printer{w: cmd.OutOrStdout()}
+	out.printf("%s\n", base64.RawURLEncoding.EncodeToString(random))
+	return out.err
 }

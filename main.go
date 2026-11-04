@@ -97,7 +97,7 @@ func (a *app) rootCommand() *cobra.Command {
 		command("diagnose", "Check how the SEI API behaves, printing only counts and types", a.diagnose),
 		command("send-test", "Send a test message through every enabled channel", notImplemented),
 		command("whatsapp-pair", "Pair the WhatsApp number that sends the messages", notImplemented),
-		command("generate-token", "Generate a random value for FEED_TOKEN", notImplemented),
+		command("generate-token", "Print a random token to use as FEED_TOKEN or API_TOKEN (run it once for each)", generateToken),
 	)
 	return root
 }

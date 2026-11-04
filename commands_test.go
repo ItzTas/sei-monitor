@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ItzTas/sei-monitor/internal/config"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
 )
 
@@ -97,5 +98,19 @@ func TestCommandsListEveryConfigurationProblem(t *testing.T) {
 		if !strings.Contains(stderr, problem) {
 			t.Errorf("stderr does not contain %q:\n%s", problem, stderr)
 		}
+	}
+}
+
+func TestGenerateTokenPrintsATokenTheConfigurationAccepts(t *testing.T) {
+	first, firstOut, _ := runCLI(t, nil, "generate-token")
+	second, secondOut, _ := runCLI(t, nil, "generate-token")
+
+	feed, api := strings.TrimSpace(firstOut), strings.TrimSpace(secondOut)
+	if first != 0 || second != 0 || len(feed) != 43 || feed == api {
+		t.Fatalf("tokens = %q (%d) and %q (%d)", feed, first, api, second)
+	}
+	env := map[string]string{"FEED_TOKEN": feed, "API_TOKEN": api, "SEI_URL": "https://sei.example.org", "SEI_USERNAME": "u", "SEI_PASSWORD": "p", "SEI_ORG": "1"}
+	if _, err := config.Load(config.Source{Lookup: func(name string) (string, bool) { value, ok := env[name]; return value, ok }}); err != nil {
+		t.Errorf("the configuration refuses generated tokens: %v", err)
 	}
 }

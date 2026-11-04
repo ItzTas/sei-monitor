@@ -1,0 +1,1 @@
+{"sucesso":false,"mensagem":"O processo n&#039;foi encontrado na unidade.","exception":"#0 /opt/sei/web/modulos/wssei/rn/MdWsSeiProcedimentoRN.php(1087): SELECT * FROM procedimento WHERE id_procedimento = 1"}

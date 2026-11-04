@@ -22,7 +22,7 @@ linters:
         - -QF1008
   exclusions:
     rules:
-      - path: _test\.go
+      - path: (_test\.go$|[a-z]+test/)
         linters:
           - gosec
       - path: internal/config/password\.go

@@ -10,10 +10,12 @@ import (
 	"runtime/debug"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/sei"
 )
 
 var version string
@@ -36,6 +38,18 @@ type terminal struct {
 
 type app struct {
 	source config.Source
+}
+
+type printer struct {
+	w   io.Writer
+	err error
+}
+
+func (p *printer) printf(format string, args ...any) {
+	if p.err != nil {
+		return
+	}
+	_, p.err = fmt.Fprintf(p.w, format, args...)
 }
 
 func main() {
@@ -77,9 +91,9 @@ func (a *app) rootCommand() *cobra.Command {
 	})
 	root.AddCommand(
 		command("serve", "Watch SEI, send the notifications and serve the feed (the default)", a.serve),
-		command("test-login", "Log in to SEI and show the versions and your units", notImplemented),
-		command("orgs", "List the acronym and id of every agency on the SEI login page", notImplemented),
-		command("diagnose", "Check how the SEI API behaves, printing only counts and types", notImplemented),
+		command("test-login", "Log in to SEI and show the versions and your units", a.testLogin),
+		command("orgs", "List the acronym and id of every agency on the SEI login page", a.orgs),
+		command("diagnose", "Check how the SEI API behaves, printing only counts and types", a.diagnose),
 		command("send-test", "Send a test message through every enabled channel", notImplemented),
 		command("whatsapp-pair", "Pair the WhatsApp number that sends the messages", notImplemented),
 		command("generate-token", "Generate a random value for FEED_TOKEN", notImplemented),
@@ -134,4 +148,13 @@ func appVersion() string {
 		return info.Main.Version
 	}
 	return "dev"
+}
+
+func seiOptions(location *time.Location) sei.Options {
+	return sei.Options{UserAgent: "sei-monitor/" + appVersion(), Location: location}
+}
+
+func connect(ctx context.Context, cfg config.SEI) (sei.Connection, error) {
+	target := sei.Target{SEIURL: cfg.URL, APIURL: cfg.APIURL, Org: cfg.Org, Username: cfg.Username, Password: cfg.Password}
+	return sei.Connect(ctx, target, seiOptions(cfg.Location))
 }

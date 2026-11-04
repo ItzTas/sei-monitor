@@ -412,3 +412,35 @@ func TestAccountInfo(t *testing.T) {
 		}
 	})
 }
+
+func TestRecentEventsComeNewestFirst(t *testing.T) {
+	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
+		s := openStore(t, databaseURL)
+		ctx := t.Context()
+		account := newAccount(t, s)
+		for i, ref := range []string{"50001", "50002", "50003"} {
+			_, err := s.ApplyCycle(ctx, CycleChanges{
+				AccountID: account.ID, Now: testNow.Add(time.Duration(i) * time.Minute),
+				Events: []event.Event{{Kind: event.ActivityAdded, ProcedureID: 9001, Ref: ref, OccurredAt: testNow.Add(-time.Duration(i) * time.Hour), Payload: event.Payload{ActivityText: "andamento " + ref}}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		events, err := s.RecentEvents(ctx, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(events) != 2 || events[0].Ref != "50003" || events[1].Ref != "50002" {
+			t.Fatalf("events = %+v", events)
+		}
+		latest := events[0]
+		if latest.Kind != event.ActivityAdded || latest.AccountID != account.ID || latest.ProcedureID != 9001 ||
+			!latest.OccurredAt.Equal(micro(testNow.Add(-2*time.Hour))) || !latest.DetectedAt.Equal(micro(testNow.Add(2*time.Minute))) ||
+			latest.Payload.ActivityText != "andamento 50003" {
+			t.Errorf("latest event = %+v", latest)
+		}
+	})
+}

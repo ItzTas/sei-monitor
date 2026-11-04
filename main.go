@@ -21,8 +21,6 @@ import (
 
 var version string
 
-var errNotImplemented = errors.New("not implemented yet")
-
 type usageError struct {
 	error
 }
@@ -92,6 +90,8 @@ func (a *app) rootCommand() *cobra.Command {
 	})
 	openapi := command("openapi", "Print the OpenAPI document of the API", printOpenAPI)
 	openapi.Hidden = true
+	pair := command("whatsapp-pair [phone]", "Pair the WhatsApp number that sends the messages", a.whatsappPair)
+	pair.Args = pairArgs
 	root.AddCommand(
 		openapi,
 		command("serve", "Watch SEI, send the notifications and serve the feed (the default)", a.serve),
@@ -99,7 +99,7 @@ func (a *app) rootCommand() *cobra.Command {
 		command("orgs", "List the acronym and id of every agency on the SEI login page", a.orgs),
 		command("diagnose", "Check how the SEI API behaves, printing only counts and types", a.diagnose),
 		command("send-test", "Send a test message through every enabled channel", a.sendTest),
-		command("whatsapp-pair", "Pair the WhatsApp number that sends the messages", notImplemented),
+		pair,
 		command("generate-token", "Print a random token to use as FEED_TOKEN or API_TOKEN (run it once for each)", generateToken),
 	)
 	return root
@@ -154,10 +154,6 @@ func (a *app) serve(cmd *cobra.Command, _ []string) (err error) {
 		"channels", strings.Join(cfg.Channels.Enabled(), ","),
 	)
 	return application.Run(cmd.Context())
-}
-
-func notImplemented(*cobra.Command, []string) error {
-	return errNotImplemented
 }
 
 func appVersion() string {

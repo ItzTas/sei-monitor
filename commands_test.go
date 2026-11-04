@@ -11,6 +11,7 @@ import (
 	"github.com/ItzTas/sei-monitor/internal/config"
 	"github.com/ItzTas/sei-monitor/internal/notify/notifytest"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
+	"github.com/ItzTas/sei-monitor/internal/store/storetest"
 )
 
 func seiEnv(server *seitest.Server, overrides map[string]string) map[string]string {
@@ -156,5 +157,31 @@ func TestSendTestNeedsAChannel(t *testing.T) {
 
 	if code != 1 || stdout != "" || !strings.Contains(stderr, "no channel is configured") {
 		t.Errorf("exit code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+func TestSendTestReportsAnUnpairedWhatsApp(t *testing.T) {
+	env := map[string]string{"DATABASE_URL": storetest.SQLiteURL(t), "WHATSAPP_RECIPIENTS": "5595991234567"}
+
+	code, stdout, stderr := runCLI(t, env, "send-test")
+
+	want := "whatsapp: failed: could not connect to WhatsApp: not paired with WhatsApp; run sei-monitor whatsapp-pair\n"
+	if code != 1 || stdout != want || !strings.Contains(stderr, "1 of 1 channels failed") {
+		t.Errorf("exit code %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+}
+
+func TestWhatsAppPairRefusesABadPhoneNumber(t *testing.T) {
+	env := map[string]string{"DATABASE_URL": storetest.SQLiteURL(t)}
+	tests := map[string][]string{
+		"without the area code": {"whatsapp-pair", "991234567"},
+		"with a leading zero":   {"whatsapp-pair", "095991234567"},
+		"two numbers":           {"whatsapp-pair", "5595991234567", "5595991234568"},
+	}
+	for name, args := range tests {
+		code, stdout, stderr := runCLI(t, env, args...)
+		if code != 2 || stdout != "" || stderr == "" {
+			t.Errorf("%s: exit code %d, stdout %q, stderr %q", name, code, stdout, stderr)
+		}
 	}
 }

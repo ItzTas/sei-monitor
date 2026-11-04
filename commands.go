@@ -16,6 +16,7 @@ import (
 	"github.com/ItzTas/sei-monitor/internal/config"
 	"github.com/ItzTas/sei-monitor/internal/notify"
 	"github.com/ItzTas/sei-monitor/internal/sei"
+	"github.com/ItzTas/sei-monitor/internal/whatsapp"
 )
 
 func (a *app) orgs(cmd *cobra.Command, _ []string) error {
@@ -116,14 +117,25 @@ func printOpenAPI(cmd *cobra.Command, _ []string) error {
 	return out.err
 }
 
-func (a *app) sendTest(cmd *cobra.Command, _ []string) error {
+func (a *app) sendTest(cmd *cobra.Command, _ []string) (err error) {
 	cfg, err := config.LoadChannels(a.source)
 	if err != nil {
 		return err
 	}
 	channels := notify.Channels(cfg, userAgent())
+	if cfg.WhatsApp != nil {
+		st, session, err := a.openWhatsApp(cmd.Context(), cmd.ErrOrStderr())
+		if err != nil {
+			return err
+		}
+		defer func() {
+			session.Close()
+			err = errors.Join(err, st.Close())
+		}()
+		channels = append(channels, whatsapp.NewChannel(session, cfg.WhatsApp.Recipients))
+	}
 	if len(channels) == 0 {
-		return errors.New("no channel is configured: set SMTP_HOST, TELEGRAM_TOKEN, NTFY_URL or WEBHOOK_URL")
+		return errors.New("no channel is configured: set SMTP_HOST, TELEGRAM_TOKEN, NTFY_URL, WEBHOOK_URL or WHATSAPP_RECIPIENTS")
 	}
 	results := make([]error, len(channels))
 	var wg sync.WaitGroup

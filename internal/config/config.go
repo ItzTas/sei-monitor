@@ -91,6 +91,26 @@ type Channels struct {
 	WhatsApp *WhatsApp
 }
 
+func (c Channels) Enabled() []string {
+	channels := []struct {
+		name string
+		on   bool
+	}{
+		{"email", c.Email != nil},
+		{"telegram", c.Telegram != nil},
+		{"ntfy", c.Ntfy != nil},
+		{"webhook", c.Webhook != nil},
+		{"whatsapp", c.WhatsApp != nil},
+	}
+	var enabled []string
+	for _, channel := range channels {
+		if channel.on {
+			enabled = append(enabled, channel.name)
+		}
+	}
+	return enabled
+}
+
 type Email struct {
 	Host     string
 	Port     int

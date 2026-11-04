@@ -274,6 +274,12 @@ func TestChannelsTurnOnWithTheirMainVariable(t *testing.T) {
 	if cfg.Channels.WhatsApp == nil || !slices.Equal(cfg.Channels.WhatsApp.Recipients, []string{"5595991234567", "120363012345678901@g.us"}) {
 		t.Errorf("whatsapp = %+v", cfg.Channels.WhatsApp)
 	}
+	if enabled := cfg.Channels.Enabled(); !slices.Equal(enabled, []string{"email", "telegram", "ntfy", "webhook", "whatsapp"}) {
+		t.Errorf("enabled channels = %v", enabled)
+	}
+	if enabled := (Channels{Ntfy: cfg.Channels.Ntfy}).Enabled(); !slices.Equal(enabled, []string{"ntfy"}) {
+		t.Errorf("enabled channels with only ntfy = %v", enabled)
+	}
 }
 
 func TestIncompleteChannelsStopTheStart(t *testing.T) {

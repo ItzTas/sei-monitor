@@ -98,7 +98,7 @@ func (a *app) rootCommand() *cobra.Command {
 		command("test-login", "Log in to SEI and show the versions and your units", a.testLogin),
 		command("orgs", "List the acronym and id of every agency on the SEI login page", a.orgs),
 		command("diagnose", "Check how the SEI API behaves, printing only counts and types", a.diagnose),
-		command("send-test", "Send a test message through every enabled channel", notImplemented),
+		command("send-test", "Send a test message through every enabled channel", a.sendTest),
 		command("whatsapp-pair", "Pair the WhatsApp number that sends the messages", notImplemented),
 		command("generate-token", "Print a random token to use as FEED_TOKEN or API_TOKEN (run it once for each)", generateToken),
 	)
@@ -170,8 +170,12 @@ func appVersion() string {
 	return "dev"
 }
 
+func userAgent() string {
+	return "sei-monitor/" + appVersion()
+}
+
 func seiOptions(location *time.Location) sei.Options {
-	return sei.Options{UserAgent: "sei-monitor/" + appVersion(), Location: location}
+	return sei.Options{UserAgent: userAgent(), Location: location}
 }
 
 func connect(ctx context.Context, cfg config.SEI) (sei.Connection, error) {

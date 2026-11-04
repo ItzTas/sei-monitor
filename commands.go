@@ -3,15 +3,18 @@ package main
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"github.com/ItzTas/sei-monitor/internal/api"
 	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/notify"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 )
 
@@ -111,4 +114,38 @@ func printOpenAPI(cmd *cobra.Command, _ []string) error {
 	out := &printer{w: cmd.OutOrStdout()}
 	out.printf("%s\n", spec)
 	return out.err
+}
+
+func (a *app) sendTest(cmd *cobra.Command, _ []string) error {
+	cfg, err := config.LoadChannels(a.source)
+	if err != nil {
+		return err
+	}
+	channels := notify.Channels(cfg, userAgent())
+	if len(channels) == 0 {
+		return errors.New("no channel is configured: set SMTP_HOST, TELEGRAM_TOKEN, NTFY_URL or WEBHOOK_URL")
+	}
+	results := make([]error, len(channels))
+	var wg sync.WaitGroup
+	for i, channel := range channels {
+		wg.Go(func() { results[i] = channel.Send(cmd.Context(), notify.NewTestMessage()) })
+	}
+	wg.Wait()
+	out := &printer{w: cmd.OutOrStdout()}
+	failed := 0
+	for i, channel := range channels {
+		if results[i] == nil {
+			out.printf("%s: ok\n", channel.Name())
+			continue
+		}
+		failed++
+		out.printf("%s: failed: %v\n", channel.Name(), results[i])
+	}
+	if out.err != nil {
+		return out.err
+	}
+	if failed > 0 {
+		return fmt.Errorf("%d of %d channels failed", failed, len(channels))
+	}
+	return nil
 }

@@ -2,10 +2,14 @@ package main
 
 import (
 	"maps"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/notify/notifytest"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
 )
 
@@ -112,5 +116,45 @@ func TestGenerateTokenPrintsATokenTheConfigurationAccepts(t *testing.T) {
 	env := map[string]string{"FEED_TOKEN": feed, "API_TOKEN": api, "SEI_URL": "https://sei.example.org", "SEI_USERNAME": "u", "SEI_PASSWORD": "p", "SEI_ORG": "1"}
 	if _, err := config.Load(envSource(env)); err != nil {
 		t.Errorf("the configuration refuses generated tokens: %v", err)
+	}
+}
+
+func TestSendTestReportsEveryChannel(t *testing.T) {
+	smtp := notifytest.NewSMTPServer(t, notifytest.SMTPPlain)
+	titles := make(chan string, 1)
+	ntfy := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		titles <- r.Header.Get("Title")
+	}))
+	t.Cleanup(ntfy.Close)
+	webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(webhook.Close)
+	env := map[string]string{
+		"SMTP_HOST": smtp.Host, "SMTP_PORT": strconv.Itoa(smtp.Port), "SMTP_TLS": "none",
+		"SMTP_FROM": "sei-monitor@example.org", "SMTP_TO": "fulano@example.org",
+		"NTFY_URL":    ntfy.URL + "/sei-topic",
+		"WEBHOOK_URL": webhook.URL + "/sei", "WEBHOOK_SECRET": "0123456789abcdef",
+	}
+
+	code, stdout, stderr := runCLI(t, env, "send-test")
+
+	want := "email: ok\nntfy: ok\nwebhook: failed: the server answered 500\n"
+	if code != 1 || stdout != want || !strings.Contains(stderr, "1 of 3 channels failed") {
+		t.Errorf("exit code %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	if mails := smtp.Mails(); len(mails) != 1 || mails[0].To[0] != "fulano@example.org" {
+		t.Errorf("mails = %+v", mails)
+	}
+	if title := <-titles; title != "sei-monitor: test message" {
+		t.Errorf("ntfy title = %q", title)
+	}
+}
+
+func TestSendTestNeedsAChannel(t *testing.T) {
+	code, stdout, stderr := runCLI(t, nil, "send-test")
+
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "no channel is configured") {
+		t.Errorf("exit code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ItzTas/sei-monitor/internal/api"
 	"github.com/ItzTas/sei-monitor/internal/config"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 )
@@ -99,5 +100,15 @@ func generateToken(cmd *cobra.Command, _ []string) error {
 	}
 	out := &printer{w: cmd.OutOrStdout()}
 	out.printf("%s\n", base64.RawURLEncoding.EncodeToString(random))
+	return out.err
+}
+
+func printOpenAPI(cmd *cobra.Command, _ []string) error {
+	spec, err := api.Spec()
+	if err != nil {
+		return err
+	}
+	out := &printer{w: cmd.OutOrStdout()}
+	out.printf("%s\n", spec)
 	return out.err
 }

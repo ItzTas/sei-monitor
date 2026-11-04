@@ -90,7 +90,10 @@ func (a *app) rootCommand() *cobra.Command {
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		return usageError{err}
 	})
+	openapi := command("openapi", "Print the OpenAPI document of the API", printOpenAPI)
+	openapi.Hidden = true
 	root.AddCommand(
+		openapi,
 		command("serve", "Watch SEI, send the notifications and serve the feed (the default)", a.serve),
 		command("test-login", "Log in to SEI and show the versions and your units", a.testLogin),
 		command("orgs", "List the acronym and id of every agency on the SEI login page", a.orgs),

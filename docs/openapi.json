@@ -1,0 +1,1283 @@
+{
+  "components": {
+    "schemas": {
+      "CycleRun": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "description": "Why the cycle failed; empty when it worked.",
+            "type": "string"
+          },
+          "events_created": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "processes_seen": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "trigger": {
+            "enum": [
+              "scheduled",
+              "manual"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "started_at",
+          "finished_at",
+          "trigger",
+          "error",
+          "processes_seen",
+          "events_created"
+        ],
+        "type": "object"
+      },
+      "CycleScheduled": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "description": "The cycle starts right away; follow it on /status.",
+            "enum": [
+              "scheduled"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "Delivery": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "event_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "last_error": {
+            "description": "Why the last attempt failed, without secrets.",
+            "type": "string"
+          },
+          "next_attempt_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sent_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "sent",
+              "failed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "channel",
+          "status",
+          "attempts",
+          "next_attempt_at"
+        ],
+        "type": "object"
+      },
+      "DeliveryCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "pending": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sent": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pending",
+          "sent",
+          "failed"
+        ],
+        "type": "object"
+      },
+      "Document": {
+        "additionalProperties": false,
+        "properties": {
+          "document_id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "document_type": {
+            "description": "Only at the full detail level.",
+            "type": "string"
+          },
+          "first_seen_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "description": "Only at the full detail level.",
+            "type": "string"
+          },
+          "protocol": {
+            "description": "Formatted SEI number of the document.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "protocol",
+          "first_seen_at"
+        ],
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {
+            "description": "Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'",
+            "type": "string"
+          },
+          "message": {
+            "description": "Error message text",
+            "type": "string"
+          },
+          "value": {
+            "description": "The value at the given location"
+          }
+        },
+        "type": "object"
+      },
+      "ErrorModel": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "description": "A human-readable explanation specific to this occurrence of the problem.",
+            "examples": [
+              "Property foo is required but is missing."
+            ],
+            "type": "string"
+          },
+          "errors": {
+            "description": "Optional list of individual error details",
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "instance": {
+            "description": "A URI reference that identifies the specific occurrence of the problem.",
+            "examples": [
+              "https://example.com/error-log/abc123"
+            ],
+            "format": "uri",
+            "type": "string"
+          },
+          "status": {
+            "description": "HTTP status code",
+            "examples": [
+              400
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "description": "A short, human-readable summary of the problem type. This value should not change between occurrences of the error.",
+            "examples": [
+              "Bad Request"
+            ],
+            "type": "string"
+          },
+          "type": {
+            "default": "about:blank",
+            "description": "A URI reference to human-readable documentation for the error.",
+            "examples": [
+              "https://example.com/errors/example"
+            ],
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Event": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/EventDetail",
+            "description": "Fields beyond the minimal level are absent unless the detail level is full."
+          },
+          "detected_at": {
+            "description": "When sei-monitor noticed it.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Event id.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "What happened.",
+            "enum": [
+              "process_entered",
+              "process_left",
+              "activity_added",
+              "document_added",
+              "assignment_changed",
+              "return_due_soon",
+              "return_overdue",
+              "account_login_failed"
+            ],
+            "type": "string"
+          },
+          "occurred_at": {
+            "description": "When it happened in SEI, or when sei-monitor noticed it.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "procedure_id": {
+            "description": "SEI procedure id of the process, absent for account events.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "process_number": {
+            "description": "Formatted process number.",
+            "type": "string"
+          },
+          "title": {
+            "description": "One-line description, the same as the feed item title.",
+            "type": "string"
+          },
+          "unit": {
+            "description": "Acronym of the watched unit.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "occurred_at",
+          "detected_at",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "EventDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "activity_by_me": {
+            "type": "boolean"
+          },
+          "activity_text": {
+            "type": "string"
+          },
+          "activity_unit": {
+            "type": "string"
+          },
+          "activity_user": {
+            "description": "Acronym of who recorded the activity, absent when it was you.",
+            "type": "string"
+          },
+          "assigned_to_me": {
+            "type": "boolean"
+          },
+          "assigned_user": {
+            "type": "string"
+          },
+          "assigned_user_name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "document_name": {
+            "type": "string"
+          },
+          "document_protocol": {
+            "type": "string"
+          },
+          "document_type": {
+            "type": "string"
+          },
+          "previous_assigned_user": {
+            "type": "string"
+          },
+          "process_type": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "return_date": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ListDelivery": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Delivery"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "next_cursor": {
+            "description": "Pass it as cursor to read the next page; null on the last page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "type": "object"
+      },
+      "ListEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "next_cursor": {
+            "description": "Pass it as cursor to read the next page; null on the last page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "type": "object"
+      },
+      "ListProcess": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Process"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "next_cursor": {
+            "description": "Pass it as cursor to read the next page; null on the last page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "type": "object"
+      },
+      "Process": {
+        "additionalProperties": false,
+        "properties": {
+          "assigned_to_me": {
+            "type": "boolean"
+          },
+          "assigned_user": {
+            "description": "Acronym of the assignee, only at the full detail level and never when it is you.",
+            "type": "string"
+          },
+          "description": {
+            "description": "Only at the full detail level.",
+            "type": "string"
+          },
+          "first_seen_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "left_at": {
+            "description": "When the process left the watched units.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "number": {
+            "description": "Formatted process number.",
+            "type": "string"
+          },
+          "procedure_id": {
+            "description": "SEI procedure id.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "process_type": {
+            "description": "Only at the full detail level.",
+            "type": "string"
+          },
+          "return_date": {
+            "description": "Scheduled return date.",
+            "format": "date",
+            "type": "string"
+          },
+          "return_overdue": {
+            "type": "boolean"
+          },
+          "unit": {
+            "description": "Acronym of the watched unit the process is in.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "procedure_id",
+          "number",
+          "unit",
+          "assigned_to_me",
+          "return_overdue",
+          "first_seen_at",
+          "last_seen_at"
+        ],
+        "type": "object"
+      },
+      "ProcessDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "assigned_to_me": {
+            "type": "boolean"
+          },
+          "assigned_user": {
+            "description": "Acronym of the assignee, only at the full detail level and never when it is you.",
+            "type": "string"
+          },
+          "description": {
+            "description": "Only at the full detail level.",
+            "type": "string"
+          },
+          "documents": {
+            "description": "Documents sei-monitor has seen in the process.",
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "events": {
+            "description": "The latest 50 events of the process, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "first_seen_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "left_at": {
+            "description": "When the process left the watched units.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "number": {
+            "description": "Formatted process number.",
+            "type": "string"
+          },
+          "procedure_id": {
+            "description": "SEI procedure id.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "process_type": {
+            "description": "Only at the full detail level.",
+            "type": "string"
+          },
+          "return_date": {
+            "description": "Scheduled return date.",
+            "format": "date",
+            "type": "string"
+          },
+          "return_overdue": {
+            "type": "boolean"
+          },
+          "unit": {
+            "description": "Acronym of the watched unit the process is in.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "documents",
+          "events",
+          "procedure_id",
+          "number",
+          "unit",
+          "assigned_to_me",
+          "return_overdue",
+          "first_seen_at",
+          "last_seen_at"
+        ],
+        "type": "object"
+      },
+      "Status": {
+        "additionalProperties": false,
+        "properties": {
+          "cycle_running": {
+            "type": "boolean"
+          },
+          "deliveries": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DeliveryCounts"
+            },
+            "description": "Deliveries per channel and status.",
+            "type": "object"
+          },
+          "detail_level": {
+            "description": "How much the API shows of each process and event.",
+            "enum": [
+              "minimal",
+              "full"
+            ],
+            "type": "string"
+          },
+          "last_cycle": {
+            "$ref": "#/components/schemas/CycleRun",
+            "description": "The latest cycle, or null before the first one."
+          },
+          "next_cycle_at": {
+            "description": "When the next scheduled cycle starts, or null when none is scheduled.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_acronym": {
+            "description": "Acronym of the agency.",
+            "type": "string"
+          },
+          "paused_reason": {
+            "description": "Why monitoring is paused; empty while it runs.",
+            "type": "string"
+          },
+          "sei_version": {
+            "type": "string"
+          },
+          "units": {
+            "description": "Acronyms of the watched units.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "wssei_version": {
+            "description": "Version of the mod-wssei module.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_acronym",
+          "units",
+          "sei_version",
+          "wssei_version",
+          "paused_reason",
+          "detail_level",
+          "last_cycle",
+          "next_cycle_at",
+          "cycle_running",
+          "deliveries"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "description": "The API_TOKEN of the sei-monitor configuration.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "What sei-monitor recorded about your SEI processes. Every route except /openapi.json needs the header Authorization: Bearer \u003cAPI_TOKEN\u003e.",
+    "title": "sei-monitor API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/cycle": {
+      "post": {
+        "description": "Schedules an immediate cycle through the same loop as the scheduled ones and answers without waiting for it. Refused while a cycle runs, while monitoring is paused, and within 5 minutes of the last cycle start.",
+        "operationId": "trigger-cycle",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleScheduled"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a cycle now",
+        "tags": [
+          "cycle"
+        ]
+      }
+    },
+    "/deliveries": {
+      "get": {
+        "description": "One delivery per event and channel, newest event first.",
+        "operationId": "list-deliveries",
+        "parameters": [
+          {
+            "description": "Only deliveries in this status.",
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "description": "Only deliveries in this status.",
+              "enum": [
+                "pending",
+                "sent",
+                "failed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only deliveries through this channel.",
+            "explode": false,
+            "in": "query",
+            "name": "channel",
+            "schema": {
+              "description": "Only deliveries through this channel.",
+              "enum": [
+                "email",
+                "telegram",
+                "ntfy",
+                "webhook",
+                "whatsapp"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Items per page.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Items per page.",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The next_cursor of the previous page.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "The next_cursor of the previous page.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDelivery"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the deliveries",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/events": {
+      "get": {
+        "description": "What changed in your processes, newest first. Each event carries what the matching RSS feed item says, as JSON.",
+        "operationId": "list-events",
+        "parameters": [
+          {
+            "description": "Only these kinds; repeat the parameter for more than one.",
+            "explode": true,
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "description": "Only these kinds; repeat the parameter for more than one.",
+              "items": {
+                "enum": [
+                  "process_entered",
+                  "process_left",
+                  "activity_added",
+                  "document_added",
+                  "assignment_changed",
+                  "return_due_soon",
+                  "return_overdue",
+                  "account_login_failed"
+                ],
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Only events of this process.",
+            "explode": false,
+            "in": "query",
+            "name": "procedure_id",
+            "schema": {
+              "description": "Only events of this process.",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only events that happened at this time or later (RFC 3339).",
+            "explode": false,
+            "in": "query",
+            "name": "since",
+            "schema": {
+              "description": "Only events that happened at this time or later (RFC 3339).",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only events that happened before this time (RFC 3339).",
+            "explode": false,
+            "in": "query",
+            "name": "until",
+            "schema": {
+              "description": "Only events that happened before this time (RFC 3339).",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Items per page.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Items per page.",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The next_cursor of the previous page.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "The next_cursor of the previous page.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEvent"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the events",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/processes": {
+      "get": {
+        "description": "Processes in the watched units now, most recently seen first.",
+        "operationId": "list-processes",
+        "parameters": [
+          {
+            "description": "Only processes in this watched unit (acronym, any case).",
+            "explode": false,
+            "in": "query",
+            "name": "unit",
+            "schema": {
+              "description": "Only processes in this watched unit (acronym, any case).",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only processes assigned to you.",
+            "explode": false,
+            "in": "query",
+            "name": "assigned_to_me",
+            "schema": {
+              "description": "Only processes assigned to you.",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only processes with a scheduled return.",
+            "explode": false,
+            "in": "query",
+            "name": "return_scheduled",
+            "schema": {
+              "description": "Only processes with a scheduled return.",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only processes whose scheduled return is overdue.",
+            "explode": false,
+            "in": "query",
+            "name": "return_overdue",
+            "schema": {
+              "description": "Only processes whose scheduled return is overdue.",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Also list the processes that left the watched units.",
+            "explode": false,
+            "in": "query",
+            "name": "include_left",
+            "schema": {
+              "description": "Also list the processes that left the watched units.",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Items per page.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "description": "Items per page.",
+              "format": "int64",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The next_cursor of the previous page.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "The next_cursor of the previous page.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListProcess"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the processes",
+        "tags": [
+          "processes"
+        ]
+      }
+    },
+    "/processes/{procedure_id}": {
+      "get": {
+        "description": "One process with the documents sei-monitor has seen and its latest 50 events.",
+        "operationId": "get-process",
+        "parameters": [
+          {
+            "description": "SEI procedure id of the process.",
+            "in": "path",
+            "name": "procedure_id",
+            "required": true,
+            "schema": {
+              "description": "SEI procedure id of the process.",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDetail"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a process",
+        "tags": [
+          "processes"
+        ]
+      }
+    },
+    "/status": {
+      "get": {
+        "description": "The agency, the watched units, the SEI versions, the latest cycle, the next one and the deliveries per channel. It never includes your username.",
+        "operationId": "get-status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Monitoring status",
+        "tags": [
+          "status"
+        ]
+      }
+    }
+  }
+}

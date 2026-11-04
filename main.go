@@ -10,26 +10,26 @@ import (
 	"syscall"
 )
 
-const usage = `sei-monitor acompanha os seus processos no SEI e avisa quando algo muda.
+const usage = `sei-monitor watches your processes on SEI and tells you when something changes.
 
-Uso: sei-monitor [subcomando]
+Usage: sei-monitor [command]
 
-Subcomandos:
-  serve            monitora o SEI, envia as notificações e serve o feed (padrão)
-  testar-login     entra no SEI e mostra as versões e as suas unidades
-  orgaos           lista a sigla e o id de cada órgão da tela de login
-  diagnostico      confere o comportamento da API do SEI e mostra só contagens e tipos
-  enviar-teste     manda uma mensagem de teste por cada canal ligado
-  whatsapp-parear  pareia o número de WhatsApp que manda as mensagens
-  gerar-token      gera um valor aleatório para o FEED_TOKEN
-  ajuda            mostra esta ajuda
+Commands:
+  serve           watch SEI, send the notifications and serve the feed (default)
+  test-login      log in to SEI and show the versions and your units
+  orgs            list the acronym and id of every agency on the SEI login page
+  diagnose        check how the SEI API behaves, printing only counts and types
+  send-test       send a test message through every enabled channel
+  whatsapp-pair   pair the WhatsApp number that sends the messages
+  generate-token  generate a random value for FEED_TOKEN
+  help            show this help
 
-A configuração vem de variáveis de ambiente. Veja o README.
+Configuration comes from environment variables. See the README.
 `
 
 var (
-	errUsage          = errors.New("uso incorreto")
-	errNotImplemented = errors.New("subcomando ainda não implementado")
+	errUsage          = errors.New("incorrect usage")
+	errNotImplemented = errors.New("not implemented yet")
 )
 
 type terminal struct {
@@ -49,17 +49,16 @@ func main() {
 
 func run(ctx context.Context, args []string, term terminal) int {
 	commands := map[string]command{
-		"serve":           notImplemented,
-		"testar-login":    notImplemented,
-		"orgaos":          notImplemented,
-		"diagnostico":     notImplemented,
-		"enviar-teste":    notImplemented,
-		"whatsapp-parear": notImplemented,
-		"gerar-token":     notImplemented,
-		"ajuda":           help,
-		"help":            help,
-		"-h":              help,
-		"--help":          help,
+		"serve":          notImplemented,
+		"test-login":     notImplemented,
+		"orgs":           notImplemented,
+		"diagnose":       notImplemented,
+		"send-test":      notImplemented,
+		"whatsapp-pair":  notImplemented,
+		"generate-token": notImplemented,
+		"help":           help,
+		"-h":             help,
+		"--help":         help,
 	}
 
 	name, rest := "serve", args
@@ -68,7 +67,7 @@ func run(ctx context.Context, args []string, term terminal) int {
 	}
 	cmd, ok := commands[name]
 	if !ok {
-		term.warn("subcomando desconhecido: %q\n\n%s", name, usage)
+		term.warn("unknown command %q\n\n%s", name, usage)
 		return 2
 	}
 
@@ -81,10 +80,10 @@ func run(ctx context.Context, args []string, term terminal) int {
 		return 2
 	}
 	if ctx.Err() != nil && errors.Is(err, context.Canceled) {
-		term.warn("interrompido\n")
+		term.warn("interrupted\n")
 		return 130
 	}
-	term.warn("erro: %v\n", err)
+	term.warn("error: %v\n", err)
 	return 1
 }
 

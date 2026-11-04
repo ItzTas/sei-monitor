@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   lint:
-    name: Análise estática
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -35,7 +35,7 @@ jobs:
           version: v2.15
 
   test:
-    name: Testes (SQLite e Postgres)
+    name: Tests (SQLite and Postgres)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -64,7 +64,7 @@ jobs:
         run: go test -race ./...
 
   docker:
-    name: Imagem Docker
+    name: Docker image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

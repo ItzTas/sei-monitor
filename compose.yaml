@@ -7,7 +7,7 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
-      - dados:/data
+      - data:/data
 
   postgres:
     image: postgres:18-alpine
@@ -16,7 +16,7 @@ services:
     environment:
       POSTGRES_DB: sei_monitor
       POSTGRES_USER: sei_monitor
-      POSTGRES_PASSWORD: ${POSTGRES_SENHA:-}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
     volumes:
       - postgres:/var/lib/postgresql
     healthcheck:
@@ -26,5 +26,5 @@ services:
       retries: 10
 
 volumes:
-  dados:
+  data:
   postgres:

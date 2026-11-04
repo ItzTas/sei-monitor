@@ -1,10 +1,10 @@
 #!/bin/sh
 set -e
 
-nao_formatados=$(gofmt -l .)
-if [ -n "$nao_formatados" ]; then
-	echo "pre-commit: rode gofmt -w nestes arquivos:" >&2
-	echo "$nao_formatados" >&2
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+	echo "pre-commit: run gofmt -w on these files:" >&2
+	echo "$unformatted" >&2
 	exit 1
 fi
 

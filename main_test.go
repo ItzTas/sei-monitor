@@ -14,31 +14,31 @@ func runCLI(t *testing.T, args ...string) (int, string, string) {
 }
 
 func TestHelpPrintsUsage(t *testing.T) {
-	for _, arg := range []string{"ajuda", "help", "-h", "--help"} {
+	for _, arg := range []string{"help", "-h", "--help"} {
 		t.Run(arg, func(t *testing.T) {
 			code, stdout, stderr := runCLI(t, arg)
 			if code != 0 {
-				t.Fatalf("código de saída = %d, quero 0", code)
+				t.Fatalf("exit code = %d, want 0", code)
 			}
 			if stdout != usage {
-				t.Fatalf("stdout = %q, quero a ajuda", stdout)
+				t.Fatalf("stdout = %q, want the help", stdout)
 			}
 			if stderr != "" {
-				t.Fatalf("stderr = %q, quero vazio", stderr)
+				t.Fatalf("stderr = %q, want nothing", stderr)
 			}
 		})
 	}
 }
 
 func TestUnknownSubcommandFailsWithUsage(t *testing.T) {
-	code, stdout, stderr := runCLI(t, "monitorar")
+	code, stdout, stderr := runCLI(t, "monitor")
 	if code != 2 {
-		t.Fatalf("código de saída = %d, quero 2", code)
+		t.Fatalf("exit code = %d, want 2", code)
 	}
 	if stdout != "" {
-		t.Fatalf("stdout = %q, quero vazio", stdout)
+		t.Fatalf("stdout = %q, want nothing", stdout)
 	}
-	if !strings.HasPrefix(stderr, `subcomando desconhecido: "monitorar"`) || !strings.HasSuffix(stderr, usage) {
-		t.Fatalf("stderr = %q, quero o subcomando desconhecido seguido da ajuda", stderr)
+	if !strings.HasPrefix(stderr, `unknown command "monitor"`) || !strings.HasSuffix(stderr, usage) {
+		t.Fatalf("stderr = %q, want the unknown command followed by the help", stderr)
 	}
 }

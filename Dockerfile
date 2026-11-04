@@ -31,7 +31,7 @@ USER 65532:65532
 EXPOSE 8080
 
 HEALTHCHECK --interval=1m --timeout=10s --start-period=5m --retries=3 \
-    CMD ["sh", "-c", "endereco=\"${HTTP_ENDERECO-:8080}\"; [ -z \"$endereco\" ] || wget -q -O /dev/null \"http://127.0.0.1:${endereco##*:}/healthz\""]
+    CMD ["sh", "-c", "address=\"${HTTP_ADDRESS-:8080}\"; [ -z \"$address\" ] || wget -q -O /dev/null \"http://127.0.0.1:${address##*:}/healthz\""]
 
 ENTRYPOINT ["/usr/local/bin/sei-monitor"]
 CMD ["serve"]

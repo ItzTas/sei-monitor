@@ -110,7 +110,7 @@ func TestGenerateTokenPrintsATokenTheConfigurationAccepts(t *testing.T) {
 		t.Fatalf("tokens = %q (%d) and %q (%d)", feed, first, api, second)
 	}
 	env := map[string]string{"FEED_TOKEN": feed, "API_TOKEN": api, "SEI_URL": "https://sei.example.org", "SEI_USERNAME": "u", "SEI_PASSWORD": "p", "SEI_ORG": "1"}
-	if _, err := config.Load(config.Source{Lookup: func(name string) (string, bool) { value, ok := env[name]; return value, ok }}); err != nil {
+	if _, err := config.Load(envSource(env)); err != nil {
 		t.Errorf("the configuration refuses generated tokens: %v", err)
 	}
 }

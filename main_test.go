@@ -21,17 +21,20 @@ func TestMain(m *testing.M) {
 	os.Exit(storetest.Run(m, store.Migrate))
 }
 
-func runCLI(t *testing.T, env map[string]string, args ...string) (int, string, string) {
-	t.Helper()
-	source := config.Source{
+func envSource(env map[string]string) config.Source {
+	return config.Source{
 		Lookup: func(name string) (string, bool) {
 			value, ok := env[name]
 			return value, ok
 		},
 		ReadFile: func(string) ([]byte, error) { return nil, fs.ErrNotExist },
 	}
+}
+
+func runCLI(t *testing.T, env map[string]string, args ...string) (int, string, string) {
+	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := run(t.Context(), args, terminal{stdin: strings.NewReader(""), stdout: &stdout, stderr: &stderr}, source)
+	code := run(t.Context(), args, terminal{stdin: strings.NewReader(""), stdout: &stdout, stderr: &stderr}, envSource(env))
 	return code, stdout.String(), stderr.String()
 }
 

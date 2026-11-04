@@ -38,7 +38,7 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 			"WEBHOOK_URL":    "https://hooks.example.org/sei",
 			"WEBHOOK_SECRET": "0123456789abcdef",
 		})
-		cfg, err := config.Load(config.Source{Lookup: func(name string) (string, bool) { value, ok := env[name]; return value, ok }})
+		cfg, err := config.Load(envSource(env))
 		if err != nil {
 			t.Fatal(err)
 		}

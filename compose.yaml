@@ -1,7 +1,7 @@
 services:
   sei-monitor:
     build: .
-    image: sei-monitor
+    image: ghcr.io/itztas/sei-monitor:latest
     restart: unless-stopped
     read_only: true
     tmpfs:

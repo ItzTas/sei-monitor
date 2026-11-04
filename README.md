@@ -44,9 +44,24 @@ process you had before you installed sei-monitor; reports start with the second 
    `docker compose run --rm sei-monitor send-test`.
 7. Start it: `docker compose up -d`, and follow the logs with `docker compose logs -f sei-monitor`.
 
-Compose builds the image from this repository and keeps the SQLite database in the `data` volume.
-To use Postgres instead, follow the comments next to `DATABASE_URL` in `.env.example` and start
-with `docker compose --profile postgres up -d`.
+Compose pulls the published image, `ghcr.io/itztas/sei-monitor`, and keeps the SQLite database in
+the `data` volume. `docker compose up -d --build` builds the image from your checkout instead. To
+use Postgres, follow the comments next to `DATABASE_URL` in `.env.example` and start with
+`docker compose --profile postgres up -d`.
+
+### Running on a server
+
+The server needs only `compose.yaml` and your `.env`. Every push to `main` publishes
+`ghcr.io/itztas/sei-monitor:latest` for amd64 and arm64, and a `v1.2.3` tag also publishes `1.2.3`
+and `1.2`. To update to the newest image:
+
+```sh
+docker compose pull
+docker compose up -d
+```
+
+To stay on a release rather than follow `main`, put its tag in the `image` line of `compose.yaml`,
+for example `ghcr.io/itztas/sei-monitor:1.2`.
 
 ## Passwords
 

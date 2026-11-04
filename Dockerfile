@@ -1,4 +1,4 @@
-FROM golang:1.27.2-alpine3.24 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine3.24 AS build
 
 WORKDIR /src
 
@@ -7,7 +7,8 @@ RUN go mod download
 
 COPY . .
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build \
+ARG TARGETOS TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
       -trimpath \
       -ldflags "-s -w -X main.version=${VERSION}" \
       -o /out/sei-monitor . \

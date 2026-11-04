@@ -3,7 +3,10 @@ package main
 import (
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,9 +29,11 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 		server.AddActivities(9001, seitest.Activity{ID: 50001, Unit: "SEDEMO/NUPROC", Text: "Processo gerado", At: start.Add(-time.Hour)})
 		server.AddActivities(9002, seitest.Activity{ID: 60001, Unit: "SEDEMO/NUPROC", Text: "Processo gerado", At: start.Add(-time.Hour)})
 
+		feedToken := "feed-token-0123456789abcdefghijklmnopqrstuv"
 		env := seiEnv(server, map[string]string{
 			"DATABASE_URL":   databaseURL,
-			"HTTP_ADDRESS":   "",
+			"HTTP_ADDRESS":   "127.0.0.1:8080",
+			"FEED_TOKEN":     feedToken,
 			"WEBHOOK_URL":    "https://hooks.example.org/sei",
 			"WEBHOOK_SECRET": "0123456789abcdef",
 		})
@@ -72,6 +77,24 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 		}
 		if !slices.Equal(kinds, []event.Kind{event.ActivityAdded, event.ProcessLeft}) {
 			t.Errorf("events, newest first = %v", kinds)
+		}
+
+		handler := application.server.Handler()
+		feed := httptest.NewRecorder()
+		handler.ServeHTTP(feed, httptest.NewRequestWithContext(ctx, http.MethodGet, "/feed/"+feedToken+".xml", nil))
+		body := feed.Body.String()
+		for _, part := range []string{"<title>sei-monitor: SEDEMO</title>", "New activity on process " + seitest.ProcessNumber(1), "Process " + seitest.ProcessNumber(2) + " left SEDEMO/NUPROC"} {
+			if feed.Code != http.StatusOK || !strings.Contains(body, part) {
+				t.Errorf("feed (%d) does not contain %q:\n%s", feed.Code, part, body)
+			}
+		}
+		if strings.Contains(body, feedToken) {
+			t.Error("the feed shows its own token")
+		}
+		health := httptest.NewRecorder()
+		handler.ServeHTTP(health, httptest.NewRequestWithContext(ctx, http.MethodGet, "/healthz", nil))
+		if health.Code != http.StatusOK || strings.TrimSpace(health.Body.String()) != `{"ok":true}` {
+			t.Errorf("health = %d %q", health.Code, health.Body.String())
 		}
 	})
 }

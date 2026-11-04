@@ -1,0 +1,58 @@
+package notify
+
+import (
+	"bytes"
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/event"
+)
+
+const SignatureHeader = "X-Sei-Monitor-Signature"
+
+type Webhook struct {
+	url       string
+	secret    config.Secret
+	userAgent string
+	client    *http.Client
+}
+
+type webhookPayload struct {
+	Test   bool         `json:"test,omitempty"`
+	Events []event.View `json:"events"`
+}
+
+func NewWebhook(cfg config.Webhook, userAgent string) *Webhook {
+	return &Webhook{url: cfg.URL, secret: cfg.Secret, userAgent: userAgent, client: newHTTPClient()}
+}
+
+func (w *Webhook) Name() string {
+	return "webhook"
+}
+
+func (w *Webhook) Send(ctx context.Context, msg Message) error {
+	body, err := json.Marshal(webhookPayload{Test: msg.Test, Events: msg.Events})
+	if err != nil {
+		return fmt.Errorf("could not encode the events: %w", err)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, w.url, bytes.NewReader(body))
+	if err != nil {
+		return errBadRequest
+	}
+	mac := hmac.New(sha256.New, []byte(w.secret.Reveal()))
+	mac.Write(body)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("User-Agent", w.userAgent)
+	request.Header.Set(SignatureHeader, "sha256="+hex.EncodeToString(mac.Sum(nil)))
+	status, _, err := post(w.client, request)
+	if err != nil {
+		return err
+	}
+	return expectSuccess(status)
+}

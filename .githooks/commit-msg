@@ -1,0 +1,29 @@
+#!/bin/sh
+
+arquivo_msg="$1"
+assunto=$(grep -vE '^[[:space:]]*#' "$arquivo_msg" | grep -vE '^[[:space:]]*$' | head -n1)
+
+case "$assunto" in
+"Merge "* | "Revert "* | "fixup! "* | "squash! "* | "amend! "*)
+	exit 0
+	;;
+esac
+
+padrao='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: .+'
+
+if printf '%s\n' "$assunto" | grep -qE "$padrao"; then
+	exit 0
+fi
+
+cat >&2 <<'EOF'
+A mensagem de commit não segue o Conventional Commits.
+
+  Formato: <tipo>(<escopo opcional>): <descrição>
+  Tipos:   feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+  Mudança incompatível: "!" depois do tipo ou do escopo (ex.: "feat!: ...") ou um rodapé "BREAKING CHANGE:".
+
+  Exemplos:
+    fix(sei): retry the call once after logging in again
+    docs: describe the webhook payload
+EOF
+exit 1

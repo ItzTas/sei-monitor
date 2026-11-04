@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+nao_formatados=$(gofmt -l .)
+if [ -n "$nao_formatados" ]; then
+	echo "pre-commit: rode gofmt -w nestes arquivos:" >&2
+	echo "$nao_formatados" >&2
+	exit 1
+fi
+
+echo "pre-commit: go test ./..."
+go test ./...

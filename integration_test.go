@@ -208,3 +208,26 @@ func TestAPIRoutesStayOffWithoutAnAPIToken(t *testing.T) {
 		}
 	}
 }
+
+func TestUnpairedWhatsAppWaitsForThePairing(t *testing.T) {
+	env := seiEnv(seitest.New(t), map[string]string{
+		"DATABASE_URL":        storetest.SQLiteURL(t),
+		"HTTP_ADDRESS":        "",
+		"WHATSAPP_RECIPIENTS": "5595991234567",
+	})
+	cfg, err := config.Load(envSource(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	logs := &bytes.Buffer{}
+
+	application, err := assemble(t.Context(), cfg, slog.New(slog.NewTextHandler(logs, nil)), time.Now)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = application.Close() })
+	if !strings.Contains(logs.String(), "WhatsApp is set up but not paired") || application.whatsapp == nil || application.whatsapp.Paired() {
+		t.Errorf("logs:\n%s", logs.String())
+	}
+}

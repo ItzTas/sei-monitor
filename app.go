@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/ItzTas/sei-monitor/internal/notify"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 	"github.com/ItzTas/sei-monitor/internal/store"
+	"github.com/ItzTas/sei-monitor/internal/whatsapp"
 )
 
 type application struct {
@@ -26,6 +28,7 @@ type application struct {
 	store      *store.Store
 	monitor    *monitor.Monitor
 	dispatcher *notify.Dispatcher
+	whatsapp   *whatsapp.Session
 	server     *httpserver.Server
 }
 
@@ -48,6 +51,14 @@ func assemble(ctx context.Context, cfg config.Config, logger *slog.Logger, now f
 	}, st, logger, monitor.WithClock(now, time.After))
 	app := &application{cfg: cfg, log: logger, now: now, store: st, monitor: mon}
 	channels := notify.Channels(cfg.Channels, userAgent())
+	if cfg.Channels.WhatsApp != nil {
+		session, err := whatsapp.Open(ctx, st.PassthroughDB(), st.Dialect(), logger)
+		if err != nil {
+			return nil, errors.Join(err, st.Close())
+		}
+		app.whatsapp = session
+		channels = withWhatsApp(channels, session, cfg.Channels.WhatsApp.Recipients, logger)
+	}
 	app.dispatcher = notify.NewDispatcher(st, channels, app.formatter(cfg.FullDetail), logger, notify.WithClock(now, time.After))
 	if cfg.HTTP.Enabled() {
 		app.server = httpserver.New(cfg.HTTP.Address, app.routes(), logger)
@@ -112,5 +123,8 @@ func (a *application) Run(ctx context.Context) error {
 }
 
 func (a *application) Close() error {
+	if a.whatsapp != nil {
+		a.whatsapp.Close()
+	}
 	return a.store.Close()
 }

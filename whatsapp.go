@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/notify"
 	"github.com/ItzTas/sei-monitor/internal/store"
 	"github.com/ItzTas/sei-monitor/internal/whatsapp"
 )
@@ -100,4 +101,12 @@ func (a *app) openWhatsApp(ctx context.Context, logs io.Writer) (*store.Store, *
 		return nil, nil, errors.Join(err, st.Close())
 	}
 	return st, session, nil
+}
+
+func withWhatsApp(channels []notify.Channel, session *whatsapp.Session, recipients []string, log *slog.Logger) []notify.Channel {
+	if session.Paired() {
+		return append(channels, whatsapp.NewChannel(session, recipients))
+	}
+	log.Warn("WhatsApp is set up but not paired; its notifications wait until you run sei-monitor whatsapp-pair and restart")
+	return channels
 }

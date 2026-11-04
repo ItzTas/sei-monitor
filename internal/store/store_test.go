@@ -285,6 +285,26 @@ func TestRebind(t *testing.T) {
 	}
 }
 
+func TestPassthroughDBReachesTheSameDatabaseWithQueriesAsWritten(t *testing.T) {
+	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
+		s := openStore(t, databaseURL)
+		account := newAccount(t, s)
+		db := s.PassthroughDB()
+
+		var found int
+		if err := db.QueryRowContext(t.Context(), "SELECT count(*) FROM accounts WHERE id = $1", account.ID).Scan(&found); err != nil || found != 1 {
+			t.Fatalf("accounts with id %d = %d (%v)", account.ID, found, err)
+		}
+		if s.Dialect() != DialectPostgres {
+			return
+		}
+		var has bool
+		if err := db.QueryRowContext(t.Context(), `SELECT '{"a": 1}'::jsonb ? $1`, "a").Scan(&has); err != nil || !has {
+			t.Errorf("the jsonb ? operator = %v (%v)", has, err)
+		}
+	})
+}
+
 func TestStoredTimesSortAsText(t *testing.T) {
 	times := []time.Time{
 		time.Date(2026, 11, 4, 15, 4, 5, 0, time.UTC),

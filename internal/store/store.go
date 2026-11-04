@@ -28,8 +28,9 @@ const (
 var migrations embed.FS
 
 type Store struct {
-	db      *sql.DB
-	dialect string
+	db          *sql.DB
+	passthrough *sql.DB
+	dialect     string
 }
 
 func Open(ctx context.Context, databaseURL string) (*Store, error) {
@@ -51,7 +52,17 @@ func Migrate(ctx context.Context, databaseURL string) error {
 }
 
 func (s *Store) Close() error {
-	return s.db.Close()
+	if s.passthrough == nil {
+		return s.db.Close()
+	}
+	return errors.Join(s.db.Close(), s.passthrough.Close())
+}
+
+func (s *Store) PassthroughDB() *sql.DB {
+	if s.passthrough == nil {
+		return s.db
+	}
+	return s.passthrough
 }
 
 func (s *Store) Dialect() string {
@@ -96,7 +107,11 @@ func openPostgres(ctx context.Context, databaseURL string) (*Store, error) {
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(2)
 	db.SetConnMaxIdleTime(5 * time.Minute)
-	return &Store{db: db, dialect: DialectPostgres}, nil
+	passthrough := sql.OpenDB(stdlib.GetConnector(*config))
+	passthrough.SetMaxOpenConns(4)
+	passthrough.SetMaxIdleConns(1)
+	passthrough.SetConnMaxIdleTime(5 * time.Minute)
+	return &Store{db: db, passthrough: passthrough, dialect: DialectPostgres}, nil
 }
 
 func migrate(ctx context.Context, db *sql.DB, dialect goose.Dialect, folder string, locker lock.SessionLocker) error {

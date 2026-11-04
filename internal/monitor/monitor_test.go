@@ -149,6 +149,14 @@ func populate(server *seitest.Server) {
 	server.AddDocuments(9001, document(80001, "Ofício 1"), document(80002, "Despacho 2"), document(80003, "Anexo 3"))
 }
 
+func TestStateKnowsTheUserAcronymBeforeTheFirstLogin(t *testing.T) {
+	h := newHarness(t, storetest.SQLiteURL(t), nil)
+
+	if self := h.monitor.State().Self; self != (Self{Acronym: seitest.Username}) {
+		t.Errorf("self before any login = %+v, want the configured username", self)
+	}
+}
+
 func TestFirstCycleIsASilentBaseline(t *testing.T) {
 	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
 		h := newHarness(t, databaseURL, nil)

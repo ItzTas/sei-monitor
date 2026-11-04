@@ -102,6 +102,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger, options ...Option) *Moni
 		after:  time.After,
 		jitter: randomJitter,
 		manual: make(chan struct{}, 1),
+		state:  State{Self: Self{Acronym: cfg.Target.Username}},
 	}
 	for _, option := range options {
 		option(m)

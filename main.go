@@ -142,7 +142,7 @@ func (a *app) serve(cmd *cobra.Command, _ []string) (err error) {
 		return err
 	}
 	logger := slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), &slog.HandlerOptions{Level: cfg.LogLevel}))
-	application, err := assemble(cmd.Context(), cfg, logger)
+	application, err := assemble(cmd.Context(), cfg, logger, time.Now)
 	if err != nil {
 		return err
 	}

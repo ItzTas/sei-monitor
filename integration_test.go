@@ -13,7 +13,6 @@ import (
 
 	"github.com/ItzTas/sei-monitor/internal/config"
 	"github.com/ItzTas/sei-monitor/internal/event"
-	"github.com/ItzTas/sei-monitor/internal/monitor"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
 	"github.com/ItzTas/sei-monitor/internal/store"
 	"github.com/ItzTas/sei-monitor/internal/store/storetest"
@@ -46,10 +45,9 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 			t.Fatal(err)
 		}
 		now := start
-		clock := monitor.WithClock(func() time.Time { return now }, time.After)
 		logs := &bytes.Buffer{}
 		logger := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-		application, err := assemble(t.Context(), cfg, logger, clock)
+		application, err := assemble(t.Context(), cfg, logger, func() time.Time { return now })
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -155,7 +153,7 @@ func TestAPIRoutesStayOffWithoutAnAPIToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	application, err := assemble(t.Context(), cfg, slog.New(slog.DiscardHandler))
+	application, err := assemble(t.Context(), cfg, slog.New(slog.DiscardHandler), time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

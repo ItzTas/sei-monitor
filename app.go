@@ -21,12 +21,13 @@ import (
 type application struct {
 	cfg     config.Config
 	log     *slog.Logger
+	now     func() time.Time
 	store   *store.Store
 	monitor *monitor.Monitor
 	server  *httpserver.Server
 }
 
-func assemble(ctx context.Context, cfg config.Config, logger *slog.Logger, options ...monitor.Option) (*application, error) {
+func assemble(ctx context.Context, cfg config.Config, logger *slog.Logger, now func() time.Time) (*application, error) {
 	st, err := store.Open(ctx, cfg.DatabaseURL.Reveal())
 	if err != nil {
 		return nil, err
@@ -42,8 +43,8 @@ func assemble(ctx context.Context, cfg config.Config, logger *slog.Logger, optio
 		ReturnWarningDays: cfg.ReturnWarningDays,
 		Location:          cfg.SEI.Location,
 		Channels:          cfg.Channels.Enabled(),
-	}, st, logger, options...)
-	app := &application{cfg: cfg, log: logger, store: st, monitor: mon}
+	}, st, logger, monitor.WithClock(now, time.After))
+	app := &application{cfg: cfg, log: logger, now: now, store: st, monitor: mon}
 	if cfg.HTTP.Enabled() {
 		app.server = httpserver.New(cfg.HTTP.Address, app.routes(), logger)
 	}
@@ -51,9 +52,9 @@ func assemble(ctx context.Context, cfg config.Config, logger *slog.Logger, optio
 }
 
 func (a *application) routes() httpserver.Routes {
-	routes := httpserver.Routes{Health: httpserver.Health(a.lastRun, a.cfg.PollInterval, time.Now(), time.Now, a.log)}
+	routes := httpserver.Routes{Health: httpserver.Health(a.lastRun, a.cfg.PollInterval, a.now(), a.now, a.log)}
 	if !a.cfg.HTTP.FeedToken.IsZero() {
-		routes.Feed = feed.NewHandler(a.store, a.cfg.HTTP.FeedToken, a.feedChannel, a.formatter(a.cfg.FullDetail), time.Now, a.log)
+		routes.Feed = feed.NewHandler(a.store, a.cfg.HTTP.FeedToken, a.feedChannel, a.formatter(a.cfg.FullDetail), a.now, a.log)
 	}
 	if !a.cfg.HTTP.APIToken.IsZero() {
 		deps := api.Deps{Store: a.store, Monitor: a.monitor, Token: a.cfg.HTTP.APIToken, FullDetail: a.cfg.APIFullDetail, Location: a.cfg.SEI.Location, Log: a.log}

@@ -1,7 +1,8 @@
 package main
 
 import (
-	"io"
+	"bytes"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -30,10 +31,12 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 		server.AddActivities(9002, seitest.Activity{ID: 60001, Unit: "SEDEMO/NUPROC", Text: "Processo gerado", At: start.Add(-time.Hour)})
 
 		feedToken := "feed-token-0123456789abcdefghijklmnopqrstuv"
+		apiToken := "api-token-0123456789abcdefghijklmnopqrstuvw"
 		env := seiEnv(server, map[string]string{
 			"DATABASE_URL":   databaseURL,
 			"HTTP_ADDRESS":   "127.0.0.1:8080",
 			"FEED_TOKEN":     feedToken,
+			"API_TOKEN":      apiToken,
 			"PUBLIC_URL":     "https://monitor.example.org/api/v1",
 			"WEBHOOK_URL":    "https://hooks.example.org/sei",
 			"WEBHOOK_SECRET": "0123456789abcdef",
@@ -44,7 +47,9 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 		}
 		now := start
 		clock := monitor.WithClock(func() time.Time { return now }, time.After)
-		application, err := assemble(t.Context(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), clock)
+		logs := &bytes.Buffer{}
+		logger := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		application, err := assemble(t.Context(), cfg, logger, clock)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,8 +86,16 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 		}
 
 		handler := application.server.Handler()
-		feed := httptest.NewRecorder()
-		handler.ServeHTTP(feed, httptest.NewRequestWithContext(ctx, http.MethodGet, "/feed/"+feedToken+".xml", nil))
+		get := func(target, token string) *httptest.ResponseRecorder {
+			request := httptest.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+			if token != "" {
+				request.Header.Set("Authorization", "Bearer "+token)
+			}
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			return response
+		}
+		feed := get("/feed/"+feedToken+".xml", "")
 		body := feed.Body.String()
 		for _, part := range []string{"<title>sei-monitor: SEDEMO</title>", "New activity on process " + seitest.ProcessNumber(1), "Process " + seitest.ProcessNumber(2) + " left SEDEMO/NUPROC"} {
 			if feed.Code != http.StatusOK || !strings.Contains(body, part) {
@@ -92,10 +105,69 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 		if self := `<atom:link href="https://monitor.example.org/api/v1/feed/` + feedToken + `.xml" rel="self" type="application/rss+xml"></atom:link>`; !strings.Contains(body, self) {
 			t.Errorf("feed misses the self link %s:\n%s", self, body)
 		}
-		health := httptest.NewRecorder()
-		handler.ServeHTTP(health, httptest.NewRequestWithContext(ctx, http.MethodGet, "/healthz", nil))
+		health := get("/healthz", "")
 		if health.Code != http.StatusOK || strings.TrimSpace(health.Body.String()) != `{"ok":true}` {
 			t.Errorf("health = %d %q", health.Code, health.Body.String())
 		}
+
+		status := get("/status", apiToken)
+		var state struct {
+			OrgAcronym string   `json:"org_acronym"`
+			Units      []string `json:"units"`
+			LastCycle  struct {
+				EventsCreated int `json:"events_created"`
+			} `json:"last_cycle"`
+		}
+		if err := json.Unmarshal(status.Body.Bytes(), &state); err != nil || status.Code != http.StatusOK {
+			t.Fatalf("status = %d %s (%v)", status.Code, status.Body.String(), err)
+		}
+		if state.OrgAcronym != "SEDEMO" || !slices.Equal(state.Units, []string{"SEDEMO/NUPROC"}) || state.LastCycle.EventsCreated != 2 || strings.Contains(status.Body.String(), seitest.Username) {
+			t.Errorf("status = %s", status.Body.String())
+		}
+		processes := get("/processes", apiToken)
+		var list struct {
+			Items []struct {
+				ProcedureID int64 `json:"procedure_id"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(processes.Body.Bytes(), &list); err != nil || len(list.Items) != 1 || list.Items[0].ProcedureID != 9001 {
+			t.Errorf("processes = %d %s (%v)", processes.Code, processes.Body.String(), err)
+		}
+
+		if !strings.Contains(logs.String(), "path=/feed/[redacted]") || !strings.Contains(logs.String(), "path=/status") {
+			t.Errorf("the access log misses the requests:\n%s", logs.String())
+		}
+		for _, secret := range []string{feedToken, apiToken, seitest.Password, "Authorization", "Bearer"} {
+			if strings.Contains(logs.String(), secret) {
+				t.Errorf("the logs contain %q:\n%s", secret, logs.String())
+			}
+		}
 	})
+}
+
+func TestAPIRoutesStayOffWithoutAnAPIToken(t *testing.T) {
+	env := seiEnv(seitest.New(t), map[string]string{
+		"DATABASE_URL": storetest.SQLiteURL(t),
+		"HTTP_ADDRESS": "127.0.0.1:8080",
+		"FEED_TOKEN":   "feed-token-0123456789abcdefghijklmnopqrstuv",
+	})
+	cfg, err := config.Load(envSource(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := assemble(t.Context(), cfg, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = application.Close() })
+
+	for _, target := range []string{"/status", "/processes", "/openapi.json"} {
+		request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
+		request.Header.Set("Authorization", "Bearer api-token-0123456789abcdefghijklmnopqrstuvw")
+		response := httptest.NewRecorder()
+		application.server.Handler().ServeHTTP(response, request)
+		if response.Code != http.StatusNotFound {
+			t.Errorf("GET %s without API_TOKEN = %d", target, response.Code)
+		}
+	}
 }

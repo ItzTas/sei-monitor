@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ItzTas/sei-monitor/internal/api"
 	"github.com/ItzTas/sei-monitor/internal/config"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/feed"
@@ -53,6 +55,10 @@ func (a *application) routes() httpserver.Routes {
 	if !a.cfg.HTTP.FeedToken.IsZero() {
 		formatter := event.Formatter{Location: a.cfg.SEI.Location, Full: a.cfg.FullDetail}
 		routes.Feed = feed.NewHandler(a.store, a.cfg.HTTP.FeedToken, a.feedChannel, formatter, time.Now, a.log)
+	}
+	if !a.cfg.HTTP.APIToken.IsZero() {
+		deps := api.Deps{Store: a.store, Monitor: a.monitor, Token: a.cfg.HTTP.APIToken, FullDetail: a.cfg.APIFullDetail, Location: a.cfg.SEI.Location, Log: a.log}
+		routes.API = func(mux *http.ServeMux) { api.Register(mux, deps) }
 	}
 	return routes
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -132,8 +133,24 @@ func exitCode(ctx context.Context, err error, stderr io.Writer) int {
 	return 1
 }
 
-func (a *app) serve(*cobra.Command, []string) error {
-	return errNotImplemented
+func (a *app) serve(cmd *cobra.Command, _ []string) (err error) {
+	cfg, err := config.Load(a.source)
+	if err != nil {
+		return err
+	}
+	logger := slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), &slog.HandlerOptions{Level: cfg.LogLevel}))
+	application, err := assemble(cmd.Context(), cfg, logger)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, application.Close()) }()
+	logger.Info("sei-monitor started",
+		"version", appVersion(),
+		"database", application.store.Dialect(),
+		"interval", cfg.PollInterval,
+		"channels", strings.Join(cfg.Channels.Enabled(), ","),
+	)
+	return application.Run(cmd.Context())
 }
 
 func notImplemented(*cobra.Command, []string) error {

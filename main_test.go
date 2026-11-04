@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/store"
+	"github.com/ItzTas/sei-monitor/internal/store/storetest"
 )
 
 const hardenCheck = "SEI_MONITOR_TEST_HARDEN"
@@ -16,7 +18,7 @@ func TestMain(m *testing.M) {
 	if _, ok := os.LookupEnv(hardenCheck); ok {
 		os.Exit(reportHardening())
 	}
-	os.Exit(m.Run())
+	os.Exit(storetest.Run(m, store.Migrate))
 }
 
 func runCLI(t *testing.T, env map[string]string, args ...string) (int, string, string) {

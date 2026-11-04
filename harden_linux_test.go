@@ -27,11 +27,12 @@ func reportHardening() int {
 		fmt.Println("error:", err)
 		return 1
 	}
-	fmt.Printf("core=%d/%d dumpable=%d", limit.Cur, limit.Max, dumpable)
+	mask := unix.Umask(0o077)
+	fmt.Printf("core=%d/%d dumpable=%d umask=%03o", limit.Cur, limit.Max, dumpable, mask)
 	return 0
 }
 
-func TestHardenTurnsOffCoreDumpsAndInspection(t *testing.T) {
+func TestHardenedProcessHasNoCoreDumpsNoInspectionAndPrivateFiles(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), os.Args[0])
 	cmd.Env = append(os.Environ(), hardenCheck+"=1")
 
@@ -40,7 +41,7 @@ func TestHardenTurnsOffCoreDumpsAndInspection(t *testing.T) {
 		t.Fatalf("%v: %s", err, output)
 	}
 
-	if strings.TrimSpace(string(output)) != "core=0/0 dumpable=0" {
-		t.Errorf("hardened process reports %q, want core=0/0 dumpable=0", output)
+	if want := "core=0/0 dumpable=0 umask=077"; strings.TrimSpace(string(output)) != want {
+		t.Errorf("hardened process reports %q, want %s", output, want)
 	}
 }

@@ -2,10 +2,13 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 )
+
+var ErrNotFound = errors.New("store: not found")
 
 type AccountKey struct {
 	SEIBaseURL string
@@ -63,4 +66,22 @@ func (s *Store) UpdateAccountInfo(ctx context.Context, accountID int64, info Acc
 		return fmt.Errorf("store: update the account details: %w", err)
 	}
 	return nil
+}
+
+func (s *Store) Account(ctx context.Context, id int64) (Account, error) {
+	account := Account{ID: id}
+	var createdAt, baselineAt dbTime
+	err := s.db.QueryRowContext(ctx, `
+		SELECT sei_base_url, username, org_id, created_at, baseline_at, paused_reason, org_acronym, sei_version, wssei_version
+		FROM accounts
+		WHERE id = ?`, id).Scan(&account.Key.SEIBaseURL, &account.Key.Username, &account.Key.OrgID, &createdAt, &baselineAt,
+		&account.PausedReason, &account.Info.OrgAcronym, &account.Info.SEIVersion, &account.Info.WSSEIVersion)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Account{}, ErrNotFound
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("store: read the account: %w", err)
+	}
+	account.CreatedAt, account.BaselineAt = time.Time(createdAt), time.Time(baselineAt)
+	return account, nil
 }

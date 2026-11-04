@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"slices"
 	"testing"
@@ -441,6 +442,25 @@ func TestRecentEventsComeNewestFirst(t *testing.T) {
 			!latest.OccurredAt.Equal(micro(testNow.Add(-2*time.Hour))) || !latest.DetectedAt.Equal(micro(testNow.Add(2*time.Minute))) ||
 			latest.Payload.ActivityText != "andamento 50003" {
 			t.Errorf("latest event = %+v", latest)
+		}
+	})
+}
+
+func TestAccountByID(t *testing.T) {
+	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
+		s := openStore(t, databaseURL)
+		ensured := newAccount(t, s)
+		if err := s.UpdateAccountInfo(t.Context(), ensured.ID, AccountInfo{OrgAcronym: "SEDEMO"}); err != nil {
+			t.Fatal(err)
+		}
+		ensured.Info.OrgAcronym = "SEDEMO"
+
+		found, err := s.Account(t.Context(), ensured.ID)
+		if err != nil || found != ensured {
+			t.Errorf("account = %+v, %v\nwant %+v", found, err, ensured)
+		}
+		if _, err := s.Account(t.Context(), ensured.ID+1000); !errors.Is(err, ErrNotFound) {
+			t.Errorf("unknown account: error = %v, want ErrNotFound", err)
 		}
 	})
 }

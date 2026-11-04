@@ -14,17 +14,19 @@ import (
 	"github.com/ItzTas/sei-monitor/internal/feed"
 	"github.com/ItzTas/sei-monitor/internal/httpserver"
 	"github.com/ItzTas/sei-monitor/internal/monitor"
+	"github.com/ItzTas/sei-monitor/internal/notify"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 	"github.com/ItzTas/sei-monitor/internal/store"
 )
 
 type application struct {
-	cfg     config.Config
-	log     *slog.Logger
-	now     func() time.Time
-	store   *store.Store
-	monitor *monitor.Monitor
-	server  *httpserver.Server
+	cfg        config.Config
+	log        *slog.Logger
+	now        func() time.Time
+	store      *store.Store
+	monitor    *monitor.Monitor
+	dispatcher *notify.Dispatcher
+	server     *httpserver.Server
 }
 
 func assemble(ctx context.Context, cfg config.Config, logger *slog.Logger, now func() time.Time) (*application, error) {
@@ -45,6 +47,8 @@ func assemble(ctx context.Context, cfg config.Config, logger *slog.Logger, now f
 		Channels:          cfg.Channels.Enabled(),
 	}, st, logger, monitor.WithClock(now, time.After))
 	app := &application{cfg: cfg, log: logger, now: now, store: st, monitor: mon}
+	channels := notify.Channels(cfg.Channels, userAgent())
+	app.dispatcher = notify.NewDispatcher(st, channels, app.formatter(cfg.FullDetail), logger, notify.WithClock(now, time.After))
 	if cfg.HTTP.Enabled() {
 		app.server = httpserver.New(cfg.HTTP.Address, app.routes(), logger)
 	}
@@ -100,6 +104,7 @@ func (a *application) feedChannel(ctx context.Context) feed.Channel {
 func (a *application) Run(ctx context.Context) error {
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return a.monitor.Run(gctx) })
+	g.Go(func() error { return a.dispatcher.Run(gctx) })
 	if a.server != nil {
 		g.Go(func() error { return a.server.Run(gctx) })
 	}

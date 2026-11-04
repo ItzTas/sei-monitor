@@ -2,8 +2,13 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -13,6 +18,7 @@ import (
 
 	"github.com/ItzTas/sei-monitor/internal/config"
 	"github.com/ItzTas/sei-monitor/internal/event"
+	"github.com/ItzTas/sei-monitor/internal/notify"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
 	"github.com/ItzTas/sei-monitor/internal/store"
 	"github.com/ItzTas/sei-monitor/internal/store/storetest"
@@ -29,6 +35,17 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 		server.AddActivities(9001, seitest.Activity{ID: 50001, Unit: "SEDEMO/NUPROC", Text: "Processo gerado", At: start.Add(-time.Hour)})
 		server.AddActivities(9002, seitest.Activity{ID: 60001, Unit: "SEDEMO/NUPROC", Text: "Processo gerado", At: start.Add(-time.Hour)})
 
+		type hook struct {
+			signature string
+			body      []byte
+		}
+		hooks := make(chan hook, 4)
+		webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			hooks <- hook{signature: r.Header.Get(notify.SignatureHeader), body: body}
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		t.Cleanup(webhook.Close)
 		feedToken := "feed-token-0123456789abcdefghijklmnopqrstuv"
 		apiToken := "api-token-0123456789abcdefghijklmnopqrstuvw"
 		env := seiEnv(server, map[string]string{
@@ -37,7 +54,7 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 			"FEED_TOKEN":     feedToken,
 			"API_TOKEN":      apiToken,
 			"PUBLIC_URL":     "https://monitor.example.org/api/v1",
-			"WEBHOOK_URL":    "https://hooks.example.org/sei",
+			"WEBHOOK_URL":    webhook.URL + "/sei",
 			"WEBHOOK_SECRET": "0123456789abcdef",
 		})
 		cfg, err := config.Load(envSource(env))
@@ -108,6 +125,25 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 			t.Errorf("health = %d %q", health.Code, health.Body.String())
 		}
 
+		application.dispatcher.RunOnce(ctx)
+		delivered := <-hooks
+		mac := hmac.New(sha256.New, []byte("0123456789abcdef"))
+		mac.Write(delivered.body)
+		var payload struct {
+			Events []event.View `json:"events"`
+		}
+		if err := json.Unmarshal(delivered.body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		var deliveredKinds []event.Kind
+		for _, view := range payload.Events {
+			deliveredKinds = append(deliveredKinds, view.Kind)
+		}
+		slices.Sort(deliveredKinds)
+		if delivered.signature != "sha256="+hex.EncodeToString(mac.Sum(nil)) || !slices.Equal(deliveredKinds, []event.Kind{event.ActivityAdded, event.ProcessLeft}) {
+			t.Errorf("webhook got %s with signature %s", delivered.body, delivered.signature)
+		}
+
 		status := get("/status", apiToken)
 		var state struct {
 			OrgAcronym string   `json:"org_acronym"`
@@ -115,11 +151,14 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 			LastCycle  struct {
 				EventsCreated int `json:"events_created"`
 			} `json:"last_cycle"`
+			Deliveries map[string]map[string]int `json:"deliveries"`
 		}
 		if err := json.Unmarshal(status.Body.Bytes(), &state); err != nil || status.Code != http.StatusOK {
 			t.Fatalf("status = %d %s (%v)", status.Code, status.Body.String(), err)
 		}
-		if state.OrgAcronym != "SEDEMO" || !slices.Equal(state.Units, []string{"SEDEMO/NUPROC"}) || state.LastCycle.EventsCreated != 2 || strings.Contains(status.Body.String(), seitest.Username) {
+		sent := map[string]int{"pending": 0, "sent": 2, "failed": 0}
+		if state.OrgAcronym != "SEDEMO" || !slices.Equal(state.Units, []string{"SEDEMO/NUPROC"}) || state.LastCycle.EventsCreated != 2 ||
+			!maps.Equal(state.Deliveries["webhook"], sent) || strings.Contains(status.Body.String(), seitest.Username) {
 			t.Errorf("status = %s", status.Body.String())
 		}
 		processes := get("/processes", apiToken)

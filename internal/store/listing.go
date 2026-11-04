@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -214,22 +215,31 @@ func (s *Store) queryEvents(ctx context.Context, query string, args ...any) ([]e
 
 	var events []event.Event
 	for rows.Next() {
-		var ev event.Event
-		var kind, payload string
-		var occurred, detected dbTime
-		if err := rows.Scan(&ev.ID, &ev.AccountID, &kind, &ev.ProcedureID, &ev.Ref, &occurred, &detected, &payload); err != nil {
-			return nil, fmt.Errorf("store: read an event: %w", err)
+		ev, err := scanEvent(rows)
+		if err != nil {
+			return nil, err
 		}
-		if err := json.Unmarshal([]byte(payload), &ev.Payload); err != nil {
-			return nil, fmt.Errorf("store: decode the payload of event %d: %w", ev.ID, err)
-		}
-		ev.Kind, ev.OccurredAt, ev.DetectedAt = event.Kind(kind), time.Time(occurred), time.Time(detected)
 		events = append(events, ev)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("store: read the events: %w", err)
 	}
 	return events, nil
+}
+
+func scanEvent(rows *sql.Rows, extra ...any) (event.Event, error) {
+	var ev event.Event
+	var kind, payload string
+	var occurred, detected dbTime
+	columns := append([]any{&ev.ID, &ev.AccountID, &kind, &ev.ProcedureID, &ev.Ref, &occurred, &detected, &payload}, extra...)
+	if err := rows.Scan(columns...); err != nil {
+		return event.Event{}, fmt.Errorf("store: read an event: %w", err)
+	}
+	if err := json.Unmarshal([]byte(payload), &ev.Payload); err != nil {
+		return event.Event{}, fmt.Errorf("store: decode the payload of event %d: %w", ev.ID, err)
+	}
+	ev.Kind, ev.OccurredAt, ev.DetectedAt = event.Kind(kind), time.Time(occurred), time.Time(detected)
+	return ev, nil
 }
 
 func (s *Store) ListDeliveries(ctx context.Context, filter DeliveryFilter) ([]Delivery, error) {

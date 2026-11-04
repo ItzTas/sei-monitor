@@ -77,6 +77,7 @@ type SEI struct {
 
 type HTTP struct {
 	Address   string
+	PublicURL string
 	FeedToken Secret
 	APIToken  Secret
 }
@@ -470,7 +471,19 @@ func (r *reader) http() HTTP {
 	if !feed.IsZero() && feed.Reveal() == api.Reveal() {
 		r.problem("API_TOKEN must be different from FEED_TOKEN")
 	}
-	return HTTP{Address: address, FeedToken: feed, APIToken: api}
+	return HTTP{Address: address, PublicURL: r.publicURL(), FeedToken: feed, APIToken: api}
+}
+
+func (r *reader) publicURL() string {
+	value := r.text("PUBLIC_URL")
+	if value == "" {
+		return ""
+	}
+	parsed, ok := r.parseURL("PUBLIC_URL", value, urlRules{https: true})
+	if !ok {
+		return ""
+	}
+	return strings.TrimRight(parsed.String(), "/")
 }
 
 func validPort(port string) bool {

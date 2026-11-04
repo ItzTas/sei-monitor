@@ -389,3 +389,29 @@ func TestProblemsNeverShowSecretValues(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicURL(t *testing.T) {
+	tests := []struct {
+		value   string
+		want    string
+		problem string
+	}{
+		{value: "https://monitor.example.org/api/v1/", want: "https://monitor.example.org/api/v1"},
+		{value: "http://localhost:8080", want: "http://localhost:8080"},
+		{value: "http://monitor.example.org/api/v1", problem: "PUBLIC_URL: use https"},
+		{value: "https://monitor.example.org/api/v1?x=1", problem: "PUBLIC_URL: remove everything after ? or #"},
+		{value: "", want: ""},
+	}
+	for _, tt := range tests {
+		cfg, problems := load(t, baseEnv(map[string]string{"PUBLIC_URL": tt.value}), nil)
+		if tt.problem != "" {
+			if !slices.ContainsFunc(problems, func(p string) bool { return strings.HasPrefix(p, tt.problem) }) {
+				t.Errorf("PUBLIC_URL=%q: problems = %q, want %q", tt.value, problems, tt.problem)
+			}
+			continue
+		}
+		if problems != nil || cfg.HTTP.PublicURL != tt.want {
+			t.Errorf("PUBLIC_URL=%q: %q, %q; want %q", tt.value, cfg.HTTP.PublicURL, problems, tt.want)
+		}
+	}
+}

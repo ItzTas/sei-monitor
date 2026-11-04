@@ -225,16 +225,57 @@ func TestOptionsWithinLimits(t *testing.T) {
 	}
 }
 
-func TestFeedToken(t *testing.T) {
-	tests := map[string]string{
-		"":                       "FEED_TOKEN is required while the HTTP server is on",
-		"short-token":            "FEED_TOKEN: use at least 32 characters",
-		strings.Repeat("a/", 20): "FEED_TOKEN: use only letters, digits",
+func TestHTTPTokens(t *testing.T) {
+	token := strings.Repeat("a", 32)
+	other := strings.Repeat("b", 32)
+	tests := []struct {
+		name    string
+		env     map[string]string
+		problem string
+		feed    bool
+		api     bool
+	}{
+		{name: "feed only", env: map[string]string{"FEED_TOKEN": token}, feed: true},
+		{name: "API only", env: map[string]string{"FEED_TOKEN": "<unset>", "API_TOKEN": other}, api: true},
+		{name: "both", env: map[string]string{"FEED_TOKEN": token, "API_TOKEN": other}, feed: true, api: true},
+		{name: "neither", env: map[string]string{"FEED_TOKEN": "<unset>"}, problem: "with the HTTP server on, set FEED_TOKEN, API_TOKEN or both"},
+		{name: "same value", env: map[string]string{"FEED_TOKEN": token, "API_TOKEN": token}, problem: "API_TOKEN must be different from FEED_TOKEN"},
+		{name: "short", env: map[string]string{"API_TOKEN": "short-token"}, problem: "API_TOKEN: use at least 32 characters"},
+		{name: "unsafe characters", env: map[string]string{"FEED_TOKEN": strings.Repeat("a/", 20)}, problem: "FEED_TOKEN: use only letters, digits"},
 	}
-	for token, problem := range tests {
-		_, problems := load(t, baseEnv(map[string]string{"FEED_TOKEN": token}), nil)
-		if !slices.ContainsFunc(problems, func(p string) bool { return strings.HasPrefix(p, problem) }) {
-			t.Errorf("FEED_TOKEN %q: problems = %q, want %q", token, problems, problem)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, problems := load(t, baseEnv(tt.env), nil)
+			if tt.problem != "" {
+				if !slices.ContainsFunc(problems, func(p string) bool { return strings.HasPrefix(p, tt.problem) }) {
+					t.Errorf("problems = %q, want %q", problems, tt.problem)
+				}
+				return
+			}
+			if problems != nil {
+				t.Fatal(problems)
+			}
+			if !cfg.HTTP.FeedToken.IsZero() != tt.feed || !cfg.HTTP.APIToken.IsZero() != tt.api {
+				t.Errorf("feed token set = %v, API token set = %v", !cfg.HTTP.FeedToken.IsZero(), !cfg.HTTP.APIToken.IsZero())
+			}
+		})
+	}
+}
+
+func TestAPIDetailFollowsTheNotificationDetail(t *testing.T) {
+	tests := []struct {
+		notification, api string
+		want              bool
+	}{
+		{"", "", false},
+		{"full", "", true},
+		{"full", "minimal", false},
+		{"minimal", "full", true},
+	}
+	for _, tt := range tests {
+		cfg, problems := load(t, baseEnv(map[string]string{"NOTIFICATION_DETAIL": tt.notification, "API_DETAIL": tt.api}), nil)
+		if problems != nil || cfg.APIFullDetail != tt.want {
+			t.Errorf("NOTIFICATION_DETAIL=%q API_DETAIL=%q: API full detail = %v, %q; want %v", tt.notification, tt.api, cfg.APIFullDetail, problems, tt.want)
 		}
 	}
 }

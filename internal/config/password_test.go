@@ -143,7 +143,7 @@ func TestPasswordCommandStopsWhenTheCallerGivesUp(t *testing.T) {
 
 func TestPasswordCommandEnvironmentHasNoSecrets(t *testing.T) {
 	secrets := []string{
-		"SEI_PASSWORD", "SEI_PASSWORD_FILE", "SEI_PASSWORD_CMD", "FEED_TOKEN", "FEED_TOKEN_FILE",
+		"SEI_PASSWORD", "SEI_PASSWORD_FILE", "SEI_PASSWORD_CMD", "FEED_TOKEN", "FEED_TOKEN_FILE", "API_TOKEN",
 		"SMTP_PASSWORD", "TELEGRAM_TOKEN", "NTFY_TOKEN_FILE", "WEBHOOK_SECRET", "POSTGRES_PASSWORD", "DATABASE_URL",
 	}
 	kept := []string{"VAULT_TOKEN", "BW_SESSION", "SEI_USERNAME"}

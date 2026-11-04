@@ -30,7 +30,7 @@ const (
 	TLSImplicit = "tls"
 	TLSNone     = "none"
 
-	minFeedTokenLength     = 32
+	minTokenLength         = 32
 	minWebhookSecretLength = 16
 )
 
@@ -57,6 +57,7 @@ type Config struct {
 	PollInterval      time.Duration
 	ReturnWarningDays int
 	FullDetail        bool
+	APIFullDetail     bool
 	HTTP              HTTP
 	Channels          Channels
 	LogLevel          slog.Level
@@ -77,6 +78,7 @@ type SEI struct {
 type HTTP struct {
 	Address   string
 	FeedToken Secret
+	APIToken  Secret
 }
 
 func (h HTTP) Enabled() bool {
@@ -142,12 +144,14 @@ type WhatsApp struct {
 
 func Load(src Source) (Config, error) {
 	r := &reader{src: src}
+	fullDetail := r.detailLevel("NOTIFICATION_DETAIL", false)
 	cfg := Config{
 		SEI:               r.sei(),
 		DatabaseURL:       r.databaseURL(),
 		PollInterval:      r.pollInterval(),
 		ReturnWarningDays: r.integer("RETURN_WARNING_DAYS", 2, 0, 60),
-		FullDetail:        r.detail(),
+		FullDetail:        fullDetail,
+		APIFullDetail:     r.detailLevel("API_DETAIL", fullDetail),
 		HTTP:              r.http(),
 		Channels:          r.channels(),
 		LogLevel:          r.logLevel(),
@@ -457,9 +461,16 @@ func (r *reader) http() HTTP {
 	if _, port, err := net.SplitHostPort(address); err != nil || !validPort(port) {
 		r.problem("HTTP_ADDRESS: use host:port or :port, such as :8080 (got %q)", address)
 	}
-	token := r.secret("FEED_TOKEN")
-	r.checkFeedToken(token)
-	return HTTP{Address: address, FeedToken: token}
+	feed, api := r.secret("FEED_TOKEN"), r.secret("API_TOKEN")
+	r.checkToken("FEED_TOKEN", feed)
+	r.checkToken("API_TOKEN", api)
+	if feed.IsZero() && api.IsZero() {
+		r.problem("with the HTTP server on, set FEED_TOKEN, API_TOKEN or both (create them with the generate-token command), or leave HTTP_ADDRESS empty")
+	}
+	if !feed.IsZero() && feed.Reveal() == api.Reveal() {
+		r.problem("API_TOKEN must be different from FEED_TOKEN")
+	}
+	return HTTP{Address: address, FeedToken: feed, APIToken: api}
 }
 
 func validPort(port string) bool {
@@ -467,25 +478,28 @@ func validPort(port string) bool {
 	return err == nil && n >= 1 && n <= 65535
 }
 
-func (r *reader) checkFeedToken(token Secret) {
+func (r *reader) checkToken(name string, token Secret) {
 	if token.IsZero() {
-		r.problem("FEED_TOKEN is required while the HTTP server is on (create one with the generate-token subcommand, or leave HTTP_ADDRESS empty)")
 		return
 	}
-	if len(token.Reveal()) < minFeedTokenLength {
-		r.problem("FEED_TOKEN: use at least %d characters (create one with the generate-token subcommand)", minFeedTokenLength)
+	if len(token.Reveal()) < minTokenLength {
+		r.problem("%s: use at least %d characters (create one with the generate-token command)", name, minTokenLength)
 	}
 	if !regexp.MustCompile(`^[A-Za-z0-9._~-]+$`).MatchString(token.Reveal()) {
-		r.problem("FEED_TOKEN: use only letters, digits, '-', '_', '.' and '~'")
+		r.problem("%s: use only letters, digits, '-', '_', '.' and '~'", name)
 	}
 }
 
-func (r *reader) detail() bool {
-	value := strings.ToLower(cmp.Or(r.text("NOTIFICATION_DETAIL"), "minimal"))
+func (r *reader) detailLevel(name string, fallback bool) bool {
+	value := strings.ToLower(r.text(name))
+	if value == "" {
+		return fallback
+	}
 	levels := map[string]bool{"minimal": false, "full": true}
 	full, ok := levels[value]
 	if !ok {
-		r.problem("NOTIFICATION_DETAIL: use minimal or full (got %q)", value)
+		r.problem("%s: use minimal or full (got %q)", name, value)
+		return fallback
 	}
 	return full
 }

@@ -135,6 +135,7 @@ func withoutSecrets(environ []string) []string {
 	secrets := map[string]bool{
 		"SEI_PASSWORD":      true,
 		"FEED_TOKEN":        true,
+		"API_TOKEN":         true,
 		"SMTP_PASSWORD":     true,
 		"TELEGRAM_TOKEN":    true,
 		"NTFY_TOKEN":        true,

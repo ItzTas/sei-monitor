@@ -35,6 +35,7 @@ type Document struct {
 	Protocol    string
 	Type        string
 	Name        string
+	FirstSeenAt time.Time
 }
 
 type CycleChanges struct {
@@ -51,35 +52,7 @@ type CycleChanges struct {
 }
 
 func (s *Store) Processes(ctx context.Context, accountID int64) ([]Process, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT procedure_id, number, process_type, description, unit_id, unit_acronym, assigned_user,
-		       assigned_user_id, return_date, return_overdue, last_activity_id, document_total,
-		       first_seen_at, last_seen_at, left_at
-		FROM processes
-		WHERE account_id = ?
-		ORDER BY procedure_id`, accountID)
-	if err != nil {
-		return nil, fmt.Errorf("store: read the processes: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var processes []Process
-	for rows.Next() {
-		var p Process
-		var firstSeen, lastSeen, left dbTime
-		err := rows.Scan(&p.ProcedureID, &p.Number, &p.Type, &p.Description, &p.UnitID, &p.UnitAcronym, &p.AssignedUser,
-			&p.AssignedUserID, &p.ReturnDate, &p.ReturnOverdue, &p.LastActivityID, &p.DocumentTotal,
-			&firstSeen, &lastSeen, &left)
-		if err != nil {
-			return nil, fmt.Errorf("store: read a process: %w", err)
-		}
-		p.FirstSeenAt, p.LastSeenAt, p.LeftAt = time.Time(firstSeen), time.Time(lastSeen), time.Time(left)
-		processes = append(processes, p)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("store: read the processes: %w", err)
-	}
-	return processes, nil
+	return s.queryProcesses(ctx, "SELECT "+processColumns+" FROM processes WHERE account_id = ? ORDER BY procedure_id", accountID)
 }
 
 func (s *Store) DocumentIDs(ctx context.Context, accountID, procedureID int64) (map[int64]bool, error) {

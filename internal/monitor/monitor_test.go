@@ -163,6 +163,9 @@ func TestFirstCycleIsASilentBaseline(t *testing.T) {
 		if result != (Result{ProcessesSeen: 2, EventsCreated: 0}) {
 			t.Errorf("result = %+v", result)
 		}
+		if state := h.monitor.State(); !slices.Equal(state.Units, []string{"SEDEMO/NUPROC"}) || state.Self != (Self{UserID: seitest.UserID, Acronym: seitest.Username}) {
+			t.Errorf("state = %+v", state)
+		}
 		if events := h.events(t); len(events) != 0 {
 			t.Errorf("baseline events = %+v", events)
 		}

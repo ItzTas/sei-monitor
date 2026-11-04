@@ -118,7 +118,7 @@ func enteredEvent(p Presence, rules Rules) event.Event {
 	payload := basePayload(p)
 	if assignee := p.Process.Assignee; assignee != nil {
 		payload.AssignedUser, payload.AssignedUserName = assignee.Acronym, assignee.Name
-		payload.AssignedToSelf = isSelf(assignee.ID, assignee.Acronym, rules.Self)
+		payload.AssignedToSelf = IsSelf(assignee.ID, assignee.Acronym, rules.Self)
 	}
 	return newEvent(event.ProcessEntered, p.Process.ProcedureID, cycleRef(p.Process.ProcedureID, rules.Now), payload)
 }
@@ -139,7 +139,7 @@ func assignmentEvent(p Presence, rules Rules) (event.Event, bool) {
 	}
 	payload := basePayload(p)
 	payload.AssignedUser, payload.AssignedUserName, payload.PreviousAssignee = acronym, name, p.Previous.AssignedUser
-	payload.AssignedToSelf = acronym != "" && isSelf(id, acronym, rules.Self)
+	payload.AssignedToSelf = acronym != "" && IsSelf(id, acronym, rules.Self)
 	return newEvent(event.AssignmentChanged, p.Process.ProcedureID, cycleRef(p.Process.ProcedureID, rules.Now), payload), true
 }
 
@@ -208,7 +208,7 @@ func sameAssignee(previousID int64, previousAcronym string, currentID int64, cur
 	return strings.EqualFold(previousAcronym, currentAcronym)
 }
 
-func isSelf(id int64, acronym string, self Self) bool {
+func IsSelf(id int64, acronym string, self Self) bool {
 	if id != 0 && self.UserID != 0 {
 		return id == self.UserID
 	}

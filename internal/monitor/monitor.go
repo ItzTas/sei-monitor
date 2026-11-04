@@ -45,6 +45,8 @@ type Result struct {
 
 type State struct {
 	AccountID     int64
+	Units         []string
+	Self          Self
 	Running       bool
 	Paused        bool
 	PausedReason  string
@@ -209,6 +211,7 @@ func (m *Monitor) cycle(ctx context.Context, conn sei.Connection, account store.
 	if err != nil {
 		return Result{}, err
 	}
+	m.rememberSession(session, units)
 	observations, err := m.observe(ctx, conn.Client, units)
 	if err != nil {
 		return Result{}, err
@@ -241,6 +244,16 @@ func (m *Monitor) cycle(ctx context.Context, conn sei.Connection, account store.
 	result := Result{ProcessesSeen: len(diff.Present), EventsCreated: len(inserted)}
 	m.log.Info("cycle finished", "processes", result.ProcessesSeen, "events", result.EventsCreated, "baseline", baseline, "duration", m.now().Sub(started).Round(time.Millisecond))
 	return result, nil
+}
+
+func (m *Monitor) rememberSession(session sei.Session, units []sei.Unit) {
+	acronyms := make([]string, 0, len(units))
+	for _, unit := range units {
+		acronyms = append(acronyms, unit.Acronym)
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.state.Units, m.state.Self = acronyms, Self{UserID: session.UserID, Acronym: session.UserAcronym}
 }
 
 func (m *Monitor) afterSuccess(ctx context.Context, account store.Account, baseline bool, started time.Time) {

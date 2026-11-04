@@ -1,0 +1,64 @@
+package notify
+
+import (
+	"context"
+	"crypto/tls"
+	"fmt"
+
+	"github.com/wneessen/go-mail"
+
+	"github.com/ItzTas/sei-monitor/internal/config"
+)
+
+type Email struct {
+	cfg       config.Email
+	userAgent string
+	tlsConfig *tls.Config
+}
+
+func NewEmail(cfg config.Email, userAgent string, tlsConfig *tls.Config) *Email {
+	return &Email{cfg: cfg, userAgent: userAgent, tlsConfig: tlsConfig}
+}
+
+func (e *Email) Name() string {
+	return "email"
+}
+
+func (e *Email) Send(ctx context.Context, msg Message) error {
+	m := mail.NewMsg()
+	if err := m.From(e.cfg.From); err != nil {
+		return fmt.Errorf("invalid SMTP_FROM: %w", err)
+	}
+	if err := m.To(e.cfg.To...); err != nil {
+		return fmt.Errorf("invalid SMTP_TO: %w", err)
+	}
+	m.Subject("[sei-monitor] " + msg.Subject)
+	m.SetDate()
+	m.SetMessageID()
+	m.SetUserAgent(e.userAgent)
+	m.SetBodyString(mail.TypeTextPlain, msg.Body)
+	client, err := mail.NewClient(e.cfg.Host, e.options()...)
+	if err != nil {
+		return fmt.Errorf("could not set up the SMTP client: %w", err)
+	}
+	if err := client.DialAndSendWithContext(ctx, m); err != nil {
+		return fmt.Errorf("could not send the email: %w", err)
+	}
+	return nil
+}
+
+func (e *Email) options() []mail.Option {
+	security := map[string]mail.Option{
+		config.TLSStartTLS: mail.WithTLSPolicy(mail.TLSMandatory),
+		config.TLSImplicit: mail.WithSSL(),
+		config.TLSNone:     mail.WithTLSPolicy(mail.NoTLS),
+	}
+	options := []mail.Option{mail.WithPort(e.cfg.Port), mail.WithTimeout(httpTimeout), security[e.cfg.TLS]}
+	if e.tlsConfig != nil {
+		options = append(options, mail.WithTLSConfig(e.tlsConfig))
+	}
+	if e.cfg.Username != "" {
+		options = append(options, mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover), mail.WithUsername(e.cfg.Username), mail.WithPassword(e.cfg.Password.Reveal()))
+	}
+	return options
+}

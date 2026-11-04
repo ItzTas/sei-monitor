@@ -115,10 +115,14 @@ func TestFullDescriptionEscapesSEIContent(t *testing.T) {
 }
 
 func newHandler(source Source) *Handler {
+	return newHandlerWith(source, func() event.Formatter { return event.Formatter{} })
+}
+
+func newHandlerWith(source Source, formatter func() event.Formatter) *Handler {
 	channel := func(context.Context) Channel {
 		return Channel{Title: "sei-monitor: SEDEMO", Link: "https://sei.example.org"}
 	}
-	return NewHandler(source, config.NewSecret(token), channel, event.Formatter{}, func() time.Time { return now }, slog.New(slog.DiscardHandler))
+	return NewHandler(source, config.NewSecret(token), channel, formatter, func() time.Time { return now }, slog.New(slog.DiscardHandler))
 }
 
 func serve(t *testing.T, handler http.Handler, path string) *httptest.ResponseRecorder {
@@ -128,6 +132,23 @@ func serve(t *testing.T, handler http.Handler, path string) *httptest.ResponseRe
 	recorder := httptest.NewRecorder()
 	mux.ServeHTTP(recorder, httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil))
 	return recorder
+}
+
+func TestHandlerFormatsEveryRequestWithTheCurrentFormatter(t *testing.T) {
+	ev := event.Event{ID: 1, Kind: event.ActivityAdded, OccurredAt: now, DetectedAt: now, Payload: event.Payload{
+		ProcessNumber: "00000.000001/2026-00", Unit: "SEDEMO/NUPROC",
+		ActivityText: "Processo recebido na unidade", ActivityUser: "12345678901", ActivityUnit: "SEDEMO/NUPROC",
+	}}
+	formatter := event.Formatter{Location: time.UTC}
+	handler := newHandlerWith(&fakeSource{events: []event.Event{ev}}, func() event.Formatter { return formatter })
+
+	minimal := serve(t, handler, "/feed/"+token+".xml").Body.String()
+	formatter.Full, formatter.Self = true, "12345678901"
+	full := serve(t, handler, "/feed/"+token+".xml").Body.String()
+
+	if strings.Contains(minimal, "Processo recebido") || !strings.Contains(full, "Activity: Processo recebido na unidade (you, SEDEMO/NUPROC)") || strings.Contains(full, "12345678901") {
+		t.Errorf("minimal feed:\n%s\nfull feed:\n%s", minimal, full)
+	}
 }
 
 func TestHandlerServesTheFeedForTheRightToken(t *testing.T) {

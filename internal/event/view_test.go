@@ -33,7 +33,7 @@ func encode(t *testing.T, view View) map[string]any {
 }
 
 func TestMinimalViewLeavesTheDetailsOut(t *testing.T) {
-	view := encode(t, Viewer{Formatter: Formatter{Location: time.UTC}}.View(sampleEvent()))
+	view := encode(t, Formatter{Location: time.UTC}.View(sampleEvent()))
 
 	if view["id"] != float64(42) || view["kind"] != "activity_added" || view["process_number"] != "00000.000001/2026-00" || view["unit"] != "SEDEMO/NUPROC" {
 		t.Errorf("view = %v", view)
@@ -48,11 +48,11 @@ func TestMinimalViewLeavesTheDetailsOut(t *testing.T) {
 
 func TestFullViewShowsTheDetailsButNeverTheUserOwnAcronym(t *testing.T) {
 	ev := sampleEvent()
-	viewer := Viewer{Formatter: Formatter{Location: time.UTC, Full: true}, Self: "Fulano.Tal"}
+	formatter := Formatter{Location: time.UTC, Full: true, Self: "Fulano.Tal"}
 
-	other := encode(t, viewer.View(ev))["detail"].(map[string]any)
+	other := encode(t, formatter.View(ev))["detail"].(map[string]any)
 	ev.Payload.ActivityUser = "fulano.tal"
-	own := encode(t, viewer.View(ev))["detail"].(map[string]any)
+	own := encode(t, formatter.View(ev))["detail"].(map[string]any)
 
 	if other["activity_text"] != "Processo recebido na unidade" || other["activity_user"] != "beltrano.silva" || other["process_type"] != "Contrato" || other["description"] != "Compra de cadeiras" {
 		t.Errorf("full detail = %v", other)
@@ -68,7 +68,7 @@ func TestAssignmentViewHidesTheUserBehindAssignedToMe(t *testing.T) {
 		AssignedToSelf: true, PreviousAssignee: "beltrano.silva",
 	}}
 
-	raw, err := json.Marshal(Viewer{Formatter: Formatter{Full: true}, Self: "fulano.tal"}.View(ev))
+	raw, err := json.Marshal(Formatter{Full: true, Self: "fulano.tal"}.View(ev))
 	if err != nil {
 		t.Fatal(err)
 	}

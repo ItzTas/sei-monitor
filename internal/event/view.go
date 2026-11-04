@@ -1,9 +1,6 @@
 package event
 
-import (
-	"strings"
-	"time"
-)
+import "time"
 
 type View struct {
 	ID            int64      `json:"id" doc:"Event id."`
@@ -35,12 +32,7 @@ type ViewDetail struct {
 	Reason               string `json:"reason,omitempty"`
 }
 
-type Viewer struct {
-	Formatter Formatter
-	Self      string
-}
-
-func (v Viewer) View(ev Event) View {
+func (f Formatter) View(ev Event) View {
 	p := ev.Payload
 	view := View{
 		ID:            ev.ID,
@@ -48,38 +40,34 @@ func (v Viewer) View(ev Event) View {
 		ProcedureID:   ev.ProcedureID,
 		ProcessNumber: p.ProcessNumber,
 		Unit:          p.Unit,
-		Title:         v.Formatter.Title(ev),
+		Title:         f.Title(ev),
 		OccurredAt:    ev.OccurredAt.UTC(),
 		DetectedAt:    ev.DetectedAt.UTC(),
 		Detail: ViewDetail{
 			DocumentProtocol: p.DocumentProtocol,
-			AssignedToMe:     p.AssignedToSelf,
-			ActivityByMe:     v.isSelf(p.ActivityUser),
+			AssignedToMe:     f.assignedToSelf(p),
+			ActivityByMe:     f.IsSelf(p.ActivityUser),
 			ReturnDate:       p.ReturnDate,
 			Reason:           p.Reason,
 		},
 	}
-	if !v.Formatter.Full {
+	if !f.Full {
 		return view
 	}
 	detail := &view.Detail
 	detail.ProcessType, detail.Description = p.ProcessType, p.Description
-	detail.ActivityText, detail.ActivityUser, detail.ActivityUnit = p.ActivityText, v.other(p.ActivityUser), p.ActivityUnit
+	detail.ActivityText, detail.ActivityUser, detail.ActivityUnit = p.ActivityText, f.other(p.ActivityUser), p.ActivityUnit
 	detail.DocumentName, detail.DocumentType = p.DocumentName, p.DocumentType
-	detail.PreviousAssignedUser = v.other(p.PreviousAssignee)
-	if !p.AssignedToSelf {
-		detail.AssignedUser, detail.AssignedUserName = v.other(p.AssignedUser), p.AssignedUserName
+	detail.PreviousAssignedUser = f.other(p.PreviousAssignee)
+	if !view.Detail.AssignedToMe {
+		detail.AssignedUser, detail.AssignedUserName = f.other(p.AssignedUser), p.AssignedUserName
 	}
 	return view
 }
 
-func (v Viewer) other(acronym string) string {
-	if v.isSelf(acronym) {
+func (f Formatter) other(acronym string) string {
+	if f.IsSelf(acronym) {
 		return ""
 	}
 	return acronym
-}
-
-func (v Viewer) isSelf(acronym string) bool {
-	return acronym != "" && v.Self != "" && strings.EqualFold(acronym, v.Self)
 }

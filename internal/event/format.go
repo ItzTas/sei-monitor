@@ -14,6 +14,7 @@ const (
 type Formatter struct {
 	Location *time.Location
 	Full     bool
+	Self     string
 }
 
 func (f Formatter) Title(ev Event) string {
@@ -57,10 +58,10 @@ func (f Formatter) Details(ev Event) []string {
 	optional := []struct{ label, value string }{
 		{"Type", p.ProcessType},
 		{"Description", p.Description},
-		{"Activity", joinNonEmpty(p.ActivityText, parenthesized(p.ActivityUser, p.ActivityUnit))},
+		{"Activity", joinNonEmpty(p.ActivityText, parenthesized(f.person(p.ActivityUser), p.ActivityUnit))},
 		{"Document", p.DocumentName},
 		{"Return date", f.date(p.ReturnDate)},
-		{"Assigned to", joinNonEmpty(p.AssignedUser, parenthesized(p.AssignedUserName))},
+		{"Assigned to", f.assignee(p)},
 	}
 	for _, item := range optional {
 		if item.value != "" {
@@ -70,8 +71,30 @@ func (f Formatter) Details(ev Event) []string {
 	return lines
 }
 
+func (f Formatter) IsSelf(acronym string) bool {
+	return acronym != "" && f.Self != "" && strings.EqualFold(acronym, f.Self)
+}
+
+func (f Formatter) person(acronym string) string {
+	if f.IsSelf(acronym) {
+		return "you"
+	}
+	return acronym
+}
+
+func (f Formatter) assignedToSelf(p Payload) bool {
+	return p.AssignedToSelf || f.IsSelf(p.AssignedUser)
+}
+
+func (f Formatter) assignee(p Payload) string {
+	if f.assignedToSelf(p) {
+		return "you"
+	}
+	return joinNonEmpty(p.AssignedUser, parenthesized(p.AssignedUserName))
+}
+
 func (f Formatter) assignment(p Payload) string {
-	if p.AssignedToSelf {
+	if f.assignedToSelf(p) {
 		return fmt.Sprintf("Process %s was assigned to you", p.ProcessNumber)
 	}
 	if p.AssignedUser == "" {

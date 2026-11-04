@@ -110,12 +110,12 @@ type Handler struct {
 	source    Source
 	token     config.Secret
 	channel   func(context.Context) Channel
-	formatter event.Formatter
+	formatter func() event.Formatter
 	now       func() time.Time
 	log       *slog.Logger
 }
 
-func NewHandler(source Source, token config.Secret, channel func(context.Context) Channel, formatter event.Formatter, now func() time.Time, log *slog.Logger) *Handler {
+func NewHandler(source Source, token config.Secret, channel func(context.Context) Channel, formatter func() event.Formatter, now func() time.Time, log *slog.Logger) *Handler {
 	return &Handler{source: source, token: token, channel: channel, formatter: formatter, now: now, log: log}
 }
 
@@ -131,7 +131,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body bytes.Buffer
-	if err := Write(&body, h.channel(r.Context()), events, h.formatter, h.now()); err != nil {
+	if err := Write(&body, h.channel(r.Context()), events, h.formatter(), h.now()); err != nil {
 		h.log.Error("could not build the feed", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

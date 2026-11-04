@@ -104,9 +104,9 @@ func (s *Service) Detail(ctx context.Context, procedureID int64) (Detail, error)
 		}
 		detail.Documents = append(detail.Documents, document)
 	}
-	viewer := event.Viewer{Formatter: event.Formatter{Location: s.location, Full: s.full}, Self: state.Self.Acronym}
+	formatter := event.Formatter{Location: s.location, Full: s.full, Self: state.Self.Acronym}
 	for _, ev := range events {
-		detail.Events = append(detail.Events, viewer.View(ev))
+		detail.Events = append(detail.Events, formatter.View(ev))
 	}
 	return detail, nil
 }

@@ -53,14 +53,19 @@ func assemble(ctx context.Context, cfg config.Config, logger *slog.Logger, optio
 func (a *application) routes() httpserver.Routes {
 	routes := httpserver.Routes{Health: httpserver.Health(a.lastRun, a.cfg.PollInterval, time.Now(), time.Now, a.log)}
 	if !a.cfg.HTTP.FeedToken.IsZero() {
-		formatter := event.Formatter{Location: a.cfg.SEI.Location, Full: a.cfg.FullDetail}
-		routes.Feed = feed.NewHandler(a.store, a.cfg.HTTP.FeedToken, a.feedChannel, formatter, time.Now, a.log)
+		routes.Feed = feed.NewHandler(a.store, a.cfg.HTTP.FeedToken, a.feedChannel, a.formatter(a.cfg.FullDetail), time.Now, a.log)
 	}
 	if !a.cfg.HTTP.APIToken.IsZero() {
 		deps := api.Deps{Store: a.store, Monitor: a.monitor, Token: a.cfg.HTTP.APIToken, FullDetail: a.cfg.APIFullDetail, Location: a.cfg.SEI.Location, Log: a.log}
 		routes.API = func(mux *http.ServeMux) { api.Register(mux, deps) }
 	}
 	return routes
+}
+
+func (a *application) formatter(full bool) func() event.Formatter {
+	return func() event.Formatter {
+		return event.Formatter{Location: a.cfg.SEI.Location, Full: full, Self: a.monitor.State().Self.Acronym}
+	}
 }
 
 func (a *application) lastRun(ctx context.Context) (store.CycleRun, bool, error) {

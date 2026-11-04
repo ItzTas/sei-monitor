@@ -55,8 +55,8 @@ func (s *Service) List(ctx context.Context, input ListInput) (resp.List[event.Vi
 	if err != nil {
 		return resp.List[event.View]{}, err
 	}
-	viewer := event.Viewer{Formatter: event.Formatter{Location: s.location, Full: s.full}, Self: state.Self.Acronym}
-	return resp.Paginate(rows, input.Limit, viewer.View, func(ev event.Event) cursor {
+	formatter := event.Formatter{Location: s.location, Full: s.full, Self: state.Self.Acronym}
+	return resp.Paginate(rows, input.Limit, formatter.View, func(ev event.Event) cursor {
 		return cursor{OccurredAt: ev.OccurredAt, ID: ev.ID}
 	})
 }

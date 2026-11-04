@@ -109,6 +109,31 @@ func TestMinimalDetailsHideOtherPeopleAndContent(t *testing.T) {
 	}
 }
 
+func TestFullTextCallsTheUserYou(t *testing.T) {
+	formatter := Formatter{Location: time.UTC, Full: true, Self: "12345678901"}
+	activity := Event{Kind: ActivityAdded, Payload: Payload{
+		ProcessNumber: "00000.000001/2026-00", Unit: "SEDEMO/NUPROC",
+		ActivityText: "Processo recebido na unidade", ActivityUser: "12345678901", ActivityUnit: "SEDEMO/NUPROC",
+	}}
+	assignment := Event{Kind: AssignmentChanged, Payload: Payload{
+		ProcessNumber: "00000.000001/2026-00", AssignedUser: "12345678901", AssignedUserName: "Fulano de Tal",
+	}}
+
+	activityDetails := formatter.Details(activity)
+	assignmentTitle, assignmentDetails := formatter.Title(assignment), formatter.Details(assignment)
+
+	if !slices.Contains(activityDetails, "Activity: Processo recebido na unidade (you, SEDEMO/NUPROC)") {
+		t.Errorf("activity details = %q", activityDetails)
+	}
+	if assignmentTitle != "Process 00000.000001/2026-00 was assigned to you" || !slices.Contains(assignmentDetails, "Assigned to: you") {
+		t.Errorf("assignment = %q %q", assignmentTitle, assignmentDetails)
+	}
+	text := strings.Join(slices.Concat(activityDetails, assignmentDetails), "\n")
+	if strings.Contains(text, "12345678901") || strings.Contains(text, "Fulano") {
+		t.Errorf("the text shows the user:\n%s", text)
+	}
+}
+
 func TestLoginFailureDetails(t *testing.T) {
 	details := Formatter{}.Details(Event{Kind: AccountLoginFailed, Payload: Payload{Reason: "SEI rejected the login (Usuário ou Senha Inválida.)"}})
 

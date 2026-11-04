@@ -160,3 +160,35 @@ func TestHandlerKeepsStorageErrorsOutOfTheResponse(t *testing.T) {
 		t.Errorf("response = %d %q", response.Code, response.Body.String())
 	}
 }
+
+func TestSelfLinkUsesTheAtomNamespace(t *testing.T) {
+	var out strings.Builder
+	channel := Channel{Title: "sei-monitor: SEDEMO", Link: "https://sei.example.org", Self: "https://monitor.example.org/api/v1/feed/" + token + ".xml"}
+	if err := Write(&out, channel, sampleEvents(), event.Formatter{}, now); err != nil {
+		t.Fatal(err)
+	}
+
+	var doc struct {
+		Channel struct {
+			Self struct {
+				Href string `xml:"href,attr"`
+				Rel  string `xml:"rel,attr"`
+				Type string `xml:"type,attr"`
+			} `xml:"http://www.w3.org/2005/Atom link"`
+		} `xml:"channel"`
+	}
+	if err := xml.Unmarshal([]byte(out.String()), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Channel.Self.Href != channel.Self || doc.Channel.Self.Rel != "self" || doc.Channel.Self.Type != "application/rss+xml" {
+		t.Errorf("atom:link = %+v\n%s", doc.Channel.Self, out.String())
+	}
+}
+
+func TestFeedWithoutSelfLinkLeavesAtomAndTheTokenOut(t *testing.T) {
+	response := serve(t, newHandler(&fakeSource{events: sampleEvents()}), "/feed/"+token+".xml")
+
+	if body := response.Body.String(); strings.Contains(body, "atom") || strings.Contains(body, token) {
+		t.Errorf("feed without a self link:\n%s", body)
+	}
+}

@@ -67,6 +67,9 @@ func (a *application) lastRun(ctx context.Context) (store.CycleRun, bool, error)
 
 func (a *application) feedChannel(ctx context.Context) feed.Channel {
 	channel := feed.Channel{Title: "sei-monitor", Link: a.cfg.SEI.URL}
+	if a.cfg.HTTP.PublicURL != "" {
+		channel.Self = a.cfg.HTTP.PublicURL + "/feed/" + a.cfg.HTTP.FeedToken.Reveal() + ".xml"
+	}
 	accountID := a.monitor.State().AccountID
 	if accountID == 0 {
 		return channel

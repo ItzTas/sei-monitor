@@ -26,21 +26,30 @@ type Source interface {
 type Channel struct {
 	Title string
 	Link  string
+	Self  string
 }
 
 type rss struct {
 	XMLName xml.Name   `xml:"rss"`
 	Version string     `xml:"version,attr"`
+	Atom    string     `xml:"xmlns:atom,attr,omitempty"`
 	Channel rssChannel `xml:"channel"`
 }
 
 type rssChannel struct {
 	Title         string    `xml:"title"`
 	Link          string    `xml:"link"`
+	Self          *atomLink `xml:"atom:link,omitempty"`
 	Description   string    `xml:"description"`
 	LastBuildDate string    `xml:"lastBuildDate"`
 	Generator     string    `xml:"generator"`
 	Items         []rssItem `xml:"item"`
+}
+
+type atomLink struct {
+	Href string `xml:"href,attr"`
+	Rel  string `xml:"rel,attr"`
+	Type string `xml:"type,attr"`
 }
 
 type rssItem struct {
@@ -65,6 +74,10 @@ func Write(w io.Writer, channel Channel, events []event.Event, formatter event.F
 			LastBuildDate: now.UTC().Format(time.RFC1123Z),
 			Generator:     "sei-monitor",
 		},
+	}
+	if channel.Self != "" {
+		doc.Atom = "http://www.w3.org/2005/Atom"
+		doc.Channel.Self = &atomLink{Href: channel.Self, Rel: "self", Type: "application/rss+xml"}
 	}
 	for _, ev := range events {
 		doc.Channel.Items = append(doc.Channel.Items, item(ev, formatter))

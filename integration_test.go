@@ -34,6 +34,7 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 			"DATABASE_URL":   databaseURL,
 			"HTTP_ADDRESS":   "127.0.0.1:8080",
 			"FEED_TOKEN":     feedToken,
+			"PUBLIC_URL":     "https://monitor.example.org/api/v1",
 			"WEBHOOK_URL":    "https://hooks.example.org/sei",
 			"WEBHOOK_SECRET": "0123456789abcdef",
 		})
@@ -88,8 +89,8 @@ func TestTwoCyclesThroughTheWholeApp(t *testing.T) {
 				t.Errorf("feed (%d) does not contain %q:\n%s", feed.Code, part, body)
 			}
 		}
-		if strings.Contains(body, feedToken) {
-			t.Error("the feed shows its own token")
+		if self := `<atom:link href="https://monitor.example.org/api/v1/feed/` + feedToken + `.xml" rel="self" type="application/rss+xml"></atom:link>`; !strings.Contains(body, self) {
+			t.Errorf("feed misses the self link %s:\n%s", self, body)
 		}
 		health := httptest.NewRecorder()
 		handler.ServeHTTP(health, httptest.NewRequestWithContext(ctx, http.MethodGet, "/healthz", nil))

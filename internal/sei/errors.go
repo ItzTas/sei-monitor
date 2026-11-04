@@ -22,6 +22,7 @@ var (
 	ErrRedirect           = errors.New("SEI answered with a redirect")
 	ErrUnexpectedResponse = errors.New("SEI answered outside the API format")
 	ErrOrgNotFound        = errors.New("agency not found on the SEI login page")
+	ErrRefused            = errors.New("SEI refused the request")
 )
 
 type APIError struct {
@@ -62,7 +63,7 @@ func classify(route string, status int, message string) error {
 			return rule.kind
 		}
 	}
-	return nil
+	return ErrRefused
 }
 
 func fold(text string) string {

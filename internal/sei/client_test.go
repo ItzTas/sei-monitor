@@ -269,3 +269,34 @@ func TestDisabledModule(t *testing.T) {
 		t.Fatalf("Login: error = %v, want sei.ErrModuleUnavailable", err)
 	}
 }
+
+func TestLoginsCountsEverySuccessfulLogin(t *testing.T) {
+	server := seitest.New(t)
+	client := newClient(t, server)
+	if client.Logins() != 0 {
+		t.Fatalf("logins before any call = %d", client.Logins())
+	}
+
+	if _, err := client.Processes(t.Context(), seitest.UnitNUPROC); err != nil {
+		t.Fatal(err)
+	}
+	server.ExpireTokens()
+	if _, err := client.Processes(t.Context(), seitest.UnitNUPROC); err != nil {
+		t.Fatal(err)
+	}
+
+	if client.Logins() != 2 {
+		t.Errorf("logins = %d, want 2", client.Logins())
+	}
+}
+
+func TestRefusalWithoutAKnownCauseIsErrRefused(t *testing.T) {
+	server := seitest.New(t)
+	client := newClient(t, server)
+
+	_, err := client.Processes(t.Context(), 9999)
+
+	if !errors.Is(err, sei.ErrRefused) || errors.Is(err, sei.ErrUnauthorized) {
+		t.Fatalf("error = %v, want sei.ErrRefused", err)
+	}
+}

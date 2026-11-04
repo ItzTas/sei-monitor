@@ -103,6 +103,12 @@ func (c *Client) BaseURL() string {
 	return c.base
 }
 
+func (c *Client) Logins() uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.generation
+}
+
 func (c *Client) Login(ctx context.Context) (Session, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

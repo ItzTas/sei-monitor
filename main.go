@@ -39,6 +39,9 @@ type app struct {
 }
 
 func main() {
+	if err := harden(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "warning: could not turn off core dumps and process inspection: %v\n", err)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	code := run(ctx, os.Args[1:], terminal{stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr}, config.Environment())
 	stop()

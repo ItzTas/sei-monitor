@@ -1,0 +1,30 @@
+services:
+  sei-monitor:
+    build: .
+    image: sei-monitor
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - dados:/data
+
+  postgres:
+    image: postgres:18-alpine
+    profiles: [postgres]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sei_monitor
+      POSTGRES_USER: sei_monitor
+      POSTGRES_PASSWORD: ${POSTGRES_SENHA:-}
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sei_monitor -d sei_monitor"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  dados:
+  postgres:

@@ -3,6 +3,7 @@ module github.com/ItzTas/sei-monitor
 go 1.27.2
 
 require (
+	github.com/danielgtaylor/huma/v2 v2.40.0
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/spf13/cobra v1.10.2
@@ -14,7 +15,6 @@ require (
 )
 
 require (
-	github.com/danielgtaylor/huma/v2 v2.40.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

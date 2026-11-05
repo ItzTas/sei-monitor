@@ -34,7 +34,7 @@ func (s *fakeSource) RecentEvents(_ context.Context, limit int) ([]event.Event, 
 func sampleEvents() []event.Event {
 	return []event.Event{
 		{
-			ID: 7, Kind: event.ActivityAdded,
+			ID: 7, Kind: event.ActivityAdded, ProcedureID: 4242,
 			OccurredAt: time.Date(2026, 11, 4, 17, 13, 5, 0, time.UTC), DetectedAt: time.Date(2026, 11, 4, 17, 15, 0, 0, time.UTC),
 			Payload: event.Payload{ProcessNumber: "00000.000001/2026-00", Unit: "SEDEMO/NUPROC", ActivityText: `<script>alert("x")</script> recebido`},
 		},
@@ -54,6 +54,7 @@ type parsed struct {
 		Description string `xml:"description"`
 		Items       []struct {
 			Title string `xml:"title"`
+			Link  string `xml:"link"`
 			GUID  struct {
 				Value       string `xml:",chardata"`
 				IsPermaLink string `xml:"isPermaLink,attr"`
@@ -90,6 +91,12 @@ func TestWriteProducesAnRSS2Feed(t *testing.T) {
 	first := doc.Channel.Items[0]
 	if first.Title != "New activity on process 00000.000001/2026-00 (2026-11-04 17:13)" {
 		t.Errorf("title = %q", first.Title)
+	}
+	if first.Link != "https://sei.example.org/sei/controlador.php?acao=procedimento_trabalhar&id_procedimento=4242" {
+		t.Errorf("link = %q, want the process page on SEI", first.Link)
+	}
+	if doc.Channel.Items[1].Link != "" {
+		t.Errorf("link = %q, want none for an event without a process", doc.Channel.Items[1].Link)
 	}
 	if first.GUID.Value != "7-20261104T171500Z" || first.GUID.IsPermaLink != "false" {
 		t.Errorf("guid = %+v", first.GUID)

@@ -54,6 +54,7 @@ type atomLink struct {
 
 type rssItem struct {
 	Title       string  `xml:"title"`
+	Link        string  `xml:"link,omitempty"`
 	GUID        rssGUID `xml:"guid"`
 	PubDate     string  `xml:"pubDate"`
 	Description string  `xml:"description"`
@@ -80,7 +81,7 @@ func Write(w io.Writer, channel Channel, events []event.Event, formatter event.F
 		doc.Channel.Self = &atomLink{Href: channel.Self, Rel: "self", Type: "application/rss+xml"}
 	}
 	for _, ev := range events {
-		doc.Channel.Items = append(doc.Channel.Items, item(ev, formatter))
+		doc.Channel.Items = append(doc.Channel.Items, item(ev, formatter, channel.Link))
 	}
 	if _, err := io.WriteString(w, xml.Header); err != nil {
 		return err
@@ -93,17 +94,25 @@ func Write(w io.Writer, channel Channel, events []event.Event, formatter event.F
 	return encoder.Close()
 }
 
-func item(ev event.Event, formatter event.Formatter) rssItem {
+func item(ev event.Event, formatter event.Formatter, seiURL string) rssItem {
 	lines := formatter.Details(ev)
 	for i, line := range lines {
 		lines[i] = html.EscapeString(line)
 	}
 	return rssItem{
 		Title:       formatter.Title(ev),
+		Link:        processLink(seiURL, ev.ProcedureID),
 		GUID:        rssGUID{Value: fmt.Sprintf("%d-%s", ev.ID, ev.DetectedAt.UTC().Format("20060102T150405Z")), IsPermaLink: "false"},
 		PubDate:     ev.OccurredAt.UTC().Format(time.RFC1123Z),
 		Description: strings.Join(lines, "<br>"),
 	}
+}
+
+func processLink(seiURL string, procedureID int64) string {
+	if procedureID == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s/sei/controlador.php?acao=procedimento_trabalhar&id_procedimento=%d", seiURL, procedureID)
 }
 
 type Handler struct {

@@ -41,9 +41,9 @@ func TestFullMessageIndentsTheDetailsUnderEachTitle(t *testing.T) {
 
 	msg := notify.Compose(events, event.Formatter{Location: time.UTC, Full: true, Self: "fulano.tal"})
 
-	first := "New activity on process 00000.000001/2026-00 (2026-11-04 18:00)\n" +
+	first := "00000.000001/2026-00: Processo recebido na unidade\n" +
 		"  When: 2026-11-04 18:00\n  Unit: SEDEMO/NUPROC\n  Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)"
-	if !strings.HasPrefix(msg.Body, first+"\n\nNew activity on process 00000.000002/2026-00") {
+	if !strings.HasPrefix(msg.Body, first+"\n\n00000.000002/2026-00: Processo recebido na unidade") {
 		t.Errorf("body = %q", msg.Body)
 	}
 	if msg.Events[0].Detail.ActivityText != "Processo recebido na unidade" {

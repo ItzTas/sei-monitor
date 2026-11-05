@@ -1,6 +1,7 @@
 package event
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 	"time"
@@ -9,6 +10,8 @@ import (
 const (
 	dateLayout     = "2006-01-02"
 	dateTimeLayout = "2006-01-02 15:04"
+	labelLimit     = 40
+	summaryLimit   = 80
 )
 
 type Formatter struct {
@@ -23,10 +26,8 @@ func (f Formatter) Title(ev Event) string {
 		ProcessEntered: func() string {
 			return fmt.Sprintf("New process in %s: %s%s", p.Unit, p.ProcessNumber, map[bool]string{true: " (assigned to you)"}[p.AssignedToSelf])
 		},
-		ProcessLeft: func() string { return fmt.Sprintf("Process %s left %s", p.ProcessNumber, p.Unit) },
-		ActivityAdded: func() string {
-			return fmt.Sprintf("New activity on process %s (%s)", p.ProcessNumber, f.time(ev.OccurredAt))
-		},
+		ProcessLeft:        func() string { return fmt.Sprintf("Process %s left %s", p.ProcessNumber, p.Unit) },
+		ActivityAdded:      func() string { return f.activity(ev) },
 		DocumentAdded:      func() string { return fmt.Sprintf("New document on process %s", p.ProcessNumber) },
 		AssignmentChanged:  func() string { return f.assignment(p) },
 		ReturnDueSoon:      func() string { return f.returnDue(ev) },
@@ -106,6 +107,15 @@ func (f Formatter) assignment(p Payload) string {
 	return fmt.Sprintf("Process %s was assigned to someone else", p.ProcessNumber)
 }
 
+func (f Formatter) activity(ev Event) string {
+	p := ev.Payload
+	if !f.Full || strings.TrimSpace(p.ActivityText) == "" {
+		return fmt.Sprintf("New activity on process %s (%s)", p.ProcessNumber, f.time(ev.OccurredAt))
+	}
+	label := shorten(cmp.Or(strings.TrimSpace(p.Description), p.ProcessType), labelLimit)
+	return joinNonEmpty(p.ProcessNumber, parenthesized(label)) + ": " + shorten(p.ActivityText, summaryLimit)
+}
+
 func (f Formatter) returnDue(ev Event) string {
 	date, err := time.Parse(dateLayout, ev.Payload.ReturnDate)
 	if err != nil {
@@ -139,6 +149,14 @@ func (f Formatter) location() *time.Location {
 		return time.UTC
 	}
 	return f.Location
+}
+
+func shorten(text string, limit int) string {
+	runes := []rune(strings.Join(strings.Fields(text), " "))
+	if len(runes) <= limit {
+		return string(runes)
+	}
+	return strings.TrimSpace(string(runes[:limit-1])) + "…"
 }
 
 func parenthesized(parts ...string) string {

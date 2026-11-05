@@ -34,6 +34,17 @@ func TestTitles(t *testing.T) {
 		{"entered and assigned to the user", Event{Kind: ProcessEntered, Payload: with(func(p *Payload) { p.AssignedToSelf = true })}, "New process in SEDEMO/NUPROC: 00000.000001/2026-00 (assigned to you)", ""},
 		{"left", Event{Kind: ProcessLeft, Payload: process}, "Process 00000.000001/2026-00 left SEDEMO/NUPROC", ""},
 		{"activity in the SEI time zone", Event{Kind: ActivityAdded, OccurredAt: time.Date(2026, 11, 4, 17, 13, 5, 0, time.UTC), Payload: process}, "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)", ""},
+		{"activity with a description", Event{Kind: ActivityAdded, OccurredAt: detected, Payload: with(func(p *Payload) {
+			p.ProcessType, p.Description, p.ActivityText = "Contrato", "Compra de cadeiras", "Processo recebido na unidade"
+		})}, "New activity on process 00000.000001/2026-00 (2026-11-04 14:00)", "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade"},
+		{"activity on a process without a description", Event{Kind: ActivityAdded, OccurredAt: detected, Payload: with(func(p *Payload) {
+			p.ProcessType, p.ActivityText = "Contrato", "Processo recebido na unidade"
+		})}, "New activity on process 00000.000001/2026-00 (2026-11-04 14:00)", "00000.000001/2026-00 (Contrato): Processo recebido na unidade"},
+		{"activity with long texts", Event{Kind: ActivityAdded, OccurredAt: detected, Payload: with(func(p *Payload) {
+			p.Description = "Aquisição de cadeiras ergonômicas para o setor de protocolo"
+			p.ActivityText = "Processo remetido pela unidade SEDEMO/NUPROC\n  para a unidade SEDEMO/PROTOCOLO com retorno programado"
+		})}, "New activity on process 00000.000001/2026-00 (2026-11-04 14:00)",
+			"00000.000001/2026-00 (Aquisição de cadeiras ergonômicas para…): Processo remetido pela unidade SEDEMO/NUPROC para a unidade SEDEMO/PROTOCOLO co…"},
 		{"document", Event{Kind: DocumentAdded, Payload: process}, "New document on process 00000.000001/2026-00", ""},
 		{"assigned to the user", Event{Kind: AssignmentChanged, Payload: with(func(p *Payload) { p.AssignedUser, p.AssignedToSelf = "fulano.tal", true })}, "Process 00000.000001/2026-00 was assigned to you", ""},
 		{"assigned to someone else", Event{Kind: AssignmentChanged, Payload: with(func(p *Payload) { p.AssignedUser = "beltrano.silva" })}, "Process 00000.000001/2026-00 was assigned to someone else", "Process 00000.000001/2026-00 was assigned to beltrano.silva"},

@@ -14,6 +14,7 @@ func TestChannelsUseTheNamesOfTheirDeliveries(t *testing.T) {
 		Telegram: &config.Telegram{Token: config.NewSecret(botToken), ChatID: "-1001234567890"},
 		Ntfy:     &config.Ntfy{URL: "https://ntfy.sh/sei-topic"},
 		Webhook:  &config.Webhook{URL: "https://hooks.example.org/sei", Secret: config.NewSecret(webhookSecret)},
+		AMQP:     &config.AMQP{URL: config.NewSecret("amqp://monitor:pw@rabbitmq:5672/"), Exchange: config.DefaultAMQPExchange},
 	}
 
 	var names []string

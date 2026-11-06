@@ -25,6 +25,7 @@ const (
 	DefaultTimeZone     = "America/Sao_Paulo"
 	DefaultPollInterval = 15 * time.Minute
 	MinPollInterval     = 5 * time.Minute
+	DefaultAMQPExchange = "sei-monitor"
 
 	TLSStartTLS = "starttls"
 	TLSImplicit = "tls"
@@ -91,6 +92,7 @@ type Channels struct {
 	Telegram *Telegram
 	Ntfy     *Ntfy
 	Webhook  *Webhook
+	AMQP     *AMQP
 	WhatsApp *WhatsApp
 }
 
@@ -103,6 +105,7 @@ func (c Channels) Enabled() []string {
 		{"telegram", c.Telegram != nil},
 		{"ntfy", c.Ntfy != nil},
 		{"webhook", c.Webhook != nil},
+		{"amqp", c.AMQP != nil},
 		{"whatsapp", c.WhatsApp != nil},
 	}
 	var enabled []string
@@ -137,6 +140,11 @@ type Ntfy struct {
 type Webhook struct {
 	URL    string
 	Secret Secret
+}
+
+type AMQP struct {
+	URL      Secret
+	Exchange string
 }
 
 type WhatsApp struct {
@@ -533,6 +541,7 @@ func (r *reader) channels() Channels {
 		Telegram: r.telegram(),
 		Ntfy:     r.ntfy(),
 		Webhook:  r.webhook(),
+		AMQP:     r.amqp(),
 		WhatsApp: r.whatsapp(),
 	}
 }
@@ -635,6 +644,22 @@ func (r *reader) webhook() *Webhook {
 		r.problem("WEBHOOK_SECRET: use at least %d characters", minWebhookSecretLength)
 	}
 	return &Webhook{URL: value, Secret: secret}
+}
+
+func (r *reader) amqp() *AMQP {
+	address := r.secret("AMQP_URL")
+	if address.IsZero() {
+		return nil
+	}
+	parsed, err := url.Parse(address.Reveal())
+	if err != nil || strings.ContainsAny(address.Reveal(), " \t\r\n") || (parsed.Scheme != "amqp" && parsed.Scheme != "amqps") || parsed.Hostname() == "" {
+		r.problem("AMQP_URL: use amqp://user:password@host:5672/vhost or amqps://..., with special characters in the password percent-encoded")
+	}
+	exchange := cmp.Or(r.text("AMQP_EXCHANGE"), DefaultAMQPExchange)
+	if !regexp.MustCompile(`^[A-Za-z0-9._:-]{1,255}$`).MatchString(exchange) || strings.HasPrefix(exchange, "amq.") {
+		r.problem("AMQP_EXCHANGE: use letters, digits, '-', '_', '.' and ':', without the reserved amq. prefix (got %q)", exchange)
+	}
+	return &AMQP{URL: address, Exchange: exchange}
 }
 
 func (r *reader) whatsapp() *WhatsApp {

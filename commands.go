@@ -135,7 +135,7 @@ func (a *app) sendTest(cmd *cobra.Command, _ []string) (err error) {
 		channels = append(channels, whatsapp.NewChannel(session, cfg.WhatsApp.Recipients))
 	}
 	if len(channels) == 0 {
-		return errors.New("no channel is configured: set SMTP_HOST, TELEGRAM_TOKEN, NTFY_URL, WEBHOOK_URL or WHATSAPP_RECIPIENTS")
+		return errors.New("no channel is configured: set SMTP_HOST, TELEGRAM_TOKEN, NTFY_URL, WEBHOOK_URL, AMQP_URL or WHATSAPP_RECIPIENTS")
 	}
 	results := make([]error, len(channels))
 	var wg sync.WaitGroup

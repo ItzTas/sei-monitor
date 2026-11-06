@@ -3,7 +3,7 @@
 sei-monitor watches your processes on SEI and tells you when something changes. It logs in with
 your own SEI account through SEI's REST module (`mod-wssei`), checks the processes of your units
 every few minutes and turns what changed into events. You can read them in an RSS feed or a JSON
-API, or get them by email, Telegram, ntfy, webhook or WhatsApp.
+API, or get them by email, Telegram, ntfy, webhook, AMQP (RabbitMQ) or WhatsApp.
 
 It is self-hosted. It runs on your own machine or server, keeps its data in SQLite or Postgres, and
 talks only to your SEI and to the channels you turn on. The name is provisional.
@@ -76,7 +76,7 @@ Set exactly one of these:
   doesn't have, so this option fits best when sei-monitor runs outside Docker.
 
 Every secret variable accepts the same `_FILE` form: `SEI_PASSWORD`, `DATABASE_URL`, `FEED_TOKEN`,
-`API_TOKEN`, `SMTP_PASSWORD`, `TELEGRAM_TOKEN`, `NTFY_TOKEN` and `WEBHOOK_SECRET`.
+`API_TOKEN`, `SMTP_PASSWORD`, `TELEGRAM_TOKEN`, `NTFY_TOKEN`, `WEBHOOK_SECRET` and `AMQP_URL`.
 
 A Docker secret for the password looks like this in `compose.yaml`:
 
@@ -117,12 +117,12 @@ memory, never in the database, a file, a log or a message.
 | `HTTP_ADDRESS` | `:8080` | Address of the HTTP server; empty turns it off. |
 | `PUBLIC_URL` | | Public address behind nginx, used only for the feed's link to itself. |
 | `FEED_TOKEN` | | Turns on the RSS feed. At least 32 characters. |
-| `API_TOKEN` | | Turns on the JSON API. At least 32 characters, different from `FEED_TOKEN`. |
+| `API_TOKEN` | | Turns on the JSON API and the web interface. At least 32 characters, different from `FEED_TOKEN`. |
 | `NOTIFICATION_DETAIL` | `minimal` | Detail of the feed and the messages: `minimal` or `full`. |
 | `API_DETAIL` | `NOTIFICATION_DETAIL` | Detail of the API: `minimal` or `full`. |
 | `RETURN_WARNING_DAYS` | `2` | How early to warn about a scheduled return. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
-| `SMTP_*`, `TELEGRAM_*`, `NTFY_*`, `WEBHOOK_*`, `WHATSAPP_RECIPIENTS` | | The channels, below. |
+| `SMTP_*`, `TELEGRAM_*`, `NTFY_*`, `WEBHOOK_*`, `AMQP_*`, `WHATSAPP_RECIPIENTS` | | The channels, below. |
 
 ## Reading the events
 
@@ -242,6 +242,26 @@ def is_from_sei_monitor(secret: bytes, body: bytes, signature: str) -> bool:
     return hmac.compare_digest(expected, signature)
 ```
 
+### AMQP (RabbitMQ)
+
+Set `AMQP_URL` to the broker, as `amqp://user:password@host:5672/vhost` or `amqps://...` for TLS,
+with any special character in the password percent-encoded. Plain `amqp` sends the password and the
+events unencrypted. Keep it for a broker on the same machine or the same Docker network, and use
+`amqps` for anything else. The broker user needs the configure and write permissions on the
+exchange.
+
+sei-monitor declares a durable topic exchange named by `AMQP_EXCHANGE` (`sei-monitor` by default)
+and publishes one persistent message per event, with the event kind as the routing key. Bind a
+queue to `#` to get everything, or only to the kinds you care about, such as `return_overdue`. The
+body is a single event, the same object as one item of the webhook's `events` list. `message_id`
+holds the event id and `type` the kind. The message from `send-test` goes out under the routing key
+`test`, with the body `{"test": true}`.
+
+sei-monitor waits for the broker to confirm every message. If part of a batch fails, it sends the
+whole batch again, so a consumer can get the same event twice; drop duplicates by `message_id`.
+RabbitMQ confirms a message that no queue is bound to and then throws it away, so bind your queues
+before the events you want start arriving.
+
 ### WhatsApp
 
 The WhatsApp channel uses an unofficial client library (whatsmeow), not an API offered by
@@ -323,12 +343,12 @@ are retried after 30 seconds, then a minute, doubling up to the check interval.
 
 ## Security
 
-- Secrets (the password, the tokens, the SMTP password, the webhook secret) print as `[redacted]`
-  everywhere, and none of them goes into the database.
+- Secrets (the password, the tokens, the SMTP password, the webhook secret, the AMQP address) print
+  as `[redacted]` everywhere, and none of them goes into the database.
 - On Linux, sei-monitor turns off core dumps and blocks other processes from reading its memory
   through debugging interfaces. It has no profiling endpoint.
-- Calls to SEI and to the email, Telegram, ntfy and webhook channels verify TLS and time out after
-  30 seconds. Logs never include request headers, and errors never include addresses that may
+- Calls to SEI and to the email, Telegram, ntfy, webhook and AMQP channels verify TLS and time out
+  after 30 seconds. Logs never include request headers, and errors never include addresses that may
   carry a token.
 - The feed and the API compare their tokens in constant time. The API sends `no-store`, has no
   CORS and never returns the username.
@@ -346,6 +366,8 @@ are retried after 30 seconds, then a minute, doubling up to the check interval.
 - The storage tests run on SQLite and on Postgres. Point `TEST_DATABASE_URL` at a Postgres server,
   or install `initdb` and `postgres` and the tests start a throwaway one. With `CI` set, a missing
   Postgres fails the tests instead of skipping them.
+- The AMQP channel tests need a RabbitMQ: point `TEST_AMQP_URL` at one, such as
+  `amqp://guest:guest@localhost:5672/`. Without it they are skipped, and with `CI` set they fail.
 - `make openapi` regenerates `docs/openapi.json`, and a test fails while the file lags behind the
   code.
 - `git config core.hooksPath .githooks` turns on the hooks: Conventional Commits messages, and

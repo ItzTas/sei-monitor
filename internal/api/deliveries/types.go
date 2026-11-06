@@ -8,7 +8,7 @@ import (
 
 type ListInput struct {
 	Status  string `query:"status" enum:"pending,sent,failed" doc:"Only deliveries in this status."`
-	Channel string `query:"channel" enum:"email,telegram,ntfy,webhook,whatsapp" doc:"Only deliveries through this channel."`
+	Channel string `query:"channel" enum:"email,telegram,ntfy,webhook,amqp,whatsapp" doc:"Only deliveries through this channel."`
 	resp.PageInput
 }
 

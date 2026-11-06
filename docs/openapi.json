@@ -764,6 +764,7 @@
                 "telegram",
                 "ntfy",
                 "webhook",
+                "amqp",
                 "whatsapp"
               ],
               "type": "string"

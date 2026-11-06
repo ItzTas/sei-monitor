@@ -293,6 +293,7 @@ func TestChannelsTurnOnWithTheirMainVariable(t *testing.T) {
 		"NTFY_URL":            "https://ntfy.example.org/sei-topic/",
 		"WEBHOOK_URL":         "https://hooks.example.org/in?key=abc",
 		"WEBHOOK_SECRET":      "0123456789abcdef",
+		"AMQP_URL":            "amqps://monitor:amqp-pw@rabbit.example.org/sei",
 		"WHATSAPP_RECIPIENTS": "+55 (95) 99123-4567, 120363012345678901@g.us",
 	}), nil)
 	if problems != nil {
@@ -312,10 +313,13 @@ func TestChannelsTurnOnWithTheirMainVariable(t *testing.T) {
 	if cfg.Channels.Webhook == nil || cfg.Channels.Webhook.URL != "https://hooks.example.org/in?key=abc" {
 		t.Errorf("webhook = %+v", cfg.Channels.Webhook)
 	}
+	if amqp := cfg.Channels.AMQP; amqp == nil || amqp.URL.Reveal() != "amqps://monitor:amqp-pw@rabbit.example.org/sei" || amqp.Exchange != "sei-monitor" {
+		t.Errorf("amqp = %+v", amqp)
+	}
 	if cfg.Channels.WhatsApp == nil || !slices.Equal(cfg.Channels.WhatsApp.Recipients, []string{"5595991234567", "120363012345678901@g.us"}) {
 		t.Errorf("whatsapp = %+v", cfg.Channels.WhatsApp)
 	}
-	if enabled := cfg.Channels.Enabled(); !slices.Equal(enabled, []string{"email", "telegram", "ntfy", "webhook", "whatsapp"}) {
+	if enabled := cfg.Channels.Enabled(); !slices.Equal(enabled, []string{"email", "telegram", "ntfy", "webhook", "amqp", "whatsapp"}) {
 		t.Errorf("enabled channels = %v", enabled)
 	}
 	if enabled := (Channels{Ntfy: cfg.Channels.Ntfy}).Enabled(); !slices.Equal(enabled, []string{"ntfy"}) {
@@ -373,6 +377,7 @@ func TestProblemsNeverShowSecretValues(t *testing.T) {
 		"WEBHOOK_SECRET": "hook-4",
 		"DATABASE_URL":   "mysql://user:database-secret-5@host/db",
 		"SEI_URL":        "https://user:url-secret-6@sei.example.org",
+		"AMQP_URL":       "amqp://user:amqp#secret-8@rabbit.example.org",
 	}
 	env := baseEnv(secrets)
 	env["SEI_PASSWORD_FILE"] = "/run/secrets/sei"
@@ -383,10 +388,42 @@ func TestProblemsNeverShowSecretValues(t *testing.T) {
 		t.Fatal("want an error")
 	}
 
-	for _, value := range []string{"sei-secret-1", "feed-secret-2", "telegram-secret-3", "hook-4", "database-secret-5", "url-secret-6", "file-secret-7"} {
+	for _, value := range []string{"sei-secret-1", "feed-secret-2", "telegram-secret-3", "hook-4", "database-secret-5", "url-secret-6", "file-secret-7", "secret-8"} {
 		if strings.Contains(err.Error(), value) {
 			t.Errorf("the error shows %q:\n%v", value, err)
 		}
+	}
+}
+
+func TestAMQP(t *testing.T) {
+	tests := []struct {
+		url      string
+		exchange string
+		want     string
+		problem  string
+	}{
+		{url: "amqp://monitor:pw@rabbitmq:5672/", want: "sei-monitor"},
+		{url: "amqps://monitor:pw@rabbit.example.org/sei", exchange: "sei.events:v1", want: "sei.events:v1"},
+		{url: "https://rabbit.example.org", problem: "AMQP_URL: use amqp://"},
+		{url: "amqp:///sei", problem: "AMQP_URL: use amqp://"},
+		{url: "amqp://monitor:pw@rabbit.example.org/sei ", problem: "AMQP_URL: use amqp://"},
+		{url: "amqp://rabbitmq", exchange: "amq.topic", problem: "AMQP_EXCHANGE: use letters"},
+		{url: "amqp://rabbitmq", exchange: "sei monitor", problem: "AMQP_EXCHANGE: use letters"},
+	}
+	for _, tt := range tests {
+		cfg, problems := load(t, baseEnv(map[string]string{"AMQP_URL": tt.url, "AMQP_EXCHANGE": tt.exchange}), nil)
+		if tt.problem != "" {
+			if !slices.ContainsFunc(problems, func(p string) bool { return strings.HasPrefix(p, tt.problem) }) {
+				t.Errorf("AMQP_URL=%q AMQP_EXCHANGE=%q: problems = %q, want %q", tt.url, tt.exchange, problems, tt.problem)
+			}
+			continue
+		}
+		if problems != nil || cfg.Channels.AMQP == nil || cfg.Channels.AMQP.Exchange != tt.want {
+			t.Errorf("AMQP_URL=%q AMQP_EXCHANGE=%q: %+v, %q; want exchange %q", tt.url, tt.exchange, cfg.Channels.AMQP, problems, tt.want)
+		}
+	}
+	if cfg, problems := load(t, baseEnv(map[string]string{"AMQP_EXCHANGE": "sei-monitor"}), nil); problems != nil || cfg.Channels.AMQP != nil {
+		t.Errorf("without AMQP_URL: %+v, %q", cfg.Channels.AMQP, problems)
 	}
 }
 

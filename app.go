@@ -18,6 +18,7 @@ import (
 	"github.com/ItzTas/sei-monitor/internal/notify"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 	"github.com/ItzTas/sei-monitor/internal/store"
+	"github.com/ItzTas/sei-monitor/internal/ui"
 	"github.com/ItzTas/sei-monitor/internal/whatsapp"
 )
 
@@ -74,6 +75,8 @@ func (a *application) routes() httpserver.Routes {
 	if !a.cfg.HTTP.APIToken.IsZero() {
 		deps := api.Deps{Store: a.store, Monitor: a.monitor, Token: a.cfg.HTTP.APIToken, FullDetail: a.cfg.APIFullDetail, Location: a.cfg.SEI.Location, Log: a.log}
 		routes.API = func(mux *http.ServeMux) { api.Register(mux, deps) }
+		pages := ui.Deps{Store: a.store, Monitor: a.monitor, Token: a.cfg.HTTP.APIToken, FullDetail: a.cfg.APIFullDetail, Location: a.cfg.SEI.Location, Now: a.now, Log: a.log}
+		routes.UI = func(mux *http.ServeMux) { ui.Register(mux, pages) }
 	}
 	return routes
 }

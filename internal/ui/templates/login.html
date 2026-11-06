@@ -1,0 +1,15 @@
+{{define "login" -}}
+{{template "head" "Sign in"}}
+<main class="login">
+  <h1>sei-monitor</h1>
+  <form method="post" action="login">
+    <label for="token">API token</label>
+    <input id="token" name="token" type="password" autocomplete="current-password" required autofocus>
+    {{- if .Rejected}}
+    <p class="error" role="alert">That isn't the API_TOKEN from the configuration.</p>
+    {{- end}}
+    <button type="submit">Sign in</button>
+  </form>
+</main>
+{{template "foot"}}
+{{- end}}

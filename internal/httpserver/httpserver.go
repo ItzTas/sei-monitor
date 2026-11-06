@@ -28,6 +28,7 @@ type Routes struct {
 	Health http.Handler
 	Feed   http.Handler
 	API    func(mux *http.ServeMux)
+	UI     func(mux *http.ServeMux)
 }
 
 type Server struct {
@@ -59,6 +60,9 @@ func Handler(routes Routes, logger *slog.Logger) http.Handler {
 	}
 	if routes.API != nil {
 		routes.API(mux)
+	}
+	if routes.UI != nil {
+		routes.UI(mux)
 	}
 	return accessLog(logger, secureHeaders(limitBody(mux)))
 }

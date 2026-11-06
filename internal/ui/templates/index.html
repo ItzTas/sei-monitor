@@ -1,0 +1,14 @@
+{{define "index" -}}
+{{template "head" "Events"}}
+<header>
+  <h1>sei-monitor</h1>
+  <form method="post" action="logout"><button type="submit">Sign out</button></form>
+</header>
+<main>
+  <h2>Latest events</h2>
+  <section id="events" hx-get="events" hx-trigger="every 60s">
+    {{- template "events" .}}
+  </section>
+</main>
+{{template "foot"}}
+{{- end}}

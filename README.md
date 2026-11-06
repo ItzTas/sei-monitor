@@ -161,6 +161,19 @@ while a check is running, while monitoring is paused or before sei-monitor first
 
 [`docs/openapi.json`](docs/openapi.json) describes every route and field.
 
+### Web interface
+
+With `API_TOKEN` set, sei-monitor also serves a page at `/ui/` that lists the latest 50 events and
+refreshes the list every minute. Sign in with the `API_TOKEN`, and the browser keeps a session
+cookie for 7 days. The cookie carries a signature made with the token, so the browser never stores
+the token itself. Changing `API_TOKEN` signs every browser out; signing out on the page only clears
+the cookie in the browser you're using.
+
+The cookie is marked `Secure`, so open the page over HTTPS or on `localhost`. Browsers refuse it on
+plain HTTP to any other address, and signing in then sends you straight back to the form. With the
+nginx setup below, the page is at `https://example.org/api/v1/ui/`. It shows the events at the
+API's detail level (`API_DETAIL`).
+
 ### Detail level
 
 At the `minimal` level, events carry the event type, the process number, the unit and the date.
@@ -311,15 +324,15 @@ it answers 200 for one interval while the first check runs. The Docker image use
 ## When SEI refuses the login
 
 sei-monitor doesn't try again, because repeated failures can lock the account. It pauses, records
-an `account_login_failed` event, delivers it through the channels and keeps serving the feed and
-the API. Fix the configuration and restart it. Network errors and SEI outages are different: those
+an `account_login_failed` event, delivers it through the channels and keeps serving the feed, the
+API and the web interface. Fix the configuration and restart it. Network errors and SEI outages are different: those
 are retried after 30 seconds, then a minute, doubling up to the check interval.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `serve` | Watches SEI, sends the notifications and serves the feed and the API. It runs when you give no command. |
+| `serve` | Watches SEI, sends the notifications and serves the feed, the API and the web interface. It runs when you give no command. |
 | `test-login` | Logs in and shows the SEI and module versions and your units. |
 | `orgs` | Lists the acronym and id of every agency on the SEI login page. It needs only `SEI_URL`. |
 | `diagnose` | Checks how the SEI API behaves and prints only counts and types, so its output is safe to share. |

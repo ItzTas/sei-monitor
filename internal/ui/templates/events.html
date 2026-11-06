@@ -1,0 +1,22 @@
+{{define "events" -}}
+{{if .Failed -}}
+<p class="notice">Couldn't load the events. The page tries again in a minute.</p>
+{{- else if not .Events -}}
+<p class="notice">No events yet. They start with the second check, because the first one only takes note of what is already there.</p>
+{{- else -}}
+<table>
+  <thead>
+    <tr><th scope="col">When</th><th scope="col">Unit</th><th scope="col">What happened</th></tr>
+  </thead>
+  <tbody>
+    {{- range .Events}}
+    <tr>
+      <td><time datetime="{{.OccurredAt.Format "2006-01-02T15:04:05Z07:00"}}">{{local .OccurredAt}}</time></td>
+      <td>{{.Unit}}</td>
+      <td>{{.Title}}</td>
+    </tr>
+    {{- end}}
+  </tbody>
+</table>
+{{- end}}
+{{- end}}

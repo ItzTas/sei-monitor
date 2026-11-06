@@ -1,4 +1,4 @@
-.PHONY: check lint test openapi up down
+.PHONY: check lint test openapi local up down
 
 check: lint test
 
@@ -12,6 +12,9 @@ test:
 
 openapi:
 	go run . openapi > docs/openapi.json
+
+local:
+	./scripts/local.sh $(CMD)
 
 up:
 	docker compose up -d --build

@@ -63,6 +63,20 @@ docker compose up -d
 To stay on a release rather than follow `main`, put its tag in the `image` line of `compose.yaml`,
 for example `ghcr.io/itztas/sei-monitor:1.2`.
 
+## Running without Docker
+
+With Go 1.27 installed, `make local` builds sei-monitor and runs `serve` with the variables from
+`.env`, the same file Compose reads. Pass another command in `CMD`, as in
+`make local CMD=test-login` or `make local CMD=send-test`. A variable already set in your shell
+takes precedence over the file, so `LOG_LEVEL=debug make local` works.
+
+Two values change on the way, because they describe the container. A SQLite database under `/data`
+goes to the `data` folder of the repository, and an `HTTP_ADDRESS` with no host, such as `:8080`,
+listens on `127.0.0.1` only, as Compose publishes it. To listen on every interface, write the host
+out: `0.0.0.0:8080`. A Postgres `DATABASE_URL` is used as written, so point it at a server you run
+yourself. `SEI_PASSWORD_CMD` fits best here, since tools such as `secret-tool` have the desktop
+session they need.
+
 ## Passwords
 
 Set exactly one of these:

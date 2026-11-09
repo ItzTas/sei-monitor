@@ -5,7 +5,7 @@ your own SEI account through SEI's REST module (`mod-wssei`), checks the process
 every few minutes and turns what changed into events. You can read them in an RSS feed or a JSON
 API, or get them by email, Telegram, ntfy, webhook, AMQP (RabbitMQ) or WhatsApp.
 
-It is self-hosted. It runs on your own machine or server, keeps its data in SQLite or Postgres, and
+It is self-hosted. It runs on your own machine or server, keeps its data in Postgres, and
 talks only to your SEI and to the channels you turn on. The name is provisional.
 
 ## What it reports
@@ -32,7 +32,7 @@ process you had before you installed sei-monitor; reports start with the second 
 
 ## Quick start with Docker
 
-1. Copy the example configuration: `cp .env.example .env`.
+1. Copy the example configuration, `cp .env.example .env`, and set `POSTGRES_PASSWORD` in it.
 2. Set `SEI_URL` and list the agencies to find yours:
    `docker compose run --rm sei-monitor orgs`.
 3. Fill in `SEI_USERNAME`, `SEI_ORG` and the password (see [Passwords](#passwords)).
@@ -44,10 +44,16 @@ process you had before you installed sei-monitor; reports start with the second 
    `docker compose run --rm sei-monitor send-test`.
 7. Start it: `docker compose up -d`, and follow the logs with `docker compose logs -f sei-monitor`.
 
-Compose pulls the published image, `ghcr.io/itztas/sei-monitor`, and keeps the SQLite database in
-the `data` volume. `docker compose up -d --build` builds the image from your checkout instead. To
-use Postgres, follow the comments next to `DATABASE_URL` in `.env.example` and start with
-`docker compose --profile postgres up -d`.
+Compose pulls the published image, `ghcr.io/itztas/sei-monitor`, and starts a Postgres next to it.
+The data stays in the `postgres` volume. sei-monitor waits for the database to accept connections
+and creates its tables on the first start. `docker compose up -d --build` builds the image from
+your checkout instead.
+
+### Coming from a SQLite install
+
+Installs that kept their data in SQLite have to start over on Postgres. The first check only takes
+note of what is already there, so you won't get a flood of old events. Pair the WhatsApp number
+again with `whatsapp-pair`.
 
 ### Running on a server
 
@@ -65,17 +71,15 @@ for example `ghcr.io/itztas/sei-monitor:1.2`.
 
 ## Running without Docker
 
-With Go 1.27 installed, `make local` builds sei-monitor and runs `serve` with the variables from
-`.env`, the same file Compose reads. Pass another command in `CMD`, as in
-`make local CMD=test-login` or `make local CMD=send-test`. A variable already set in your shell
-takes precedence over the file, so `LOG_LEVEL=debug make local` works.
+With Go 1.27 installed, `make local` runs `serve` with the variables from `.env`, the same file
+Compose reads. Pass another command in `CMD`, as in `make local CMD=test-login` or
+`make local CMD=send-test`. A variable already set in your shell takes precedence over the file, so
+`LOG_LEVEL=debug make local` works. `make dev` runs it with hot reload and rebuilds on every change.
 
-Two values change on the way, because they describe the container. A SQLite database under `/data`
-goes to the `data` folder of the repository, and an `HTTP_ADDRESS` with no host, such as `:8080`,
-listens on `127.0.0.1` only, as Compose publishes it. To listen on every interface, write the host
-out: `0.0.0.0:8080`. A Postgres `DATABASE_URL` is used as written, so point it at a server you run
-yourself. `SEI_PASSWORD_CMD` fits best here, since tools such as `secret-tool` have the desktop
-session they need.
+Outside Compose, point `DATABASE_URL` at a Postgres server you run yourself; the commented line in
+`.env.example` shows the shape. `HTTP_ADDRESS` is used as written, so `:8080` listens on every
+interface; use `127.0.0.1:8080` to keep it on your machine. `SEI_PASSWORD_CMD` fits best here,
+since tools such as `secret-tool` have the desktop session they need.
 
 ## Passwords
 
@@ -127,7 +131,8 @@ memory, never in the database, a file, a log or a message.
 | `SEI_TIMEZONE` | `America/Sao_Paulo` | Time zone of the dates SEI shows. |
 | `POLL_INTERVAL` | `15m` | Time between checks, at least `5m`. |
 | `SEI_CONCURRENCY` | `3` | Simultaneous calls to SEI, from 1 to 10. |
-| `DATABASE_URL` | `sqlite:///data/sei-monitor.db` | `sqlite://<path>` or `postgres://...`. |
+| `DATABASE_URL` | | Required. `postgres://user:password@host/database`. Compose builds it from `POSTGRES_PASSWORD`. |
+| `POSTGRES_PASSWORD` | | Password of the Postgres that Compose starts. |
 | `HTTP_ADDRESS` | `:8080` | Address of the HTTP server; empty turns it off. |
 | `PUBLIC_URL` | | Public address behind nginx, used only for the feed's link to itself. |
 | `FEED_TOKEN` | | Turns on the RSS feed. At least 32 characters. |
@@ -381,19 +386,21 @@ are retried after 30 seconds, then a minute, doubling up to the check interval.
 - The feed and the API compare their tokens in constant time. The API sends `no-store`, has no
   CORS and never returns the username.
 - Webhook bodies are signed with HMAC-SHA256.
-- The image runs as an unprivileged user, and `/data` is the only place it writes. The compose file
-  also makes the rest of the filesystem read-only and drops every Linux capability. Files
-  sei-monitor creates, such as the database, which also holds the WhatsApp session, can be read
-  only by its own user.
+- The image runs as an unprivileged user. The compose file makes its filesystem read-only and drops
+  every Linux capability. Everything sei-monitor keeps, the WhatsApp session included, lives in
+  Postgres, so treat the database and its backups as secrets.
 - To keep the load on SEI low, checks run at least 5 minutes apart, with a cap on simultaneous
   calls and some random spread between checks.
 
 ## Development
 
 - `make check` runs gofmt, go vet, golangci-lint and the tests with the race detector.
-- The storage tests run on SQLite and on Postgres. Point `TEST_DATABASE_URL` at a Postgres server,
-  or install `initdb` and `postgres` and the tests start a throwaway one. With `CI` set, a missing
-  Postgres fails the tests instead of skipping them.
+- The database tests run on Postgres. Point `TEST_DATABASE_URL` at a server, or install `initdb`
+  and `postgres` and the tests start a throwaway one. With `CI` set, a missing Postgres fails the
+  tests instead of skipping them.
+- The queries are in `sql/queries` and the migrations in `sql/schema`. `make generate` runs sqlc,
+  which writes `internal/db`, so don't edit that folder by hand. To change the schema, add a new
+  migration file instead of editing an old one.
 - The AMQP channel tests need a RabbitMQ: point `TEST_AMQP_URL` at one, such as
   `amqp://guest:guest@localhost:5672/`. Without it they are skipped, and with `CI` set they fail.
 - `make openapi` regenerates `docs/openapi.json`, and a test fails while the file lags behind the

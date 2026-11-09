@@ -11,19 +11,21 @@ services:
     security_opt:
       - no-new-privileges:true
     env_file: .env
+    environment:
+      DATABASE_URL: postgres://sei_monitor:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/sei_monitor?sslmode=disable
     ports:
       - "127.0.0.1:8080:8080"
-    volumes:
-      - data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:18-alpine
-    profiles: [postgres]
     restart: unless-stopped
     environment:
       POSTGRES_DB: sei_monitor
       POSTGRES_USER: sei_monitor
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres:/var/lib/postgresql
     healthcheck:
@@ -33,5 +35,4 @@ services:
       retries: 10
 
 volumes:
-  data:
   postgres:

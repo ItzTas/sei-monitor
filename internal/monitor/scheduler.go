@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/sei"
-	"github.com/ItzTas/sei-monitor/internal/store"
 )
 
 const firstRetryDelay = 30 * time.Second
@@ -25,7 +24,7 @@ type TooSoonError struct {
 }
 
 func (e *TooSoonError) Error() string {
-	return fmt.Sprintf("the last cycle started less than %s ago; try again in %s", config.MinPollInterval, e.RetryAfter.Round(time.Second))
+	return fmt.Sprintf("the last cycle started less than %s ago; try again in %s", core.MinPollInterval, e.RetryAfter.Round(time.Second))
 }
 
 func (m *Monitor) Run(ctx context.Context) error {
@@ -33,7 +32,7 @@ func (m *Monitor) Run(ctx context.Context) error {
 	if !ready {
 		return err
 	}
-	trigger := store.TriggerScheduled
+	trigger := TriggerScheduled
 	failures := 0
 	for {
 		_, err := m.RunOnce(ctx, trigger)
@@ -53,9 +52,9 @@ func (m *Monitor) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-m.after(wait):
-			trigger = store.TriggerScheduled
+			trigger = TriggerScheduled
 		case <-m.manual:
-			trigger = store.TriggerManual
+			trigger = TriggerManual
 		}
 	}
 }
@@ -72,8 +71,8 @@ func (m *Monitor) TriggerCycle() error {
 	if m.state.Running {
 		return ErrRunning
 	}
-	if since := m.now().Sub(m.state.LastStartedAt); !m.state.LastStartedAt.IsZero() && since < config.MinPollInterval {
-		return &TooSoonError{RetryAfter: config.MinPollInterval - since}
+	if since := m.now().Sub(m.state.LastStartedAt); !m.state.LastStartedAt.IsZero() && since < core.MinPollInterval {
+		return &TooSoonError{RetryAfter: core.MinPollInterval - since}
 	}
 	select {
 	case m.manual <- struct{}{}:
@@ -138,11 +137,11 @@ func (m *Monitor) pause(ctx context.Context, cause error) {
 	m.mu.Unlock()
 
 	m.log.Error("SEI rejected the login; monitoring is paused until sei-monitor restarts with the configuration fixed", "reason", reason)
-	if err := m.store.SetPausedReason(ctx, accountID, reason); err != nil {
+	if err := m.repo.SetPausedReason(ctx, accountID, reason); err != nil {
 		m.log.Error("could not record the pause", "error", err)
 	}
-	changes := store.CycleChanges{AccountID: accountID, Now: now, Events: []event.Event{ev}, Channels: m.cfg.Channels}
-	if _, err := m.store.ApplyCycle(ctx, changes); err != nil {
+	changes := CycleChanges{AccountID: accountID, Now: now, Events: []event.Event{ev}, Channels: m.cfg.Channels}
+	if _, err := m.repo.ApplyCycle(ctx, changes); err != nil {
 		m.log.Error("could not record the login failure event", "error", err)
 	}
 }

@@ -21,8 +21,8 @@ type Session struct {
 	*whatsmeow.Client
 }
 
-func Open(ctx context.Context, db *sql.DB, dialect string, log *slog.Logger) (*Session, error) {
-	container := sqlstore.NewWithDB(db, dialect, newLogger(log, "whatsapp/store"))
+func Open(ctx context.Context, db *sql.DB, log *slog.Logger) (*Session, error) {
+	container := sqlstore.NewWithDB(db, "postgres", newLogger(log, "whatsapp/store"))
 	if err := container.Upgrade(ctx); err != nil {
 		return nil, fmt.Errorf("whatsapp: prepare the session tables: %w", err)
 	}

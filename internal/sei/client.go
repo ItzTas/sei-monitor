@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 )
 
 const (
@@ -58,7 +58,7 @@ func (o Options) location() *time.Location {
 
 type Credentials struct {
 	Username string
-	Password config.PasswordSource
+	Password core.PasswordSource
 	OrgID    int64
 }
 
@@ -70,7 +70,7 @@ type Client struct {
 	http      *http.Client
 
 	mu         sync.Mutex
-	token      config.Secret
+	token      core.Secret
 	generation uint64
 	session    Session
 }
@@ -236,31 +236,31 @@ func (c *Client) authorized(ctx context.Context, req request) (*envelope, error)
 	return c.send(ctx, req, token)
 }
 
-func (c *Client) currentToken(ctx context.Context) (config.Secret, uint64, error) {
+func (c *Client) currentToken(ctx context.Context) (core.Secret, uint64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.token.IsZero() {
 		if err := c.loginLocked(ctx); err != nil {
-			return config.Secret{}, 0, err
+			return core.Secret{}, 0, err
 		}
 	}
 	return c.token, c.generation, nil
 }
 
-func (c *Client) renewToken(ctx context.Context, seen uint64) (config.Secret, error) {
+func (c *Client) renewToken(ctx context.Context, seen uint64) (core.Secret, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.generation != seen && !c.token.IsZero() {
 		return c.token, nil
 	}
 	if err := c.loginLocked(ctx); err != nil {
-		return config.Secret{}, err
+		return core.Secret{}, err
 	}
 	return c.token, nil
 }
 
 func (c *Client) loginLocked(ctx context.Context) error {
-	c.token = config.Secret{}
+	c.token = core.Secret{}
 	env, err := c.sendLogin(ctx)
 	if err != nil {
 		return err
@@ -272,7 +272,7 @@ func (c *Client) loginLocked(ctx context.Context) error {
 	if wire.Token == "" {
 		return fmt.Errorf("sei: %s: SEI did not return a session token", routeLogin)
 	}
-	c.token = config.NewSecret(wire.Token)
+	c.token = core.NewSecret(wire.Token)
 	c.generation++
 	c.session = wire.session()
 	return nil
@@ -289,10 +289,10 @@ func (c *Client) sendLogin(ctx context.Context) (*envelope, error) {
 		"orgao":    {strconv.FormatInt(c.creds.OrgID, 10)},
 		"contexto": {""},
 	}
-	return c.send(ctx, request{method: http.MethodPost, route: routeLogin, path: routeLogin, form: form}, config.Secret{})
+	return c.send(ctx, request{method: http.MethodPost, route: routeLogin, path: routeLogin, form: form}, core.Secret{})
 }
 
-func (c *Client) send(ctx context.Context, req request, token config.Secret) (*envelope, error) {
+func (c *Client) send(ctx context.Context, req request, token core.Secret) (*envelope, error) {
 	target := c.base + req.path
 	if len(req.query) > 0 {
 		target += "?" + req.query.Encode()

@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 )
 
 var ErrUnknownUnit = errors.New("unit not found among the user's units")
@@ -18,7 +18,7 @@ type Target struct {
 	APIURL   string
 	Org      string
 	Username string
-	Password config.PasswordSource
+	Password core.PasswordSource
 }
 
 type Connection struct {

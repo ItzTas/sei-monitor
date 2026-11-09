@@ -30,12 +30,15 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      - name: sqlc output is up to date
+        run: go tool sqlc generate && git diff --exit-code -- internal/db
+
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15
 
   test:
-    name: Tests (SQLite and Postgres)
+    name: Tests (Postgres)
     runs-on: ubuntu-latest
     services:
       postgres:

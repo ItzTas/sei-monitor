@@ -1,8 +1,8 @@
 package notify
 
-import "github.com/ItzTas/sei-monitor/internal/config"
+import "github.com/ItzTas/sei-monitor/internal/core"
 
-func Channels(cfg config.Channels, userAgent string) []Channel {
+func Channels(cfg core.Channels, userAgent string) []Channel {
 	candidates := []struct {
 		on    bool
 		build func() Channel

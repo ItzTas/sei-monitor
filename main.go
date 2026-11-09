@@ -4,177 +4,179 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"io/fs"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/spf13/cobra"
+	"github.com/joho/godotenv"
+	"golang.org/x/sync/errgroup"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/cli"
+	"github.com/ItzTas/sei-monitor/internal/core"
+	"github.com/ItzTas/sei-monitor/internal/event"
+	"github.com/ItzTas/sei-monitor/internal/feed"
+	"github.com/ItzTas/sei-monitor/internal/modules/events"
+	"github.com/ItzTas/sei-monitor/internal/monitor"
+	"github.com/ItzTas/sei-monitor/internal/notify"
 	"github.com/ItzTas/sei-monitor/internal/sei"
+	"github.com/ItzTas/sei-monitor/internal/server"
+	"github.com/ItzTas/sei-monitor/internal/ui"
+	"github.com/ItzTas/sei-monitor/internal/whatsapp"
 )
 
-var version string
-
-type usageError struct {
-	error
-}
-
-func (e usageError) Unwrap() error {
-	return e.error
-}
-
-type terminal struct {
-	stdin  io.Reader
-	stdout io.Writer
-	stderr io.Writer
-}
-
-type app struct {
-	source config.Source
-}
-
-type printer struct {
-	w   io.Writer
-	err error
-}
-
-func (p *printer) printf(format string, args ...any) {
-	if p.err != nil {
-		return
-	}
-	_, p.err = fmt.Fprintf(p.w, format, args...)
+type application struct {
+	cfg        core.Config
+	log        *slog.Logger
+	now        func() time.Time
+	database   *core.Database
+	repo       *monitor.Postgres
+	monitor    *monitor.Monitor
+	dispatcher *notify.Dispatcher
+	whatsapp   *whatsapp.Session
+	server     *server.Server
 }
 
 func main() {
-	if err := harden(); err != nil {
+	if err := cli.Harden(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "warning: could not turn off core dumps and process inspection: %v\n", err)
 	}
+	if err := godotenv.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		_, _ = fmt.Fprintf(os.Stderr, "error: read .env: %v\n", err)
+		os.Exit(1)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	code := run(ctx, os.Args[1:], terminal{stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr}, config.Environment())
+	terminal := cli.Terminal{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr}
+	code := cli.Run(ctx, os.Args[1:], terminal, core.Environment(), serve)
 	stop()
 	os.Exit(code)
 }
 
-func run(ctx context.Context, args []string, term terminal, source config.Source) int {
-	root := (&app{source: source}).rootCommand()
-	root.SetArgs(args)
-	root.SetIn(term.stdin)
-	root.SetOut(term.stdout)
-	root.SetErr(term.stderr)
-	return exitCode(ctx, root.ExecuteContext(ctx), term.stderr)
-}
-
-func (a *app) rootCommand() *cobra.Command {
-	root := &cobra.Command{
-		Use:   "sei-monitor",
-		Short: "Watch your processes on SEI and get told when something changes",
-		Long: "sei-monitor watches your processes on SEI and tells you when something changes.\n\n" +
-			"Without a command it runs serve. Configuration comes from environment variables; see the README.",
-		Version:       appVersion(),
-		Args:          noArgs,
-		RunE:          a.serve,
-		SilenceUsage:  true,
-		SilenceErrors: true,
-	}
-	root.CompletionOptions.HiddenDefaultCmd = true
-	root.SuggestionsMinimumDistance = 2
-	root.SetVersionTemplate("sei-monitor {{.Version}}\n")
-	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
-		return usageError{err}
-	})
-	openapi := command("openapi", "Print the OpenAPI document of the API", printOpenAPI)
-	openapi.Hidden = true
-	pair := command("whatsapp-pair [phone]", "Pair the WhatsApp number that sends the messages", a.whatsappPair)
-	pair.Args = pairArgs
-	root.AddCommand(
-		openapi,
-		command("serve", "Watch SEI, send the notifications and serve the feed (the default)", a.serve),
-		command("test-login", "Log in to SEI and show the versions and your units", a.testLogin),
-		command("orgs", "List the acronym and id of every agency on the SEI login page", a.orgs),
-		command("diagnose", "Check how the SEI API behaves, printing only counts and types", a.diagnose),
-		command("send-test", "Send a test message through every enabled channel", a.sendTest),
-		pair,
-		command("generate-token", "Print a random token to use as FEED_TOKEN or API_TOKEN (run it once for each)", generateToken),
-	)
-	return root
-}
-
-func command(use, short string, run func(*cobra.Command, []string) error) *cobra.Command {
-	return &cobra.Command{Use: use, Short: short, Args: noArgs, RunE: run}
-}
-
-func noArgs(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		return nil
-	}
-	message := fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath())
-	if suggestions := cmd.SuggestionsFor(args[0]); len(suggestions) > 0 {
-		message += "\n\nDid you mean this?\n\t" + strings.Join(suggestions, "\n\t")
-	}
-	return usageError{errors.New(message)}
-}
-
-func exitCode(ctx context.Context, err error, stderr io.Writer) int {
-	if err == nil {
-		return 0
-	}
-	if usage, ok := errors.AsType[usageError](err); ok {
-		_, _ = fmt.Fprintf(stderr, "%v\nRun 'sei-monitor --help' for usage.\n", usage.error)
-		return 2
-	}
-	if ctx.Err() != nil && errors.Is(err, context.Canceled) {
-		_, _ = fmt.Fprintln(stderr, "interrupted")
-		return 130
-	}
-	_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
-	return 1
-}
-
-func (a *app) serve(cmd *cobra.Command, _ []string) (err error) {
-	cfg, err := config.Load(a.source)
+func serve(ctx context.Context, cfg core.Config, logger *slog.Logger) (err error) {
+	app, err := assemble(ctx, cfg, logger, time.Now)
 	if err != nil {
 		return err
 	}
-	logger := slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), &slog.HandlerOptions{Level: cfg.LogLevel}))
-	application, err := assemble(cmd.Context(), cfg, logger, time.Now)
-	if err != nil {
-		return err
-	}
-	defer func() { err = errors.Join(err, application.Close()) }()
+	defer func() { err = errors.Join(err, app.Close()) }()
 	logger.Info("sei-monitor started",
-		"version", appVersion(),
-		"database", application.store.Dialect(),
+		"version", core.Version(),
 		"interval", cfg.PollInterval,
 		"channels", strings.Join(cfg.Channels.Enabled(), ","),
 	)
-	return application.Run(cmd.Context())
+	return app.Run(ctx)
 }
 
-func appVersion() string {
-	if version != "" {
-		return version
+func assemble(ctx context.Context, cfg core.Config, logger *slog.Logger, now func() time.Time) (*application, error) {
+	database, err := core.OpenDatabase(ctx, cfg.DatabaseURL.Reveal())
+	if err != nil {
+		return nil, err
 	}
-	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
-		return info.Main.Version
+	repo := monitor.NewPostgres(database.Pool)
+	target := sei.Target{SEIURL: cfg.SEI.URL, APIURL: cfg.SEI.APIURL, Org: cfg.SEI.Org, Username: cfg.SEI.Username, Password: cfg.SEI.Password}
+	mon := monitor.New(monitor.Config{
+		Target:            target,
+		Options:           sei.Options{UserAgent: core.UserAgent(), Location: cfg.SEI.Location},
+		Units:             cfg.SEI.Units,
+		AllUnits:          cfg.SEI.AllUnits,
+		PollInterval:      cfg.PollInterval,
+		Concurrency:       cfg.SEI.Concurrency,
+		ReturnWarningDays: cfg.ReturnWarningDays,
+		RetentionDays:     cfg.RetentionDays,
+		Location:          cfg.SEI.Location,
+		Channels:          cfg.Channels.Enabled(),
+	}, repo, logger, monitor.WithClock(now, time.After))
+	app := &application{cfg: cfg, log: logger, now: now, database: database, repo: repo, monitor: mon}
+	channels := notify.Channels(cfg.Channels, core.UserAgent())
+	if cfg.Channels.WhatsApp != nil {
+		session, err := whatsapp.Open(ctx, database.SQL, logger)
+		if err != nil {
+			return nil, errors.Join(err, database.Close())
+		}
+		app.whatsapp = session
+		channels = withWhatsApp(channels, session, cfg.Channels.WhatsApp.Recipients, logger)
 	}
-	return "dev"
+	outbox := notify.NewPostgres(database.Pool)
+	app.dispatcher = notify.NewDispatcher(outbox, channels, app.formatter(cfg.FullDetail), logger, notify.WithClock(now, time.After))
+	if cfg.HTTP.Enabled() {
+		app.server = server.New(cfg.HTTP.Address, app.routes(), logger)
+	}
+	return app, nil
 }
 
-func userAgent() string {
-	return "sei-monitor/" + appVersion()
+func withWhatsApp(channels []notify.Channel, session *whatsapp.Session, recipients []string, log *slog.Logger) []notify.Channel {
+	if session.Paired() {
+		return append(channels, whatsapp.NewChannel(session, recipients))
+	}
+	log.Warn("WhatsApp is set up but not paired; its notifications wait until you run sei-monitor whatsapp-pair and restart")
+	return channels
 }
 
-func seiOptions(location *time.Location) sei.Options {
-	return sei.Options{UserAgent: userAgent(), Location: location}
+func (a *application) routes() server.Routes {
+	routes := server.Routes{Health: server.Health(a.lastRun, a.cfg.PollInterval, a.now(), a.now, a.log)}
+	if !a.cfg.HTTP.FeedToken.IsZero() {
+		routes.Feed = feed.NewHandler(feed.NewPostgres(a.database.Pool), a.cfg.HTTP.FeedToken, a.feedChannel, a.formatter(a.cfg.FullDetail), a.now, a.log)
+	}
+	if a.cfg.HTTP.APIToken.IsZero() {
+		return routes
+	}
+	deps := server.APIDeps{Pool: a.database.Pool, Monitor: a.monitor, Token: a.cfg.HTTP.APIToken, FullDetail: a.cfg.APIFullDetail, Location: a.cfg.SEI.Location, Log: a.log}
+	routes.API = func(mux *http.ServeMux) { server.RegisterAPI(mux, deps) }
+	pages := ui.Deps{Events: events.NewPostgres(a.database.Pool), Monitor: a.monitor, Token: a.cfg.HTTP.APIToken, FullDetail: a.cfg.APIFullDetail, Location: a.cfg.SEI.Location, Now: a.now, Log: a.log}
+	routes.UI = func(mux *http.ServeMux) { ui.Register(mux, pages) }
+	return routes
 }
 
-func connect(ctx context.Context, cfg config.SEI) (sei.Connection, error) {
-	target := sei.Target{SEIURL: cfg.URL, APIURL: cfg.APIURL, Org: cfg.Org, Username: cfg.Username, Password: cfg.Password}
-	return sei.Connect(ctx, target, seiOptions(cfg.Location))
+func (a *application) formatter(full bool) func() event.Formatter {
+	return func() event.Formatter {
+		return event.Formatter{Location: a.cfg.SEI.Location, Full: full, Self: a.monitor.State().Self.Acronym}
+	}
+}
+
+func (a *application) lastRun(ctx context.Context) (core.CycleRun, bool, error) {
+	accountID := a.monitor.State().AccountID
+	if accountID == 0 {
+		return core.CycleRun{}, false, nil
+	}
+	return a.repo.LastCycleRun(ctx, accountID)
+}
+
+func (a *application) feedChannel(ctx context.Context) feed.Channel {
+	channel := feed.Channel{Title: "sei-monitor", Link: a.cfg.SEI.URL}
+	if a.cfg.HTTP.PublicURL != "" {
+		channel.Self = a.cfg.HTTP.PublicURL + "/feed/" + a.cfg.HTTP.FeedToken.Reveal() + ".xml"
+	}
+	accountID := a.monitor.State().AccountID
+	if accountID == 0 {
+		return channel
+	}
+	account, err := a.repo.Account(ctx, accountID)
+	if err != nil {
+		a.log.Warn("could not read the agency acronym for the feed title", "error", err)
+		return channel
+	}
+	if account.Info.OrgAcronym != "" {
+		channel.Title += ": " + account.Info.OrgAcronym
+	}
+	return channel
+}
+
+func (a *application) Run(ctx context.Context) error {
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error { return a.monitor.Run(gctx) })
+	g.Go(func() error { return a.dispatcher.Run(gctx) })
+	if a.server != nil {
+		g.Go(func() error { return a.server.Run(gctx) })
+	}
+	return g.Wait()
+}
+
+func (a *application) Close() error {
+	if a.whatsapp != nil {
+		a.whatsapp.Close()
+	}
+	return a.database.Close()
 }

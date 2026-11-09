@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
 )
@@ -20,20 +20,20 @@ type countingPassword struct {
 	err   error
 }
 
-func (p *countingPassword) Password(context.Context) (config.Secret, error) {
+func (p *countingPassword) Password(context.Context) (core.Secret, error) {
 	p.calls.Add(1)
 	if p.err != nil {
-		return config.Secret{}, p.err
+		return core.Secret{}, p.err
 	}
-	return config.NewSecret(seitest.Password), nil
+	return core.NewSecret(seitest.Password), nil
 }
 
 func newClient(t *testing.T, server *seitest.Server) *sei.Client {
 	t.Helper()
-	return newClientWithPassword(server, config.StaticPassword(config.NewSecret(seitest.Password)))
+	return newClientWithPassword(server, core.StaticPassword(core.NewSecret(seitest.Password)))
 }
 
-func newClientWithPassword(server *seitest.Server, password config.PasswordSource) *sei.Client {
+func newClientWithPassword(server *seitest.Server, password core.PasswordSource) *sei.Client {
 	creds := sei.Credentials{Username: seitest.Username, Password: password, OrgID: seitest.OrgID}
 	return sei.New(server.APIURL(), creds, sei.Options{UserAgent: "sei-monitor/test", Location: server.Location()})
 }
@@ -131,12 +131,12 @@ func TestChangedPasswordStopsAfterOneLoginAttempt(t *testing.T) {
 
 func TestPasswordSourceFailureIsNotAnInvalidCredential(t *testing.T) {
 	server := seitest.New(t)
-	client := newClientWithPassword(server, &countingPassword{err: config.ErrPasswordCommand})
+	client := newClientWithPassword(server, &countingPassword{err: core.ErrPasswordCommand})
 
 	_, err := client.Processes(t.Context(), seitest.UnitNUPROC)
 
-	if !errors.Is(err, config.ErrPasswordCommand) || errors.Is(err, sei.ErrInvalidCredentials) {
-		t.Fatalf("error = %v, want config.ErrPasswordCommand only", err)
+	if !errors.Is(err, core.ErrPasswordCommand) || errors.Is(err, sei.ErrInvalidCredentials) {
+		t.Fatalf("error = %v, want core.ErrPasswordCommand only", err)
 	}
 	if server.Calls(seitest.RouteLogin) != 0 {
 		t.Errorf("SEI received %d logins without a password", server.Calls(seitest.RouteLogin))
@@ -217,7 +217,7 @@ func TestServerErrorsAreTransient(t *testing.T) {
 func TestNetworkErrorsHideTheQuery(t *testing.T) {
 	closed := httptest.NewServer(http.NotFoundHandler())
 	closed.Close()
-	client := sei.New(closed.URL+"/api", sei.Credentials{Username: "u", Password: config.StaticPassword(config.NewSecret("p")), OrgID: 1}, sei.Options{})
+	client := sei.New(closed.URL+"/api", sei.Credentials{Username: "u", Password: core.StaticPassword(core.NewSecret("p")), OrgID: 1}, sei.Options{})
 
 	_, err := client.ProcessPage(t.Context(), 1, sei.ProcessQuery{Limit: 50})
 

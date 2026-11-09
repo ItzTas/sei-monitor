@@ -11,7 +11,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 )
 
 const (
@@ -20,7 +20,7 @@ const (
 )
 
 type AMQP struct {
-	url      config.Secret
+	url      core.Secret
 	exchange string
 }
 
@@ -29,7 +29,7 @@ type amqpPublishing struct {
 	message amqp.Publishing
 }
 
-func NewAMQP(cfg config.AMQP) *AMQP {
+func NewAMQP(cfg core.AMQP) *AMQP {
 	return &AMQP{url: cfg.URL, exchange: cfg.Exchange}
 }
 

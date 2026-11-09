@@ -9,10 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ItzTas/sei-monitor/internal/core"
+	"github.com/ItzTas/sei-monitor/internal/core/coretest"
 	"github.com/ItzTas/sei-monitor/internal/event"
+	"github.com/ItzTas/sei-monitor/internal/modules/deliveries"
+	"github.com/ItzTas/sei-monitor/internal/monitor"
 	"github.com/ItzTas/sei-monitor/internal/notify"
-	"github.com/ItzTas/sei-monitor/internal/store"
-	"github.com/ItzTas/sei-monitor/internal/store/storetest"
 )
 
 type fakeChannel struct {
@@ -52,35 +54,34 @@ func (c *fakeChannel) messages() []notify.Message {
 }
 
 type outbox struct {
-	*store.Store
-	account store.Account
+	*notify.Postgres
+	cycles  *monitor.Postgres
+	listing *deliveries.Postgres
+	account core.Account
 }
 
 func newOutbox(t *testing.T) outbox {
 	t.Helper()
-	st, err := store.Open(t.Context(), storetest.SQLiteURL(t))
+	database := coretest.Open(t)
+	cycles := monitor.NewPostgres(database.Pool)
+	account, err := cycles.EnsureAccount(t.Context(), core.AccountKey{SEIBaseURL: "https://sei.example.org", Username: "fulano.tal", OrgID: 63}, t0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = st.Close() })
-	account, err := st.EnsureAccount(t.Context(), store.AccountKey{SEIBaseURL: "https://sei.example.org", Username: "fulano.tal", OrgID: 63}, t0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return outbox{Store: st, account: account}
+	return outbox{Postgres: notify.NewPostgres(database.Pool), cycles: cycles, listing: deliveries.NewPostgres(database.Pool), account: account}
 }
 
 func (o outbox) add(t *testing.T, at time.Time, events ...event.Event) {
 	t.Helper()
-	changes := store.CycleChanges{AccountID: o.account.ID, Now: at, Events: events, Channels: []string{"telegram", "webhook"}}
-	if _, err := o.ApplyCycle(t.Context(), changes); err != nil {
+	changes := monitor.CycleChanges{AccountID: o.account.ID, Now: at, Events: events, Channels: []string{"telegram", "webhook"}}
+	if _, err := o.cycles.ApplyCycle(t.Context(), changes); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func (o outbox) deliveries(t *testing.T, channel string) []store.Delivery {
+func (o outbox) deliveries(t *testing.T, channel string) []core.Delivery {
 	t.Helper()
-	list, err := o.ListDeliveries(t.Context(), store.DeliveryFilter{AccountID: o.account.ID, Channel: channel, Limit: 100})
+	list, err := o.listing.ListDeliveries(t.Context(), deliveries.Filter{AccountID: o.account.ID, Channel: channel, Limit: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +111,7 @@ func TestOneMessagePerChannelWithEverythingDue(t *testing.T) {
 			t.Errorf("%s got %+v", channel.name, got)
 		}
 		for _, d := range o.deliveries(t, channel.name) {
-			if d.Status != store.DeliverySent || d.Attempts != 1 || !d.SentAt.Equal(t0) {
+			if d.Status != core.DeliverySent || d.Attempts != 1 || !d.SentAt.Equal(t0) {
 				t.Errorf("%s delivery = %+v", channel.name, d)
 			}
 		}
@@ -140,7 +141,7 @@ func TestFailedDeliveryRetriesOnTheScheduleThenGivesUp(t *testing.T) {
 	dispatcher.RunOnce(t.Context())
 
 	d := o.deliveries(t, "telegram")[0]
-	if len(telegram.messages()) != 6 || d.Status != store.DeliveryFailed || d.Attempts != 6 || d.LastError != "the server answered 500" {
+	if len(telegram.messages()) != 6 || d.Status != core.DeliveryFailed || d.Attempts != 6 || d.LastError != "the server answered 500" {
 		t.Errorf("after giving up: %d messages, delivery %+v", len(telegram.messages()), d)
 	}
 }
@@ -157,7 +158,7 @@ func TestDeliveryThatFailedOnceIsSentOnTheRetry(t *testing.T) {
 	dispatcher.RunOnce(t.Context())
 
 	d := o.deliveries(t, "telegram")[0]
-	if d.Status != store.DeliverySent || d.Attempts != 2 || d.LastError != "" || !d.SentAt.Equal(now) {
+	if d.Status != core.DeliverySent || d.Attempts != 2 || d.LastError != "" || !d.SentAt.Equal(now) {
 		t.Errorf("delivery = %+v", d)
 	}
 }
@@ -176,7 +177,7 @@ func TestShutdownDuringASendLeavesTheDeliveriesPending(t *testing.T) {
 	newDispatcher(o, &now, telegram).RunOnce(ctx)
 
 	d := o.deliveries(t, "telegram")[0]
-	if len(telegram.messages()) != 1 || d.Status != store.DeliveryPending || d.Attempts != 0 || d.LastError != "" {
+	if len(telegram.messages()) != 1 || d.Status != core.DeliveryPending || d.Attempts != 0 || d.LastError != "" {
 		t.Errorf("delivery after the shutdown = %+v", d)
 	}
 }

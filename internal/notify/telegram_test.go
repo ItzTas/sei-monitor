@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/notify"
 )
@@ -23,7 +23,7 @@ type telegramPayload struct {
 }
 
 func newTelegram(api string) *notify.Telegram {
-	return notify.NewTelegram(config.Telegram{Token: config.NewSecret(botToken), ChatID: "-1001234567890"}, api, "sei-monitor/test")
+	return notify.NewTelegram(core.Telegram{Token: core.NewSecret(botToken), ChatID: "-1001234567890"}, api, "sei-monitor/test")
 }
 
 func TestTelegramSendsTheMessageToTheChat(t *testing.T) {

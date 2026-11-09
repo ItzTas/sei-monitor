@@ -4,6 +4,7 @@
 !go.sum
 !*.go
 !internal
+!sql
 
 **/*_test.go
 **/testdata

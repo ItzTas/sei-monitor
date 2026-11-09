@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 )
 
@@ -18,7 +18,7 @@ const SignatureHeader = "X-Sei-Monitor-Signature"
 
 type Webhook struct {
 	url       string
-	secret    config.Secret
+	secret    core.Secret
 	userAgent string
 	client    *http.Client
 }
@@ -28,7 +28,7 @@ type webhookPayload struct {
 	Events []event.View `json:"events"`
 }
 
-func NewWebhook(cfg config.Webhook, userAgent string) *Webhook {
+func NewWebhook(cfg core.Webhook, userAgent string) *Webhook {
 	return &Webhook{url: cfg.URL, secret: cfg.Secret, userAgent: userAgent, client: newHTTPClient()}
 }
 

@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
 )
@@ -16,7 +16,7 @@ func TestConnectDiscoversTheModuleAndResolvesTheOrg(t *testing.T) {
 		SEIURL:   server.URL(),
 		Org:      seitest.OrgAcronym,
 		Username: seitest.Username,
-		Password: config.StaticPassword(config.NewSecret(seitest.Password)),
+		Password: core.StaticPassword(core.NewSecret(seitest.Password)),
 	}
 
 	conn, err := sei.Connect(t.Context(), target, sei.Options{})

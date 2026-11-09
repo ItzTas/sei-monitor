@@ -8,10 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/api/events"
-	"github.com/ItzTas/sei-monitor/internal/api/resp"
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
+	"github.com/ItzTas/sei-monitor/internal/modules/events"
 )
 
 const (
@@ -27,9 +26,9 @@ var templateFiles embed.FS
 var staticFiles embed.FS
 
 type Deps struct {
-	Store      events.Repository
+	Events     events.Repository
 	Monitor    events.Monitor
-	Token      config.Secret
+	Token      core.Secret
 	FullDetail bool
 	Location   *time.Location
 	Now        func() time.Time
@@ -54,7 +53,7 @@ type loginPage struct {
 
 func Register(mux *http.ServeMux, deps Deps) {
 	s := &server{
-		events:   events.NewService(deps.Store, deps.Monitor, deps.FullDetail, deps.Location),
+		events:   events.NewService(deps.Events, deps.Monitor, deps.FullDetail, deps.Location),
 		sessions: sessions{token: deps.Token, now: deps.Now},
 		pages:    parsePages(deps.Location),
 		log:      deps.Log,
@@ -98,7 +97,7 @@ func (s *server) authorized(next http.HandlerFunc) http.Handler {
 
 func (s *server) listEvents(page string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		list, err := s.events.List(r.Context(), events.ListInput{PageInput: resp.PageInput{Limit: pageSize}})
+		list, err := s.events.List(r.Context(), events.ListInput{Limit: pageSize})
 		if err != nil {
 			s.log.Error("the web interface could not list the events", "error", err)
 			s.render(w, http.StatusInternalServerError, page, eventsPage{Failed: true})

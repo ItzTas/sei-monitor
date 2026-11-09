@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 )
 
@@ -129,7 +129,7 @@ func newHandlerWith(source Source, formatter func() event.Formatter) *Handler {
 	channel := func(context.Context) Channel {
 		return Channel{Title: "sei-monitor: SEDEMO", Link: "https://sei.example.org"}
 	}
-	return NewHandler(source, config.NewSecret(token), channel, formatter, func() time.Time { return now }, slog.New(slog.DiscardHandler))
+	return NewHandler(source, core.NewSecret(token), channel, formatter, func() time.Time { return now }, slog.New(slog.DiscardHandler))
 }
 
 func serve(t *testing.T, handler http.Handler, path string) *httptest.ResponseRecorder {

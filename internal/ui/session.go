@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 )
 
 const (
@@ -20,7 +20,7 @@ const (
 )
 
 type sessions struct {
-	token config.Secret
+	token core.Secret
 	now   func() time.Time
 }
 

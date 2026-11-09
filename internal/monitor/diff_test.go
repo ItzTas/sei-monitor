@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/sei"
-	"github.com/ItzTas/sei-monitor/internal/store"
 )
 
 var (
@@ -31,8 +31,8 @@ func observed(id int64, change func(*sei.Process)) Observation {
 	return Observation{Process: process, Unit: nuproc}
 }
 
-func stored(id int64, change func(*store.Process)) store.Process {
-	process := store.Process{ProcedureID: id, Number: "00000.00000" + string(rune('0'+id%10)) + "/2026-00", UnitID: nuproc.ID, UnitAcronym: nuproc.Acronym, LastActivityID: 500}
+func stored(id int64, change func(*core.Process)) core.Process {
+	process := core.Process{ProcedureID: id, Number: "00000.00000" + string(rune('0'+id%10)) + "/2026-00", UnitID: nuproc.ID, UnitAcronym: nuproc.Acronym, LastActivityID: 500}
 	if change != nil {
 		change(&process)
 	}
@@ -61,7 +61,7 @@ func TestDiffProcesses(t *testing.T) {
 	cycle := "2026-11-04T18:00:00Z"
 	tests := []struct {
 		name     string
-		previous []store.Process
+		previous []core.Process
 		current  []Observation
 		baseline bool
 		want     []kindRef
@@ -74,64 +74,64 @@ func TestDiffProcesses(t *testing.T) {
 		},
 		{
 			name:     "a new process only enters",
-			previous: []store.Process{stored(1, nil)},
+			previous: []core.Process{stored(1, nil)},
 			current:  []Observation{observed(1, nil), observed(2, func(p *sei.Process) { p.ReturnDate, p.Assignee = date("2026-11-05"), beltrano })},
 			want:     []kindRef{{event.ProcessEntered, "2:" + cycle}},
 		},
 		{
 			name:     "a missing process leaves",
-			previous: []store.Process{stored(1, nil), stored(2, nil)},
+			previous: []core.Process{stored(1, nil), stored(2, nil)},
 			current:  []Observation{observed(1, nil)},
 			want:     []kindRef{{event.ProcessLeft, "2:" + cycle}},
 			left:     []int64{2},
 		},
 		{
 			name:     "a process that left and came back enters again",
-			previous: []store.Process{stored(2, func(p *store.Process) { p.LeftAt = diffNow.Add(-time.Hour) })},
+			previous: []core.Process{stored(2, func(p *core.Process) { p.LeftAt = diffNow.Add(-time.Hour) })},
 			current:  []Observation{observed(2, nil)},
 			want:     []kindRef{{event.ProcessEntered, "2:" + cycle}},
 		},
 		{
 			name:     "a process that already left does not leave twice",
-			previous: []store.Process{stored(2, func(p *store.Process) { p.LeftAt = diffNow.Add(-time.Hour) })},
+			previous: []core.Process{stored(2, func(p *core.Process) { p.LeftAt = diffNow.Add(-time.Hour) })},
 		},
 		{
 			name:     "assignment to the user",
-			previous: []store.Process{stored(1, nil)},
+			previous: []core.Process{stored(1, nil)},
 			current:  []Observation{observed(1, func(p *sei.Process) { p.Assignee = fulano })},
 			want:     []kindRef{{event.AssignmentChanged, "1:" + cycle}},
 		},
 		{
 			name:     "assignment removed",
-			previous: []store.Process{stored(1, func(p *store.Process) { p.AssignedUser, p.AssignedUserID = "beltrano.silva", 202 })},
+			previous: []core.Process{stored(1, func(p *core.Process) { p.AssignedUser, p.AssignedUserID = "beltrano.silva", 202 })},
 			current:  []Observation{observed(1, nil)},
 			want:     []kindRef{{event.AssignmentChanged, "1:" + cycle}},
 		},
 		{
 			name:     "same assignee written with other letters is no change",
-			previous: []store.Process{stored(1, func(p *store.Process) { p.AssignedUser, p.AssignedUserID = "Beltrano.Silva", 202 })},
+			previous: []core.Process{stored(1, func(p *core.Process) { p.AssignedUser, p.AssignedUserID = "Beltrano.Silva", 202 })},
 			current:  []Observation{observed(1, func(p *sei.Process) { p.Assignee = beltrano })},
 		},
 		{
 			name:     "return due within the warning window",
-			previous: []store.Process{stored(1, nil)},
+			previous: []core.Process{stored(1, nil)},
 			current:  []Observation{observed(1, func(p *sei.Process) { p.ReturnDate = date("2026-11-06") })},
 			want:     []kindRef{{event.ReturnDueSoon, "1:2026-11-06"}},
 		},
 		{
 			name:     "return beyond the warning window",
-			previous: []store.Process{stored(1, nil)},
+			previous: []core.Process{stored(1, nil)},
 			current:  []Observation{observed(1, func(p *sei.Process) { p.ReturnDate = date("2026-11-07") })},
 		},
 		{
 			name:     "return that just became overdue",
-			previous: []store.Process{stored(1, func(p *store.Process) { p.ReturnDate = "2026-11-03" })},
+			previous: []core.Process{stored(1, func(p *core.Process) { p.ReturnDate = "2026-11-03" })},
 			current:  []Observation{observed(1, func(p *sei.Process) { p.ReturnDate, p.ReturnOverdue = date("2026-11-03"), true })},
 			want:     []kindRef{{event.ReturnOverdue, "1:2026-11-03"}},
 		},
 		{
 			name:     "return still overdue",
-			previous: []store.Process{stored(1, func(p *store.Process) { p.ReturnDate, p.ReturnOverdue = "2026-11-03", true })},
+			previous: []core.Process{stored(1, func(p *core.Process) { p.ReturnDate, p.ReturnOverdue = "2026-11-03", true })},
 			current:  []Observation{observed(1, func(p *sei.Process) { p.ReturnDate, p.ReturnOverdue = date("2026-11-03"), true })},
 		},
 	}
@@ -157,7 +157,7 @@ func TestDiffProcesses(t *testing.T) {
 }
 
 func TestDiffPayloads(t *testing.T) {
-	previous := []store.Process{stored(1, func(p *store.Process) { p.AssignedUser, p.AssignedUserID = "beltrano.silva", 202 })}
+	previous := []core.Process{stored(1, func(p *core.Process) { p.AssignedUser, p.AssignedUserID = "beltrano.silva", 202 })}
 	current := []Observation{
 		observed(1, func(p *sei.Process) { p.Assignee = fulano }),
 		observed(2, func(p *sei.Process) { p.Assignee, p.Description = fulano, "Compra de cadeiras" }),

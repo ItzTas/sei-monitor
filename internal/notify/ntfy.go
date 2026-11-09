@@ -6,19 +6,19 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 )
 
 const ntfyMaxBytes = 4000
 
 type Ntfy struct {
 	url       string
-	token     config.Secret
+	token     core.Secret
 	userAgent string
 	client    *http.Client
 }
 
-func NewNtfy(cfg config.Ntfy, userAgent string) *Ntfy {
+func NewNtfy(cfg core.Ntfy, userAgent string) *Ntfy {
 	return &Ntfy{url: cfg.URL, token: cfg.Token, userAgent: userAgent, client: newHTTPClient()}
 }
 

@@ -3,25 +3,22 @@ package monitor
 import (
 	"log/slog"
 	"net/http"
-	"os"
 	"slices"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/ItzTas/sei-monitor/internal/core"
+	"github.com/ItzTas/sei-monitor/internal/core/coretest"
+	"github.com/ItzTas/sei-monitor/internal/db"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
-	"github.com/ItzTas/sei-monitor/internal/store"
-	"github.com/ItzTas/sei-monitor/internal/store/storetest"
 )
 
 var start = time.Date(2026, 11, 4, 18, 0, 0, 0, time.UTC)
-
-func TestMain(m *testing.M) {
-	os.Exit(storetest.Run(m, store.Migrate))
-}
 
 type fakeClock struct {
 	mu    sync.Mutex
@@ -69,28 +66,22 @@ func (c *fakeClock) nextWait(t *testing.T) pendingWait {
 
 type harness struct {
 	server  *seitest.Server
-	store   *store.Store
+	pool    *pgxpool.Pool
+	store   *Postgres
 	clock   *fakeClock
 	monitor *Monitor
 }
 
-func newHarness(t *testing.T, databaseURL string, configure func(*Config)) *harness {
+func newHarness(t *testing.T, configure func(*Config)) *harness {
 	t.Helper()
 	server := seitest.New(t)
-	st, err := store.Open(t.Context(), databaseURL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := st.Close(); err != nil {
-			t.Error(err)
-		}
-	})
+	database := coretest.Open(t)
+	st := NewPostgres(database.Pool)
 	clock := newFakeClock(start)
 	cfg := Config{
 		Target: sei.Target{
 			SEIURL: server.URL(), Org: seitest.OrgAcronym, Username: seitest.Username,
-			Password: config.StaticPassword(config.NewSecret(seitest.Password)),
+			Password: core.StaticPassword(core.NewSecret(seitest.Password)),
 		},
 		Options:           sei.Options{UserAgent: "sei-monitor/test", Location: server.Location()},
 		PollInterval:      15 * time.Minute,
@@ -104,12 +95,12 @@ func newHarness(t *testing.T, databaseURL string, configure func(*Config)) *harn
 	}
 	noJitter := func(time.Duration) time.Duration { return 0 }
 	m := New(cfg, st, slog.New(slog.DiscardHandler), WithClock(clock.Now, clock.After), WithJitter(noJitter))
-	return &harness{server: server, store: st, clock: clock, monitor: m}
+	return &harness{server: server, pool: database.Pool, store: st, clock: clock, monitor: m}
 }
 
 func (h *harness) runOnce(t *testing.T) Result {
 	t.Helper()
-	result, err := h.monitor.RunOnce(t.Context(), store.TriggerScheduled)
+	result, err := h.monitor.RunOnce(t.Context(), TriggerScheduled)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +109,16 @@ func (h *harness) runOnce(t *testing.T) Result {
 
 func (h *harness) events(t *testing.T) []event.Event {
 	t.Helper()
-	events, err := h.store.RecentEvents(t.Context(), 100)
+	return recentEvents(t, h.pool)
+}
+
+func recentEvents(t *testing.T, pool *pgxpool.Pool) []event.Event {
+	t.Helper()
+	rows, err := db.New(pool).ListRecentEvents(t.Context(), 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := core.EventsFromRows(rows)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func populate(server *seitest.Server) {
 }
 
 func TestStateKnowsTheUserAcronymBeforeTheFirstLogin(t *testing.T) {
-	h := newHarness(t, storetest.SQLiteURL(t), nil)
+	h := newHarness(t, nil)
 
 	if self := h.monitor.State().Self; self != (Self{Acronym: seitest.Username}) {
 		t.Errorf("self before any login = %+v, want the configured username", self)
@@ -158,104 +158,100 @@ func TestStateKnowsTheUserAcronymBeforeTheFirstLogin(t *testing.T) {
 }
 
 func TestFirstCycleIsASilentBaseline(t *testing.T) {
-	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
-		h := newHarness(t, databaseURL, nil)
-		populate(h.server)
-		ctx := t.Context()
-		if err := h.monitor.Prepare(ctx); err != nil {
-			t.Fatal(err)
-		}
+	h := newHarness(t, nil)
+	populate(h.server)
+	ctx := t.Context()
+	if err := h.monitor.Prepare(ctx); err != nil {
+		t.Fatal(err)
+	}
 
-		result := h.runOnce(t)
+	result := h.runOnce(t)
 
-		if result != (Result{ProcessesSeen: 2, EventsCreated: 0}) {
-			t.Errorf("result = %+v", result)
-		}
-		if state := h.monitor.State(); !slices.Equal(state.Units, []string{"SEDEMO/NUPROC"}) || state.Self != (Self{UserID: seitest.UserID, Acronym: seitest.Username}) {
-			t.Errorf("state = %+v", state)
-		}
-		if events := h.events(t); len(events) != 0 {
-			t.Errorf("baseline events = %+v", events)
-		}
-		processes, err := h.store.Processes(ctx, h.monitor.State().AccountID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(processes) != 2 || processes[0].LastActivityID != 50003 || processes[0].DocumentTotal != 3 || processes[0].AssignedUser != seitest.Username ||
-			processes[0].ReturnDate != "2026-11-05" || processes[0].UnitAcronym != "SEDEMO/NUPROC" || processes[1].LastActivityID != 60001 {
-			t.Errorf("stored processes = %+v", processes)
-		}
-		documents, err := h.store.DocumentIDs(ctx, h.monitor.State().AccountID, 9001)
-		if err != nil || len(documents) != 3 {
-			t.Errorf("stored documents = %v, %v", documents, err)
-		}
-		run, found, err := h.store.LastCycleRun(ctx, h.monitor.State().AccountID)
-		if err != nil || !found || run.Error != "" || run.ProcessesSeen != 2 || run.Trigger != store.TriggerScheduled || run.FinishedAt.IsZero() {
-			t.Errorf("cycle run = %+v, %v, %v", run, found, err)
-		}
-		account, err := h.store.EnsureAccount(ctx, store.AccountKey{SEIBaseURL: h.server.URL(), Username: seitest.Username, OrgID: seitest.OrgID}, start)
-		if err != nil || account.BaselineAt.IsZero() || account.Info != (store.AccountInfo{OrgAcronym: seitest.OrgAcronym, SEIVersion: seitest.SEIVersion, WSSEIVersion: seitest.ModuleVersion}) {
-			t.Errorf("account = %+v, %v", account, err)
-		}
-	})
+	if result != (Result{ProcessesSeen: 2, EventsCreated: 0}) {
+		t.Errorf("result = %+v", result)
+	}
+	if state := h.monitor.State(); !slices.Equal(state.Units, []string{"SEDEMO/NUPROC"}) || state.Self != (Self{UserID: seitest.UserID, Acronym: seitest.Username}) {
+		t.Errorf("state = %+v", state)
+	}
+	if events := h.events(t); len(events) != 0 {
+		t.Errorf("baseline events = %+v", events)
+	}
+	processes, err := h.store.Processes(ctx, h.monitor.State().AccountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(processes) != 2 || processes[0].LastActivityID != 50003 || processes[0].DocumentTotal != 3 || processes[0].AssignedUser != seitest.Username ||
+		processes[0].ReturnDate != "2026-11-05" || processes[0].UnitAcronym != "SEDEMO/NUPROC" || processes[1].LastActivityID != 60001 {
+		t.Errorf("stored processes = %+v", processes)
+	}
+	documents, err := h.store.DocumentIDs(ctx, h.monitor.State().AccountID, 9001)
+	if err != nil || len(documents) != 3 {
+		t.Errorf("stored documents = %v, %v", documents, err)
+	}
+	run, found, err := h.store.LastCycleRun(ctx, h.monitor.State().AccountID)
+	if err != nil || !found || run.Error != "" || run.ProcessesSeen != 2 || run.Trigger != TriggerScheduled || run.FinishedAt.IsZero() {
+		t.Errorf("cycle run = %+v, %v, %v", run, found, err)
+	}
+	account, err := h.store.EnsureAccount(ctx, core.AccountKey{SEIBaseURL: h.server.URL(), Username: seitest.Username, OrgID: seitest.OrgID}, start)
+	if err != nil || account.BaselineAt.IsZero() || account.Info != (core.AccountInfo{OrgAcronym: seitest.OrgAcronym, SEIVersion: seitest.SEIVersion, WSSEIVersion: seitest.ModuleVersion}) {
+		t.Errorf("account = %+v, %v", account, err)
+	}
 }
 
 func TestNextCycleReportsWhatChanged(t *testing.T) {
-	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
-		h := newHarness(t, databaseURL, nil)
-		populate(h.server)
-		if err := h.monitor.Prepare(t.Context()); err != nil {
-			t.Fatal(err)
-		}
-		h.runOnce(t)
+	h := newHarness(t, nil)
+	populate(h.server)
+	if err := h.monitor.Prepare(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	h.runOnce(t)
 
-		h.clock.Advance(15 * time.Minute)
-		h.server.RemoveProcess(seitest.UnitNUPROC, 9002)
-		h.server.AddProcess(seitest.UnitNUPROC, seitest.Process{ID: 9003, Number: seitest.ProcessNumber(3), Type: "Ofício"})
-		h.server.AddActivities(9003, activity(70001, start, "Processo gerado"), activity(70002, start, "Processo remetido"))
-		h.server.AddDocuments(9003, document(90001, "Ofício 9"))
-		h.server.UpdateProcess(seitest.UnitNUPROC, 9001, func(p *seitest.Process) {
-			p.Assignee = &seitest.User{ID: 202, Acronym: "beltrano.silva", Name: "Beltrano da Silva"}
-		})
-		newActivity := start.Add(10 * time.Minute)
-		h.server.AddActivities(9001, activity(50004, newActivity, "Documento assinado"))
-		h.server.AddDocuments(9001, document(80004, "Ofício 4"))
-
-		result := h.runOnce(t)
-
-		cycle := start.Add(15 * time.Minute).Format(time.RFC3339)
-		want := []kindRef{
-			{event.AssignmentChanged, "9001:" + cycle},
-			{event.ReturnDueSoon, "9001:2026-11-05"},
-			{event.ProcessEntered, "9003:" + cycle},
-			{event.ProcessLeft, "9002:" + cycle},
-			{event.ActivityAdded, "50004"},
-			{event.DocumentAdded, "80004"},
-		}
-		events := h.events(t)
-		if got := kindsAndRefs(events); !slices.Equal(got, want) {
-			t.Fatalf("events = %v\nwant %v", got, want)
-		}
-		if result.EventsCreated != len(want) || result.ProcessesSeen != 2 {
-			t.Errorf("result = %+v", result)
-		}
-		activityEvent := events[4]
-		if !activityEvent.OccurredAt.Equal(newActivity) || activityEvent.Payload.ActivityText != "Documento assinado" || activityEvent.Payload.Unit != "SEDEMO/NUPROC" {
-			t.Errorf("activity event = %+v", activityEvent)
-		}
-		if documentEvent := events[5]; documentEvent.Payload.DocumentName != "Ofício 4" || documentEvent.Payload.ProcessNumber != seitest.ProcessNumber(1) {
-			t.Errorf("document event = %+v", documentEvent)
-		}
-
-		h.clock.Advance(15 * time.Minute)
-		if again := h.runOnce(t); again.EventsCreated != 0 {
-			t.Errorf("a cycle without changes created %d events", again.EventsCreated)
-		}
+	h.clock.Advance(15 * time.Minute)
+	h.server.RemoveProcess(seitest.UnitNUPROC, 9002)
+	h.server.AddProcess(seitest.UnitNUPROC, seitest.Process{ID: 9003, Number: seitest.ProcessNumber(3), Type: "Ofício"})
+	h.server.AddActivities(9003, activity(70001, start, "Processo gerado"), activity(70002, start, "Processo remetido"))
+	h.server.AddDocuments(9003, document(90001, "Ofício 9"))
+	h.server.UpdateProcess(seitest.UnitNUPROC, 9001, func(p *seitest.Process) {
+		p.Assignee = &seitest.User{ID: 202, Acronym: "beltrano.silva", Name: "Beltrano da Silva"}
 	})
+	newActivity := start.Add(10 * time.Minute)
+	h.server.AddActivities(9001, activity(50004, newActivity, "Documento assinado"))
+	h.server.AddDocuments(9001, document(80004, "Ofício 4"))
+
+	result := h.runOnce(t)
+
+	cycle := start.Add(15 * time.Minute).Format(time.RFC3339)
+	want := []kindRef{
+		{event.AssignmentChanged, "9001:" + cycle},
+		{event.ReturnDueSoon, "9001:2026-11-05"},
+		{event.ProcessEntered, "9003:" + cycle},
+		{event.ProcessLeft, "9002:" + cycle},
+		{event.ActivityAdded, "50004"},
+		{event.DocumentAdded, "80004"},
+	}
+	events := h.events(t)
+	if got := kindsAndRefs(events); !slices.Equal(got, want) {
+		t.Fatalf("events = %v\nwant %v", got, want)
+	}
+	if result.EventsCreated != len(want) || result.ProcessesSeen != 2 {
+		t.Errorf("result = %+v", result)
+	}
+	activityEvent := events[4]
+	if !activityEvent.OccurredAt.Equal(newActivity) || activityEvent.Payload.ActivityText != "Documento assinado" || activityEvent.Payload.Unit != "SEDEMO/NUPROC" {
+		t.Errorf("activity event = %+v", activityEvent)
+	}
+	if documentEvent := events[5]; documentEvent.Payload.DocumentName != "Ofício 4" || documentEvent.Payload.ProcessNumber != seitest.ProcessNumber(1) {
+		t.Errorf("document event = %+v", documentEvent)
+	}
+
+	h.clock.Advance(15 * time.Minute)
+	if again := h.runOnce(t); again.EventsCreated != 0 {
+		t.Errorf("a cycle without changes created %d events", again.EventsCreated)
+	}
 }
 
 func TestExpiredSessionDoesNotStopTheCycle(t *testing.T) {
-	h := newHarness(t, storetest.SQLiteURL(t), nil)
+	h := newHarness(t, nil)
 	populate(h.server)
 	if err := h.monitor.Prepare(t.Context()); err != nil {
 		t.Fatal(err)
@@ -273,7 +269,7 @@ func TestExpiredSessionDoesNotStopTheCycle(t *testing.T) {
 }
 
 func TestRefusedProcessKeepsItsStateUntilTheNextCycle(t *testing.T) {
-	h := newHarness(t, storetest.SQLiteURL(t), func(cfg *Config) { cfg.Concurrency = 1 })
+	h := newHarness(t, func(cfg *Config) { cfg.Concurrency = 1 })
 	populate(h.server)
 	if err := h.monitor.Prepare(t.Context()); err != nil {
 		t.Fatal(err)
@@ -303,39 +299,37 @@ func TestRefusedProcessKeepsItsStateUntilTheNextCycle(t *testing.T) {
 }
 
 func TestOldRecordsAreRemovedWithoutRepeatingEvents(t *testing.T) {
-	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
-		h := newHarness(t, databaseURL, func(cfg *Config) { cfg.RetentionDays = 30 })
-		populate(h.server)
-		ctx := t.Context()
-		if err := h.monitor.Prepare(ctx); err != nil {
-			t.Fatal(err)
-		}
-		h.runOnce(t)
-		h.clock.Advance(15 * time.Minute)
-		h.server.RemoveProcess(seitest.UnitNUPROC, 9002)
-		h.server.AddActivities(9001, activity(50004, start, "Documento assinado"))
-		h.runOnce(t)
+	h := newHarness(t, func(cfg *Config) { cfg.RetentionDays = 30 })
+	populate(h.server)
+	ctx := t.Context()
+	if err := h.monitor.Prepare(ctx); err != nil {
+		t.Fatal(err)
+	}
+	h.runOnce(t)
+	h.clock.Advance(15 * time.Minute)
+	h.server.RemoveProcess(seitest.UnitNUPROC, 9002)
+	h.server.AddActivities(9001, activity(50004, start, "Documento assinado"))
+	h.runOnce(t)
 
-		h.clock.Advance(31 * 24 * time.Hour)
-		h.runOnce(t)
+	h.clock.Advance(31 * 24 * time.Hour)
+	h.runOnce(t)
 
-		cutoff := h.clock.Now().AddDate(0, 0, -30)
-		for _, ev := range h.events(t) {
-			if ev.DetectedAt.Before(cutoff) || (ev.Kind == event.ActivityAdded && ev.Ref == "50004") {
-				t.Errorf("event %s %s detected at %v survived or came back", ev.Kind, ev.Ref, ev.DetectedAt)
-			}
+	cutoff := h.clock.Now().AddDate(0, 0, -30)
+	for _, ev := range h.events(t) {
+		if ev.DetectedAt.Before(cutoff) || (ev.Kind == event.ActivityAdded && ev.Ref == "50004") {
+			t.Errorf("event %s %s detected at %v survived or came back", ev.Kind, ev.Ref, ev.DetectedAt)
 		}
-		accountID := h.monitor.State().AccountID
-		processes, err := h.store.Processes(ctx, accountID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(processes) != 1 || processes[0].ProcedureID != 9001 {
-			t.Errorf("processes = %+v, want only the one still in the unit", processes)
-		}
-		documents, err := h.store.DocumentIDs(ctx, accountID, 9001)
-		if err != nil || len(documents) != 3 {
-			t.Errorf("documents of the present process = %v, %v, want the 3 kept", documents, err)
-		}
-	})
+	}
+	accountID := h.monitor.State().AccountID
+	processes, err := h.store.Processes(ctx, accountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(processes) != 1 || processes[0].ProcedureID != 9001 {
+		t.Errorf("processes = %+v, want only the one still in the unit", processes)
+	}
+	documents, err := h.store.DocumentIDs(ctx, accountID, 9001)
+	if err != nil || len(documents) != 3 {
+		t.Errorf("documents of the present process = %v, %v, want the 3 kept", documents, err)
+	}
 }

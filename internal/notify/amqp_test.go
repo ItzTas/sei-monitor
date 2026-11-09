@@ -11,7 +11,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/notify"
 )
@@ -46,7 +46,7 @@ func newTestBroker(t *testing.T) *testBroker {
 }
 
 func (b *testBroker) sender(address string) *notify.AMQP {
-	return notify.NewAMQP(config.AMQP{URL: config.NewSecret(address), Exchange: b.exchange})
+	return notify.NewAMQP(core.AMQP{URL: core.NewSecret(address), Exchange: b.exchange})
 }
 
 func (b *testBroker) queue(t *testing.T, keys ...string) string {

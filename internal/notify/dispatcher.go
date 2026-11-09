@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
-	"github.com/ItzTas/sei-monitor/internal/store"
 )
 
 const (
@@ -25,8 +25,8 @@ type Channel interface {
 }
 
 type Outbox interface {
-	DueDeliveries(ctx context.Context, channel string, now time.Time, limit int) ([]store.DueDelivery, error)
-	UpdateDeliveries(ctx context.Context, deliveries []store.Delivery) error
+	DueDeliveries(ctx context.Context, channel string, now time.Time, limit int) ([]core.DueDelivery, error)
+	UpdateDeliveries(ctx context.Context, deliveries []core.Delivery) error
 }
 
 type Dispatcher struct {
@@ -95,7 +95,7 @@ func (d *Dispatcher) deliver(ctx context.Context, channel Channel) {
 		return
 	}
 	now := d.now()
-	attempts := make([]store.Delivery, 0, len(due))
+	attempts := make([]core.Delivery, 0, len(due))
 	for _, delivery := range due {
 		attempts = append(attempts, attempt(delivery.Delivery, sendErr, now))
 	}
@@ -108,29 +108,29 @@ func (d *Dispatcher) deliver(ctx context.Context, channel Channel) {
 	d.report(name, attempts, sendErr)
 }
 
-func (d *Dispatcher) report(channel string, attempts []store.Delivery, sendErr error) {
+func (d *Dispatcher) report(channel string, attempts []core.Delivery, sendErr error) {
 	if sendErr == nil {
 		d.log.Info("notifications sent", "channel", channel, "events", len(attempts))
 		return
 	}
 	gaveUp := 0
 	for _, a := range attempts {
-		if a.Status == store.DeliveryFailed {
+		if a.Status == core.DeliveryFailed {
 			gaveUp++
 		}
 	}
 	d.log.Warn("could not send the notifications", "channel", channel, "events", len(attempts), "gave_up", gaveUp, "error", sendErr)
 }
 
-func attempt(delivery store.Delivery, sendErr error, now time.Time) store.Delivery {
+func attempt(delivery core.Delivery, sendErr error, now time.Time) core.Delivery {
 	delivery.Attempts++
 	if sendErr == nil {
-		delivery.Status, delivery.SentAt, delivery.LastError = store.DeliverySent, now, ""
+		delivery.Status, delivery.SentAt, delivery.LastError = core.DeliverySent, now, ""
 		return delivery
 	}
 	delivery.LastError = cut(strings.ToValidUTF8(sendErr.Error(), ""), maxErrorLength)
 	if delivery.Attempts > len(retryDelays) {
-		delivery.Status = store.DeliveryFailed
+		delivery.Status = core.DeliveryFailed
 		return delivery
 	}
 	delivery.NextAttemptAt = now.Add(retryDelays[delivery.Attempts-1])

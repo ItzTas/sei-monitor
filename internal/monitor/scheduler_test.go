@@ -9,11 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
-	"github.com/ItzTas/sei-monitor/internal/store"
-	"github.com/ItzTas/sei-monitor/internal/store/storetest"
 )
 
 func (h *harness) run(t *testing.T) func() error {
@@ -33,7 +32,7 @@ func (h *harness) run(t *testing.T) func() error {
 	}
 }
 
-func (h *harness) lastRun(t *testing.T) store.CycleRun {
+func (h *harness) lastRun(t *testing.T) core.CycleRun {
 	t.Helper()
 	run, _, err := h.store.LastCycleRun(t.Context(), h.monitor.State().AccountID)
 	if err != nil {
@@ -43,7 +42,7 @@ func (h *harness) lastRun(t *testing.T) store.CycleRun {
 }
 
 func TestRunBacksOffAfterFailuresAndThenKeepsTheInterval(t *testing.T) {
-	h := newHarness(t, storetest.SQLiteURL(t), nil)
+	h := newHarness(t, nil)
 	populate(h.server)
 	h.server.FailNext(seitest.RouteProcesses, http.StatusBadGateway, 2)
 	stop := h.run(t)
@@ -69,7 +68,7 @@ func TestRunBacksOffAfterFailuresAndThenKeepsTheInterval(t *testing.T) {
 }
 
 func TestRejectedLoginPausesWithoutTryingAgain(t *testing.T) {
-	h := newHarness(t, storetest.SQLiteURL(t), nil)
+	h := newHarness(t, nil)
 	populate(h.server)
 	h.server.SetPassword("changed-by-the-user")
 	stop := h.run(t)
@@ -94,13 +93,13 @@ func TestRejectedLoginPausesWithoutTryingAgain(t *testing.T) {
 	if h.server.FailedLogins() != 1 {
 		t.Errorf("rejected logins = %d, want 1", h.server.FailedLogins())
 	}
-	account, err := h.store.EnsureAccount(t.Context(), store.AccountKey{SEIBaseURL: h.server.URL(), Username: seitest.Username, OrgID: seitest.OrgID}, start)
+	account, err := h.store.EnsureAccount(t.Context(), core.AccountKey{SEIBaseURL: h.server.URL(), Username: seitest.Username, OrgID: seitest.OrgID}, start)
 	if err != nil || account.PausedReason != state.PausedReason {
 		t.Errorf("stored pause = %q, %v", account.PausedReason, err)
 	}
-	events, err := h.store.RecentEvents(t.Context(), 10)
-	if err != nil || len(events) != 1 || events[0].Kind != event.AccountLoginFailed || events[0].Payload.Reason != state.PausedReason {
-		t.Errorf("events = %+v, %v", events, err)
+	events := recentEvents(t, h.pool)
+	if len(events) != 1 || events[0].Kind != event.AccountLoginFailed || events[0].Payload.Reason != state.PausedReason {
+		t.Errorf("events = %+v", events)
 	}
 	if run := h.lastRun(t); !strings.Contains(run.Error, "Usuário ou Senha Inválida.") {
 		t.Errorf("last run = %+v", run)
@@ -108,7 +107,7 @@ func TestRejectedLoginPausesWithoutTryingAgain(t *testing.T) {
 }
 
 func TestManualCycleWaitsForTheMinimumInterval(t *testing.T) {
-	h := newHarness(t, storetest.SQLiteURL(t), nil)
+	h := newHarness(t, nil)
 	populate(h.server)
 	stop := h.run(t)
 	h.clock.nextWait(t)
@@ -129,13 +128,13 @@ func TestManualCycleWaitsForTheMinimumInterval(t *testing.T) {
 	if accepted != nil {
 		t.Errorf("manual cycle after 5m: error = %v", accepted)
 	}
-	if run := h.lastRun(t); run.Trigger != store.TriggerManual || run.Error != "" {
+	if run := h.lastRun(t); run.Trigger != TriggerManual || run.Error != "" {
 		t.Errorf("last run = %+v", run)
 	}
 }
 
 func TestRunWaitsForADisabledModule(t *testing.T) {
-	h := newHarness(t, storetest.SQLiteURL(t), nil)
+	h := newHarness(t, nil)
 	populate(h.server)
 	h.server.SetModuleInactive(true)
 	stop := h.run(t)
@@ -157,7 +156,7 @@ func TestRunWaitsForADisabledModule(t *testing.T) {
 }
 
 func TestRunStopsOnAnUnknownAgency(t *testing.T) {
-	h := newHarness(t, storetest.SQLiteURL(t), func(cfg *Config) { cfg.Target.Org = "NOPE" })
+	h := newHarness(t, func(cfg *Config) { cfg.Target.Org = "NOPE" })
 
 	err := h.monitor.Run(t.Context())
 

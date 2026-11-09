@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/notify"
 )
@@ -18,7 +18,7 @@ import (
 const webhookSecret = "0123456789abcdef0123456789abcdef"
 
 func newWebhook(url string) *notify.Webhook {
-	return notify.NewWebhook(config.Webhook{URL: url, Secret: config.NewSecret(webhookSecret)}, "sei-monitor/test")
+	return notify.NewWebhook(core.Webhook{URL: url, Secret: core.NewSecret(webhookSecret)}, "sei-monitor/test")
 }
 
 func TestWebhookPostsTheEventsWithAnHMACSignature(t *testing.T) {

@@ -1,4 +1,4 @@
-.PHONY: check lint test openapi local up down
+.PHONY: check lint test generate openapi dev local up down
 
 check: lint test
 
@@ -10,11 +10,17 @@ lint:
 test:
 	go test -race ./...
 
+generate:
+	go tool sqlc generate
+
 openapi:
 	go run . openapi > docs/openapi.json
 
+dev:
+	go tool air
+
 local:
-	./scripts/local.sh $(CMD)
+	go run . $(CMD)
 
 up:
 	docker compose up -d --build

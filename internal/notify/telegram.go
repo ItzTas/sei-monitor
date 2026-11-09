@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 
 type Telegram struct {
 	api       string
-	token     config.Secret
+	token     core.Secret
 	chatID    string
 	userAgent string
 	client    *http.Client
@@ -33,7 +33,7 @@ type telegramMessage struct {
 	} `json:"link_preview_options"`
 }
 
-func NewTelegram(cfg config.Telegram, api, userAgent string) *Telegram {
+func NewTelegram(cfg core.Telegram, api, userAgent string) *Telegram {
 	return &Telegram{api: api, token: cfg.Token, chatID: cfg.ChatID, userAgent: userAgent, client: newHTTPClient()}
 }
 

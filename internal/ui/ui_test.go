@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
-	"github.com/ItzTas/sei-monitor/internal/httpserver"
+	"github.com/ItzTas/sei-monitor/internal/modules/events"
 	"github.com/ItzTas/sei-monitor/internal/monitor"
-	"github.com/ItzTas/sei-monitor/internal/store"
+	"github.com/ItzTas/sei-monitor/internal/server"
 	"github.com/ItzTas/sei-monitor/internal/ui"
 )
 
@@ -36,7 +36,7 @@ type fakeRepository struct {
 	err    error
 }
 
-func (r *fakeRepository) ListEvents(context.Context, store.EventFilter) ([]event.Event, error) {
+func (r *fakeRepository) ListEvents(context.Context, events.Filter) ([]event.Event, error) {
 	return r.events, r.err
 }
 
@@ -69,15 +69,15 @@ func newFixture(t *testing.T) *fixture {
 	}
 	logger := slog.New(slog.NewTextHandler(f.logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	deps := ui.Deps{
-		Store:    f.repo,
+		Events:   f.repo,
 		Monitor:  f.monitor,
-		Token:    config.NewSecret(apiToken),
+		Token:    core.NewSecret(apiToken),
 		Location: time.FixedZone("UTC-3", -3*60*60),
 		Now:      func() time.Time { return f.now },
 		Log:      logger,
 	}
 	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	f.handler = httpserver.Handler(httpserver.Routes{Health: ok, UI: func(mux *http.ServeMux) { ui.Register(mux, deps) }}, logger)
+	f.handler = server.Handler(server.Routes{Health: ok, UI: func(mux *http.ServeMux) { ui.Register(mux, deps) }}, logger)
 	return f
 }
 

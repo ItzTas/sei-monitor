@@ -13,9 +13,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/sei"
-	"github.com/ItzTas/sei-monitor/internal/store"
 )
 
 const (
@@ -71,7 +71,7 @@ func WithJitter(jitter func(time.Duration) time.Duration) Option {
 
 type Monitor struct {
 	cfg    Config
-	store  *store.Store
+	repo   Repository
 	log    *slog.Logger
 	now    func() time.Time
 	after  func(time.Duration) <-chan time.Time
@@ -80,7 +80,7 @@ type Monitor struct {
 
 	mu      sync.Mutex
 	conn    sei.Connection
-	account store.Account
+	account core.Account
 	logins  uint64
 	state   State
 }
@@ -94,10 +94,10 @@ type detail struct {
 	newDocuments   []sei.Document
 }
 
-func New(cfg Config, st *store.Store, log *slog.Logger, options ...Option) *Monitor {
+func New(cfg Config, st Repository, log *slog.Logger, options ...Option) *Monitor {
 	m := &Monitor{
 		cfg:    cfg,
-		store:  st,
+		repo:   st,
 		log:    log,
 		now:    time.Now,
 		after:  time.After,
@@ -134,14 +134,14 @@ func (m *Monitor) Prepare(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	key := store.AccountKey{SEIBaseURL: m.cfg.Target.SEIURL, Username: m.cfg.Target.Username, OrgID: conn.Org.ID}
-	account, err := m.store.EnsureAccount(ctx, key, m.now())
+	key := core.AccountKey{SEIBaseURL: m.cfg.Target.SEIURL, Username: m.cfg.Target.Username, OrgID: conn.Org.ID}
+	account, err := m.repo.EnsureAccount(ctx, key, m.now())
 	if err != nil {
 		return err
 	}
 	if acronym := m.orgAcronym(ctx, conn); acronym != "" && acronym != account.Info.OrgAcronym {
 		account.Info.OrgAcronym = acronym
-		if err := m.store.UpdateAccountInfo(ctx, account.ID, account.Info); err != nil {
+		if err := m.repo.UpdateAccountInfo(ctx, account.ID, account.Info); err != nil {
 			return err
 		}
 	}
@@ -189,7 +189,7 @@ func (m *Monitor) RunOnce(ctx context.Context, trigger string) (Result, error) {
 		m.mu.Unlock()
 	}()
 
-	runID, err := m.store.StartCycleRun(ctx, account.ID, trigger, started)
+	runID, err := m.repo.StartCycleRun(ctx, account.ID, trigger, started)
 	if err != nil {
 		return Result{}, err
 	}
@@ -197,11 +197,11 @@ func (m *Monitor) RunOnce(ctx context.Context, trigger string) (Result, error) {
 	if err == nil {
 		return result, nil
 	}
-	finish := store.CycleRun{ID: runID, AccountID: account.ID, FinishedAt: m.now(), Error: describe(err)}
-	return Result{}, errors.Join(err, m.store.FinishCycleRun(context.WithoutCancel(ctx), finish))
+	finish := core.CycleRun{ID: runID, AccountID: account.ID, FinishedAt: m.now(), Error: describe(err)}
+	return Result{}, errors.Join(err, m.repo.FinishCycleRun(context.WithoutCancel(ctx), finish))
 }
 
-func (m *Monitor) cycle(ctx context.Context, conn sei.Connection, account store.Account, runID int64, started time.Time) (Result, error) {
+func (m *Monitor) cycle(ctx context.Context, conn sei.Connection, account core.Account, runID int64, started time.Time) (Result, error) {
 	session, err := conn.Client.Session(ctx)
 	if err != nil {
 		return Result{}, err
@@ -218,7 +218,7 @@ func (m *Monitor) cycle(ctx context.Context, conn sei.Connection, account store.
 	if err != nil {
 		return Result{}, err
 	}
-	previous, err := m.store.Processes(ctx, account.ID)
+	previous, err := m.repo.Processes(ctx, account.ID)
 	if err != nil {
 		return Result{}, err
 	}
@@ -238,7 +238,7 @@ func (m *Monitor) cycle(ctx context.Context, conn sei.Connection, account store.
 
 	changes := buildChanges(account.ID, runID, started, baseline, diff, details)
 	changes.FinishedAt, changes.Channels = m.now(), m.cfg.Channels
-	inserted, err := m.store.ApplyCycle(ctx, changes)
+	inserted, err := m.repo.ApplyCycle(ctx, changes)
 	if err != nil {
 		return Result{}, err
 	}
@@ -259,7 +259,7 @@ func (m *Monitor) rememberSession(session sei.Session, units []sei.Unit) {
 	m.state.Units, m.state.Self = acronyms, Self{UserID: session.UserID, Acronym: session.UserAcronym}
 }
 
-func (m *Monitor) afterSuccess(ctx context.Context, account store.Account, baseline bool, started time.Time) {
+func (m *Monitor) afterSuccess(ctx context.Context, account core.Account, baseline bool, started time.Time) {
 	m.mu.Lock()
 	if baseline {
 		m.account.BaselineAt = started
@@ -270,7 +270,7 @@ func (m *Monitor) afterSuccess(ctx context.Context, account store.Account, basel
 	if !paused {
 		return
 	}
-	if err := m.store.SetPausedReason(ctx, account.ID, ""); err != nil {
+	if err := m.repo.SetPausedReason(ctx, account.ID, ""); err != nil {
 		m.log.Warn("could not clear the pause reason", "error", err)
 	}
 }
@@ -279,18 +279,18 @@ func (m *Monitor) prune(ctx context.Context, accountID int64, now time.Time) {
 	if m.cfg.RetentionDays == 0 {
 		return
 	}
-	pruned, err := m.store.PruneBefore(ctx, accountID, now.AddDate(0, 0, -m.cfg.RetentionDays))
+	pruned, err := m.repo.PruneBefore(ctx, accountID, now.AddDate(0, 0, -m.cfg.RetentionDays))
 	if err != nil {
 		m.log.Warn("could not remove old records", "error", err)
 		return
 	}
-	if pruned == (store.Pruned{}) {
+	if pruned == (Pruned{}) {
 		return
 	}
 	m.log.Info("removed old records", "events", pruned.Events, "processes", pruned.Processes, "retention_days", m.cfg.RetentionDays)
 }
 
-func (m *Monitor) refreshVersions(ctx context.Context, conn sei.Connection, account store.Account) error {
+func (m *Monitor) refreshVersions(ctx context.Context, conn sei.Connection, account core.Account) error {
 	logins := conn.Client.Logins()
 	m.mu.Lock()
 	seen := m.logins
@@ -302,8 +302,8 @@ func (m *Monitor) refreshVersions(ctx context.Context, conn sei.Connection, acco
 	if err != nil {
 		return err
 	}
-	info := store.AccountInfo{OrgAcronym: account.Info.OrgAcronym, SEIVersion: version.SEI, WSSEIVersion: version.Module}
-	if err := m.store.UpdateAccountInfo(ctx, account.ID, info); err != nil {
+	info := core.AccountInfo{OrgAcronym: account.Info.OrgAcronym, SEIVersion: version.SEI, WSSEIVersion: version.Module}
+	if err := m.repo.UpdateAccountInfo(ctx, account.ID, info); err != nil {
 		return err
 	}
 	m.mu.Lock()
@@ -374,7 +374,7 @@ func (m *Monitor) fetchDetail(ctx context.Context, client *sei.Client, accountID
 
 	known := map[int64]bool{}
 	if p.Previous != nil {
-		if known, err = m.store.DocumentIDs(ctx, accountID, p.Process.ProcedureID); err != nil {
+		if known, err = m.repo.DocumentIDs(ctx, accountID, p.Process.ProcedureID); err != nil {
 			return detail{}, err
 		}
 	}
@@ -441,8 +441,8 @@ func highestActivity(activities []sei.Activity) int64 {
 	return highest
 }
 
-func buildChanges(accountID, runID int64, now time.Time, baseline bool, diff ProcessChanges, details []detail) store.CycleChanges {
-	changes := store.CycleChanges{AccountID: accountID, RunID: runID, Now: now, Baseline: baseline, Events: diff.Events}
+func buildChanges(accountID, runID int64, now time.Time, baseline bool, diff ProcessChanges, details []detail) CycleChanges {
+	changes := CycleChanges{AccountID: accountID, RunID: runID, Now: now, Baseline: baseline, Events: diff.Events}
 	for _, process := range diff.Left {
 		changes.Left = append(changes.Left, process.ProcedureID)
 	}
@@ -453,7 +453,7 @@ func buildChanges(accountID, runID int64, now time.Time, baseline bool, diff Pro
 		}
 		changes.Processes = append(changes.Processes, processRow(p, d))
 		for _, document := range d.documents {
-			changes.Documents = append(changes.Documents, store.Document{
+			changes.Documents = append(changes.Documents, core.Document{
 				DocumentID: document.ID, ProcedureID: p.Process.ProcedureID,
 				Protocol: document.Protocol, Type: document.Type, Name: document.Name,
 			})
@@ -468,8 +468,8 @@ func buildChanges(accountID, runID int64, now time.Time, baseline bool, diff Pro
 	return changes
 }
 
-func processRow(p Presence, d detail) store.Process {
-	row := store.Process{
+func processRow(p Presence, d detail) core.Process {
+	row := core.Process{
 		ProcedureID:    p.Process.ProcedureID,
 		Number:         p.Process.Number,
 		Type:           p.Process.Type,

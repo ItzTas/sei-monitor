@@ -7,16 +7,16 @@ import (
 
 	"github.com/wneessen/go-mail"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 )
 
 type Email struct {
-	cfg       config.Email
+	cfg       core.Email
 	userAgent string
 	tlsConfig *tls.Config
 }
 
-func NewEmail(cfg config.Email, userAgent string, tlsConfig *tls.Config) *Email {
+func NewEmail(cfg core.Email, userAgent string, tlsConfig *tls.Config) *Email {
 	return &Email{cfg: cfg, userAgent: userAgent, tlsConfig: tlsConfig}
 }
 
@@ -49,9 +49,9 @@ func (e *Email) Send(ctx context.Context, msg Message) error {
 
 func (e *Email) options() []mail.Option {
 	security := map[string]mail.Option{
-		config.TLSStartTLS: mail.WithTLSPolicy(mail.TLSMandatory),
-		config.TLSImplicit: mail.WithSSL(),
-		config.TLSNone:     mail.WithTLSPolicy(mail.NoTLS),
+		core.TLSStartTLS: mail.WithTLSPolicy(mail.TLSMandatory),
+		core.TLSImplicit: mail.WithSSL(),
+		core.TLSNone:     mail.WithTLSPolicy(mail.NoTLS),
 	}
 	options := []mail.Option{mail.WithPort(e.cfg.Port), mail.WithTimeout(httpTimeout), security[e.cfg.TLS]}
 	if e.tlsConfig != nil {

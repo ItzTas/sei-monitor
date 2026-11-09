@@ -25,7 +25,7 @@ linters:
       - path: (_test\.go$|[a-z]+test/)
         linters:
           - gosec
-      - path: internal/config/password\.go
+      - path: internal/core/password\.go
         text: G(204|702)
         linters:
           - gosec

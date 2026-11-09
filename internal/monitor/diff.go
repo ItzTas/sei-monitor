@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/sei"
-	"github.com/ItzTas/sei-monitor/internal/store"
 )
 
 const storedDateLayout = "2006-01-02"
@@ -33,7 +33,7 @@ type Rules struct {
 
 type Presence struct {
 	Observation
-	Previous *store.Process
+	Previous *core.Process
 	Entered  bool
 }
 
@@ -43,12 +43,12 @@ func (p Presence) quiet(baseline bool) bool {
 
 type ProcessChanges struct {
 	Present []Presence
-	Left    []store.Process
+	Left    []core.Process
 	Events  []event.Event
 }
 
-func DiffProcesses(previous []store.Process, current []Observation, rules Rules) ProcessChanges {
-	known := make(map[int64]*store.Process, len(previous))
+func DiffProcesses(previous []core.Process, current []Observation, rules Rules) ProcessChanges {
+	known := make(map[int64]*core.Process, len(previous))
 	for i := range previous {
 		known[previous[i].ProcedureID] = &previous[i]
 	}
@@ -123,7 +123,7 @@ func enteredEvent(p Presence, rules Rules) event.Event {
 	return newEvent(event.ProcessEntered, p.Process.ProcedureID, cycleRef(p.Process.ProcedureID, rules.Now), payload)
 }
 
-func leftEvent(process store.Process, rules Rules) event.Event {
+func leftEvent(process core.Process, rules Rules) event.Event {
 	payload := event.Payload{ProcessNumber: process.Number, Unit: process.UnitAcronym, ProcessType: process.Type, Description: process.Description}
 	return newEvent(event.ProcessLeft, process.ProcedureID, cycleRef(process.ProcedureID, rules.Now), payload)
 }

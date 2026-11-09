@@ -1,8 +1,4 @@
 /sei-monitor
-/data/
-*.db
-*.db-shm
-*.db-wal
 .env
 /tmp/
 *.test

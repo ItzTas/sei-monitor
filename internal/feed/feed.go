@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 )
 
@@ -117,14 +117,14 @@ func processLink(seiURL string, procedureID int64) string {
 
 type Handler struct {
 	source    Source
-	token     config.Secret
+	token     core.Secret
 	channel   func(context.Context) Channel
 	formatter func() event.Formatter
 	now       func() time.Time
 	log       *slog.Logger
 }
 
-func NewHandler(source Source, token config.Secret, channel func(context.Context) Channel, formatter func() event.Formatter, now func() time.Time, log *slog.Logger) *Handler {
+func NewHandler(source Source, token core.Secret, channel func(context.Context) Channel, formatter func() event.Formatter, now func() time.Time, log *slog.Logger) *Handler {
 	return &Handler{source: source, token: token, channel: channel, formatter: formatter, now: now, log: log}
 }
 

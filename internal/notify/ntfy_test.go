@@ -7,7 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/notify"
 )
@@ -27,7 +27,7 @@ func TestNtfyPostsTheTextWithTitleTagsAndPriority(t *testing.T) {
 		server, rec := newServer(t, http.StatusOK, `{"id":"abc"}`)
 		msg := notify.Compose(tt.events, event.Formatter{Location: time.UTC})
 
-		err := notify.NewNtfy(config.Ntfy{URL: server.URL + "/sei-topic", Token: config.NewSecret(tt.token)}, "sei-monitor/test").Send(t.Context(), msg)
+		err := notify.NewNtfy(core.Ntfy{URL: server.URL + "/sei-topic", Token: core.NewSecret(tt.token)}, "sei-monitor/test").Send(t.Context(), msg)
 
 		if err != nil {
 			t.Fatalf("%s: Send = %v", tt.name, err)
@@ -44,7 +44,7 @@ func TestNtfyPostsTheTextWithTitleTagsAndPriority(t *testing.T) {
 func TestNtfyCutsLongTextsAtACharacter(t *testing.T) {
 	server, rec := newServer(t, http.StatusOK, "")
 
-	err := notify.NewNtfy(config.Ntfy{URL: server.URL + "/sei-topic"}, "sei-monitor/test").Send(t.Context(), notify.Message{Subject: "s", Body: strings.Repeat("Ofício ", 1000)})
+	err := notify.NewNtfy(core.Ntfy{URL: server.URL + "/sei-topic"}, "sei-monitor/test").Send(t.Context(), notify.Message{Subject: "s", Body: strings.Repeat("Ofício ", 1000)})
 
 	body := string(rec.all()[0].body)
 	if err != nil || len(body) > 4000 || !utf8.ValidString(body) || !strings.HasSuffix(body, "\n…") || !strings.HasPrefix(body, "Ofício Ofício") {

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ItzTas/sei-monitor/internal/config"
+	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 )
 
@@ -57,7 +57,7 @@ func fixtureClient(t *testing.T, routes map[string]fixture) *sei.Client {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return sei.New(server.URL+apiPath, sei.Credentials{Username: "fulano.tal", Password: config.StaticPassword(config.NewSecret("x")), OrgID: 63}, sei.Options{UserAgent: "sei-monitor/teste", Location: location})
+	return sei.New(server.URL+apiPath, sei.Credentials{Username: "fulano.tal", Password: core.StaticPassword(core.NewSecret("x")), OrgID: 63}, sei.Options{UserAgent: "sei-monitor/teste", Location: location})
 }
 
 func TestProcessPageReadsTheModuleFormat(t *testing.T) {
@@ -248,7 +248,7 @@ func TestAPICallsDoNotFollowRedirects(t *testing.T) {
 	})
 	origin := httptest.NewServer(mux)
 	t.Cleanup(origin.Close)
-	client := sei.New(origin.URL+apiPath, sei.Credentials{Username: "fulano.tal", Password: config.StaticPassword(config.NewSecret("p4ss")), OrgID: 63}, sei.Options{})
+	client := sei.New(origin.URL+apiPath, sei.Credentials{Username: "fulano.tal", Password: core.StaticPassword(core.NewSecret("p4ss")), OrgID: 63}, sei.Options{})
 
 	_, err := client.Login(t.Context())
 

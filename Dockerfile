@@ -10,9 +10,8 @@ ARG VERSION=dev
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
       -trimpath \
-      -ldflags "-s -w -X main.version=${VERSION}" \
-      -o /out/sei-monitor . \
-    && mkdir -p /out/data
+      -ldflags "-s -w -X github.com/ItzTas/sei-monitor/internal/core.version=${VERSION}" \
+      -o /out/sei-monitor .
 
 FROM alpine:3.24
 
@@ -22,10 +21,6 @@ RUN apk add --no-cache ca-certificates \
     && adduser -S -D -H -u 65532 -G sei-monitor sei-monitor
 
 COPY --from=build /out/sei-monitor /usr/local/bin/sei-monitor
-COPY --from=build --chown=65532:65532 /out/data /data
-
-WORKDIR /data
-VOLUME /data
 
 USER 65532:65532
 

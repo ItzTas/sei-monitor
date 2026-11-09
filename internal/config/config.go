@@ -57,6 +57,7 @@ type Config struct {
 	DatabaseURL       Secret
 	PollInterval      time.Duration
 	ReturnWarningDays int
+	RetentionDays     int
 	FullDetail        bool
 	APIFullDetail     bool
 	HTTP              HTTP
@@ -154,11 +155,13 @@ type WhatsApp struct {
 func Load(src Source) (Config, error) {
 	r := &reader{src: src}
 	fullDetail := r.detailLevel("NOTIFICATION_DETAIL", false)
+	warningDays := r.integer("RETURN_WARNING_DAYS", 2, 0, 60)
 	cfg := Config{
 		SEI:               r.sei(),
 		DatabaseURL:       r.databaseURL(),
 		PollInterval:      r.pollInterval(),
-		ReturnWarningDays: r.integer("RETURN_WARNING_DAYS", 2, 0, 60),
+		ReturnWarningDays: warningDays,
+		RetentionDays:     r.retentionDays(warningDays),
 		FullDetail:        fullDetail,
 		APIFullDetail:     r.detailLevel("API_DETAIL", fullDetail),
 		HTTP:              r.http(),
@@ -293,6 +296,18 @@ func (r *reader) integer(name string, fallback, low, high int) int {
 		return fallback
 	}
 	return n
+}
+
+// retentionDays must outlast the return_due_soon window: those events are deduplicated only by
+// the stored event, so deleting one while its return is still near would send it again.
+func (r *reader) retentionDays(warningDays int) int {
+	days := r.integer("RETENTION_DAYS", 90, 0, 3650)
+	minimum := warningDays + 2
+	if days == 0 || days >= minimum {
+		return days
+	}
+	r.problem("RETENTION_DAYS: keep events for at least %d days, RETURN_WARNING_DAYS plus 2, or use 0 to keep them forever (got %d)", minimum, days)
+	return days
 }
 
 func (r *reader) parseURL(name, value string, rules urlRules) (*url.URL, bool) {

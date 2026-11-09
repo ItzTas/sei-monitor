@@ -82,8 +82,8 @@ func TestLoadAppliesTheDefaults(t *testing.T) {
 	if cfg.SEI.Location.String() != "America/Sao_Paulo" || cfg.SEI.Concurrency != 3 || cfg.SEI.AllUnits || cfg.SEI.Units != nil {
 		t.Errorf("SEI defaults = %+v", cfg.SEI)
 	}
-	if cfg.DatabaseURL.Reveal() != DefaultDatabaseURL || cfg.PollInterval != 15*time.Minute || cfg.ReturnWarningDays != 2 {
-		t.Errorf("defaults = database %v, interval %v, warning days %d", cfg.DatabaseURL, cfg.PollInterval, cfg.ReturnWarningDays)
+	if cfg.DatabaseURL.Reveal() != DefaultDatabaseURL || cfg.PollInterval != 15*time.Minute || cfg.ReturnWarningDays != 2 || cfg.RetentionDays != 90 {
+		t.Errorf("defaults = database %v, interval %v, warning days %d, retention days %d", cfg.DatabaseURL, cfg.PollInterval, cfg.ReturnWarningDays, cfg.RetentionDays)
 	}
 	if cfg.HTTP.Address != ":8080" || cfg.FullDetail || cfg.LogLevel != slog.LevelInfo {
 		t.Errorf("defaults = HTTP %q, full detail %v, log level %v", cfg.HTTP.Address, cfg.FullDetail, cfg.LogLevel)
@@ -172,6 +172,7 @@ func TestValuesOutsideTheirLimits(t *testing.T) {
 		"POLL_INTERVAL":       "4m",
 		"SEI_CONCURRENCY":     "50",
 		"RETURN_WARNING_DAYS": "-1",
+		"RETENTION_DAYS":      "-1",
 		"SEI_TIMEZONE":        "America/Atlantis",
 		"NOTIFICATION_DETAIL": "everything",
 		"LOG_LEVEL":           "loud",
@@ -183,6 +184,7 @@ func TestValuesOutsideTheirLimits(t *testing.T) {
 		"POLL_INTERVAL: the minimum is 5m0s",
 		"SEI_CONCURRENCY: use a whole number from 1 to 10",
 		"RETURN_WARNING_DAYS: use a whole number from 0 to 60",
+		"RETENTION_DAYS: use a whole number from 0 to 3650",
 		"SEI_TIMEZONE: unknown time zone",
 		"NOTIFICATION_DETAIL: use minimal or full",
 		"LOG_LEVEL: use debug, info, warn or error",
@@ -222,6 +224,31 @@ func TestOptionsWithinLimits(t *testing.T) {
 	}
 	if all, _ := load(t, baseEnv(map[string]string{"SEI_UNITS": "All"}), nil); !all.SEI.AllUnits {
 		t.Error("SEI_UNITS=All does not select every unit")
+	}
+}
+
+func TestRetentionOutlastsTheReturnWarning(t *testing.T) {
+	cases := []struct {
+		retention, warning string
+		want               int
+		problem            string
+	}{
+		{retention: "0", warning: "2", want: 0},
+		{retention: "4", warning: "2", want: 4},
+		{retention: "3", warning: "2", problem: "RETENTION_DAYS: keep events for at least 4 days"},
+		{retention: "30", warning: "30", problem: "RETENTION_DAYS: keep events for at least 32 days"},
+	}
+	for _, c := range cases {
+		cfg, problems := load(t, baseEnv(map[string]string{"RETENTION_DAYS": c.retention, "RETURN_WARNING_DAYS": c.warning}), nil)
+		if c.problem == "" {
+			if problems != nil || cfg.RetentionDays != c.want {
+				t.Errorf("retention %s with warning %s = %d, %q", c.retention, c.warning, cfg.RetentionDays, problems)
+			}
+			continue
+		}
+		if !slices.ContainsFunc(problems, func(p string) bool { return strings.HasPrefix(p, c.problem) }) {
+			t.Errorf("retention %s with warning %s: problems = %q, want one starting with %q", c.retention, c.warning, problems, c.problem)
+		}
 	}
 }
 

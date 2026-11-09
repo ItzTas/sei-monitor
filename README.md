@@ -135,6 +135,7 @@ memory, never in the database, a file, a log or a message.
 | `NOTIFICATION_DETAIL` | `minimal` | Detail of the feed and the messages: `minimal` or `full`. |
 | `API_DETAIL` | `NOTIFICATION_DETAIL` | Detail of the API: `minimal` or `full`. |
 | `RETURN_WARNING_DAYS` | `2` | How early to warn about a scheduled return. |
+| `RETENTION_DAYS` | `90` | How many days to keep events and the processes that left your units. Use at least `RETURN_WARNING_DAYS` + 2, or `0` to keep them forever. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 | `SMTP_*`, `TELEGRAM_*`, `NTFY_*`, `WEBHOOK_*`, `AMQP_*`, `WHATSAPP_RECIPIENTS` | | The channels, below. |
 

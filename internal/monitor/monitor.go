@@ -34,6 +34,7 @@ type Config struct {
 	PollInterval      time.Duration
 	Concurrency       int
 	ReturnWarningDays int
+	RetentionDays     int
 	Location          *time.Location
 	Channels          []string
 }
@@ -242,6 +243,7 @@ func (m *Monitor) cycle(ctx context.Context, conn sei.Connection, account store.
 		return Result{}, err
 	}
 	m.afterSuccess(ctx, account, baseline, started)
+	m.prune(ctx, account.ID, started)
 	result := Result{ProcessesSeen: len(diff.Present), EventsCreated: len(inserted)}
 	m.log.Info("cycle finished", "processes", result.ProcessesSeen, "events", result.EventsCreated, "baseline", baseline, "duration", m.now().Sub(started).Round(time.Millisecond))
 	return result, nil
@@ -271,6 +273,21 @@ func (m *Monitor) afterSuccess(ctx context.Context, account store.Account, basel
 	if err := m.store.SetPausedReason(ctx, account.ID, ""); err != nil {
 		m.log.Warn("could not clear the pause reason", "error", err)
 	}
+}
+
+func (m *Monitor) prune(ctx context.Context, accountID int64, now time.Time) {
+	if m.cfg.RetentionDays == 0 {
+		return
+	}
+	pruned, err := m.store.PruneBefore(ctx, accountID, now.AddDate(0, 0, -m.cfg.RetentionDays))
+	if err != nil {
+		m.log.Warn("could not remove old records", "error", err)
+		return
+	}
+	if pruned == (store.Pruned{}) {
+		return
+	}
+	m.log.Info("removed old records", "events", pruned.Events, "processes", pruned.Processes, "retention_days", m.cfg.RetentionDays)
 }
 
 func (m *Monitor) refreshVersions(ctx context.Context, conn sei.Connection, account store.Account) error {

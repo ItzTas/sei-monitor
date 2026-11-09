@@ -301,3 +301,41 @@ func TestRefusedProcessKeepsItsStateUntilTheNextCycle(t *testing.T) {
 		t.Errorf("results = %+v, %+v", first, second)
 	}
 }
+
+func TestOldRecordsAreRemovedWithoutRepeatingEvents(t *testing.T) {
+	storetest.Dialects(t, func(t *testing.T, databaseURL string) {
+		h := newHarness(t, databaseURL, func(cfg *Config) { cfg.RetentionDays = 30 })
+		populate(h.server)
+		ctx := t.Context()
+		if err := h.monitor.Prepare(ctx); err != nil {
+			t.Fatal(err)
+		}
+		h.runOnce(t)
+		h.clock.Advance(15 * time.Minute)
+		h.server.RemoveProcess(seitest.UnitNUPROC, 9002)
+		h.server.AddActivities(9001, activity(50004, start, "Documento assinado"))
+		h.runOnce(t)
+
+		h.clock.Advance(31 * 24 * time.Hour)
+		h.runOnce(t)
+
+		cutoff := h.clock.Now().AddDate(0, 0, -30)
+		for _, ev := range h.events(t) {
+			if ev.DetectedAt.Before(cutoff) || (ev.Kind == event.ActivityAdded && ev.Ref == "50004") {
+				t.Errorf("event %s %s detected at %v survived or came back", ev.Kind, ev.Ref, ev.DetectedAt)
+			}
+		}
+		accountID := h.monitor.State().AccountID
+		processes, err := h.store.Processes(ctx, accountID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(processes) != 1 || processes[0].ProcedureID != 9001 {
+			t.Errorf("processes = %+v, want only the one still in the unit", processes)
+		}
+		documents, err := h.store.DocumentIDs(ctx, accountID, 9001)
+		if err != nil || len(documents) != 3 {
+			t.Errorf("documents of the present process = %v, %v, want the 3 kept", documents, err)
+		}
+	})
+}

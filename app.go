@@ -47,6 +47,7 @@ func assemble(ctx context.Context, cfg config.Config, logger *slog.Logger, now f
 		PollInterval:      cfg.PollInterval,
 		Concurrency:       cfg.SEI.Concurrency,
 		ReturnWarningDays: cfg.ReturnWarningDays,
+		RetentionDays:     cfg.RetentionDays,
 		Location:          cfg.SEI.Location,
 		Channels:          cfg.Channels.Enabled(),
 	}, st, logger, monitor.WithClock(now, time.After))

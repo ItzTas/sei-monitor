@@ -560,29 +560,6 @@
     "error": null
   },
   {
-    "name": "process id \"9223372036854775808\"",
-    "route": "processes",
-    "zone": "America/Boa_Vista",
-    "status": 200,
-    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkyMjMzNzIwMzY4NTQ3NzU4MDgiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
-    "result": {
-      "items": [
-        {
-          "procedure_id": -9223372036854775808,
-          "number": "00000.000001/2026-00",
-          "type": "",
-          "description": "",
-          "assignee": null,
-          "return_date": "",
-          "return_overdue": false,
-          "origin": ""
-        }
-      ],
-      "total": 1
-    },
-    "error": null
-  },
-  {
     "name": "process id \"-9223372036854775809\"",
     "route": "processes",
     "zone": "America/Boa_Vista",

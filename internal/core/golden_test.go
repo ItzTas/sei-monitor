@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -169,6 +170,10 @@ func fakeProgramPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
+	found, err := exec.LookPath("sh")
+	if err != nil || found != filepath.Join(dir, "sh") {
+		t.Fatalf("the fake sh in %s cannot be run (LookPath gave %q, %v): the SEI_PASSWORD_CMD vectors need TMPDIR on a file system that allows executing files", dir, found, err)
+	}
 }
 
 func configVectors(t *testing.T) configVectorSet {
@@ -286,6 +291,8 @@ func configInputs() []configInput {
 	inputs = append(inputs, passwordInputs(secretFiles)...)
 	inputs = append(inputs, databaseInputs(secretFiles)...)
 	inputs = append(inputs, secretProblemInputs(secretFiles)...)
+	inputs = append(inputs, urlEdgeInputs()...)
+	inputs = append(inputs, secretFileEdgeInputs()...)
 	return inputs
 }
 
@@ -359,6 +366,56 @@ func secretProblemInputs(files map[string]string) []configInput {
 	}
 }
 
+func urlEdges() []string {
+	edges := []string{
+		"https://h/a%41", "https://h/a%7e", "https://h/a%7E", "https://h/a%c3%a7", "https://h/a%2a", "https://h/a%21",
+		"https://h:", "https://h:99999", "https://h:65536", "https://h:0", "https://h:abc", "https://h:-1",
+		"https://h/a\tb", "https://h/a\x7fb", "https://h/a\x01b", "https://%68", "https://h%2Eexample.org",
+		"http://[::ffff:127.0.0.1]", "http://[::ffff:127.0.0.1]:8080/sei", "http://[::ffff:10.0.0.1]",
+		"https://[fe80::1%25eth0]", "http://[fe80::1%25eth0]", "http://[::1%25lo]", "http://127.1",
+		"https://h/a'b(c)*",
+	}
+	for _, char := range "!'()*;=,$&+@:~" {
+		edges = append(edges, "https://h/a"+string(char)+"b")
+	}
+	return edges
+}
+
+func urlEdgeInputs() []configInput {
+	var inputs []configInput
+	for _, edge := range urlEdges() {
+		inputs = append(inputs, configInput{name: "SEI_URL=" + edge, env: minimalEnv(map[string]string{"SEI_URL": edge})})
+	}
+	for _, edge := range []string{"http://[::ffff:127.0.0.1]:8080/api", "http://[::ffff:10.0.0.1]/api", "https://h/api/a!b%41/"} {
+		inputs = append(inputs, configInput{name: "SEI_API_URL=" + edge, env: minimalEnv(map[string]string{"SEI_API_URL": edge})})
+	}
+	return inputs
+}
+
+func secretFileEdgeInputs() []configInput {
+	files := map[string]string{
+		"/run/secrets/sei-cr":         "pw\r",
+		"/run/secrets/database-cr":    "postgres://monitor:s3cr3t-file@db.example.org/monitor\r",
+		"/run/secrets/newline-only":   "\n",
+		"/run/secrets/crlf-only":      "\r\n",
+		"/run/secrets/spaces-newline": "  \n",
+		"/run/secrets/spaces":         "  ",
+	}
+	inputs := []configInput{
+		{name: "SEI_PASSWORD only a newline", env: minimalEnv(map[string]string{"SEI_PASSWORD": "\n"})},
+		{name: "SEI_PASSWORD two spaces and a newline", env: minimalEnv(map[string]string{"SEI_PASSWORD": "  \n"})},
+		{name: "SEI_PASSWORD_FILE ending in CR", env: minimalEnv(map[string]string{"SEI_PASSWORD_FILE": "/run/secrets/sei-cr"}, "SEI_PASSWORD"), files: files},
+		{name: "DATABASE_URL_FILE ending in CR", env: minimalEnv(map[string]string{"DATABASE_URL_FILE": "/run/secrets/database-cr"}, "DATABASE_URL"), files: files},
+	}
+	for _, path := range []string{"/run/secrets/newline-only", "/run/secrets/crlf-only", "/run/secrets/spaces-newline", "/run/secrets/spaces"} {
+		inputs = append(inputs,
+			configInput{name: "SEI_PASSWORD_FILE=" + path, env: minimalEnv(map[string]string{"SEI_PASSWORD_FILE": path}, "SEI_PASSWORD"), files: files},
+			configInput{name: "DATABASE_URL_FILE=" + path, env: minimalEnv(map[string]string{"DATABASE_URL_FILE": path}, "DATABASE_URL"), files: files},
+		)
+	}
+	return inputs
+}
+
 type seiURLCase struct {
 	Input      string   `json:"input"`
 	Normalized *string  `json:"normalized"`
@@ -375,6 +432,7 @@ func seiURLVectors(t *testing.T) []seiURLCase {
 		"http://example.com", "ftp://h", "https:h", "https:///p", "https://h/%zz", "https://h{}", "  https://h/  ",
 		"", "   ", "sei.rr.gov.br", "https://h/%2Fsei", "https://h/a%2fb/", "https://h/sei%2F",
 	}
+	inputs = append(inputs, urlEdges()...)
 	cases := make([]seiURLCase, len(inputs))
 	for i, input := range inputs {
 		normalized, err := LoadSEIURL(goldenSource(map[string]string{"SEI_URL": input}, nil))

@@ -109,6 +109,12 @@ fn simple_upper(c: char) -> char {
 }
 
 fn exception(table: &[(char, char)], c: char) -> Option<char> {
+    let (Some((first, _)), Some((last, _))) = (table.first(), table.last()) else {
+        return None;
+    };
+    if c < *first || c > *last {
+        return None;
+    }
     table
         .binary_search_by_key(&c, |(from, _)| *from)
         .ok()

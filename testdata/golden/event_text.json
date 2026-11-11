@@ -4711,5 +4711,119 @@
       "detail": {}
     },
     "hidden": []
+  },
+  {
+    "name": "account_login_failed with every payload field (minimal)",
+    "event": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 9001,
+      "ref": "login:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "sei-monitor could not log in to SEI",
+    "details": [
+      "Reason: SEI rejected the login (Usuário ou Senha Inválida.)",
+      "Monitoring is paused until sei-monitor restarts with the configuration fixed."
+    ],
+    "view": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "sei-monitor could not log in to SEI",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "document_protocol": "0012345",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "account_login_failed with every payload field (full)",
+    "event": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 9001,
+      "ref": "login:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "sei-monitor could not log in to SEI",
+    "details": [
+      "Reason: SEI rejected the login (Usuário ou Senha Inválida.)",
+      "Monitoring is paused until sei-monitor restarts with the configuration fixed."
+    ],
+    "view": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "sei-monitor could not log in to SEI",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
   }
 ]

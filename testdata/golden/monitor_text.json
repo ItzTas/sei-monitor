@@ -155,6 +155,38 @@
       "failures": 30,
       "jitter_limit_ns": 196608000000000,
       "wait_ns": 1966080000000000
+    },
+    {
+      "poll_interval_ns": 900000000000,
+      "failures": 0,
+      "jitter_limit_ns": 3000000000,
+      "wait_ns": 30000000000
+    }
+  ],
+  "success_wait": [
+    {
+      "poll_interval_ns": 300000000000,
+      "failures_before": 0,
+      "failures_after": 0,
+      "jitter_limit_ns": 30000000000,
+      "jitter_ns": 15000000000,
+      "wait_ns": 315000000000
+    },
+    {
+      "poll_interval_ns": 900000000000,
+      "failures_before": 3,
+      "failures_after": 0,
+      "jitter_limit_ns": 90000000000,
+      "jitter_ns": 45000000000,
+      "wait_ns": 945000000000
+    },
+    {
+      "poll_interval_ns": 86400000000000,
+      "failures_before": 17,
+      "failures_after": 0,
+      "jitter_limit_ns": 8640000000000,
+      "jitter_ns": 4320000000000,
+      "wait_ns": 90720000000000
     }
   ],
   "too_soon": [
@@ -283,6 +315,14 @@
         "message": "Usuário ou Senha Inválida."
       },
       "error": "sei: /autenticar: Usuário ou Senha Inválida.",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "api_error",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
+          "sentinel": null
+        }
+      ],
       "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
       "event": {
         "kind": "account_login_failed",
@@ -304,6 +344,14 @@
         "message": " Usuário & Senha <inválidos> "
       },
       "error": "sei: /autenticar:  Usuário & Senha <inválidos> ",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "api_error",
+          "message": "sei: /autenticar:  Usuário & Senha <inválidos> ",
+          "sentinel": null
+        }
+      ],
       "reason": "SEI rejected the login ( Usuário & Senha <inválidos> )",
       "event": {
         "kind": "account_login_failed",
@@ -325,6 +373,14 @@
         "message": ""
       },
       "error": "sei: /autenticar answered HTTP 401",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "api_error",
+          "message": "sei: /autenticar answered HTTP 401",
+          "sentinel": null
+        }
+      ],
       "reason": "SEI rejected the login",
       "event": {
         "kind": "account_login_failed",
@@ -346,6 +402,20 @@
         "message": "Usuário ou Senha Inválida."
       },
       "error": "sei: log in: sei: /autenticar: Usuário ou Senha Inválida.",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "wrapped",
+          "message": "sei: log in: sei: /autenticar: Usuário ou Senha Inválida.",
+          "sentinel": null
+        },
+        {
+          "depth": 1,
+          "type": "api_error",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
+          "sentinel": null
+        }
+      ],
       "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
       "event": {
         "kind": "account_login_failed",
@@ -367,6 +437,26 @@
         "message": "Usuário ou Senha Inválida."
       },
       "error": "sei: /autenticar: Usuário ou Senha Inválida.\nmonitor: record the cycle end: connection refused",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "joined",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.\nmonitor: record the cycle end: connection refused",
+          "sentinel": null
+        },
+        {
+          "depth": 1,
+          "type": "api_error",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
+          "sentinel": null
+        },
+        {
+          "depth": 1,
+          "type": "plain",
+          "message": "monitor: record the cycle end: connection refused",
+          "sentinel": null
+        }
+      ],
       "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
       "event": {
         "kind": "account_login_failed",
@@ -384,6 +474,14 @@
       "now": "2026-11-04T18:07:09.5Z",
       "api_error": null,
       "error": "SEI rejected the login",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "plain",
+          "message": "SEI rejected the login",
+          "sentinel": "invalid_credentials"
+        }
+      ],
       "reason": "SEI rejected the login",
       "event": {
         "kind": "account_login_failed",
@@ -393,6 +491,70 @@
         "detected_at": "0001-01-01T00:00:00Z",
         "payload": {
           "reason": "SEI rejected the login"
+        }
+      }
+    },
+    {
+      "name": "SEI message joined with a nil cycle-end error, as RunOnce returns it",
+      "now": "2026-11-04T18:07:09.5Z",
+      "api_error": {
+        "route": "/autenticar",
+        "status": 200,
+        "message": "Usuário ou Senha Inválida."
+      },
+      "error": "sei: /autenticar: Usuário ou Senha Inválida.",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "joined",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
+          "sentinel": null
+        },
+        {
+          "depth": 1,
+          "type": "api_error",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
+          "sentinel": null
+        }
+      ],
+      "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
+      "event": {
+        "kind": "account_login_failed",
+        "procedure_id": 0,
+        "ref": "login:2026-11-04T18:07:09Z",
+        "occurred_at": "0001-01-01T00:00:00Z",
+        "detected_at": "0001-01-01T00:00:00Z",
+        "payload": {
+          "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+        }
+      }
+    },
+    {
+      "name": "rejected by the fake SEI through the client",
+      "now": "2026-11-04T18:07:09.5Z",
+      "api_error": {
+        "route": "/autenticar",
+        "status": 200,
+        "message": "Usuário ou Senha Inválida."
+      },
+      "error": "sei: /autenticar: Usuário ou Senha Inválida.",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "api_error",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
+          "sentinel": "invalid_credentials"
+        }
+      ],
+      "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
+      "event": {
+        "kind": "account_login_failed",
+        "procedure_id": 0,
+        "ref": "login:2026-11-04T18:07:09Z",
+        "occurred_at": "0001-01-01T00:00:00Z",
+        "detected_at": "0001-01-01T00:00:00Z",
+        "payload": {
+          "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
         }
       }
     }

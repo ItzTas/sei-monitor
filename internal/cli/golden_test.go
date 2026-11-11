@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"maps"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,12 +12,16 @@ import (
 
 	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/goldentest"
+	"github.com/ItzTas/sei-monitor/internal/goldentest/seisetup"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
 )
 
 const serverURLPlaceholder = "<SEI_URL>"
 
 func TestGoldenVectors(t *testing.T) {
+	if !goldentest.Pinned(t) {
+		return
+	}
 	goldentest.GoldenBytes(t, "diagnose.txt", []byte(diagnoseOutput(t)))
 	goldentest.Golden(t, "commands.json", commandVectors(t))
 }
@@ -25,32 +30,56 @@ func withoutServerURL(server *seitest.Server, text string) string {
 	return strings.ReplaceAll(text, server.URL(), serverURLPlaceholder)
 }
 
-func populateDiagnose(server *seitest.Server) {
-	assignee := &seitest.User{ID: 202, Acronym: "beltrano.silva", Name: "Beltrano da Silva"}
-	server.SetProcesses(seitest.UnitNUPROC,
-		seitest.Process{ID: 9001, Number: seitest.ProcessNumber(1), Type: "Diárias", Description: "Viagem a Brasília", ReturnDate: "06/11/2026"},
-		seitest.Process{ID: 9002, Number: seitest.ProcessNumber(2), Type: "Contrato", Assignee: assignee},
-		seitest.Process{ID: 9003, Number: seitest.ProcessNumber(3), Type: "Ofício", Generated: true},
-	)
+func withServerURL(server *seitest.Server, env map[string]string) map[string]string {
+	resolved := make(map[string]string, len(env))
+	for name, value := range env {
+		resolved[name] = strings.ReplaceAll(value, serverURLPlaceholder, server.URL())
+	}
+	return resolved
+}
+
+func diagnoseSetup() []seisetup.Call {
+	assignee := &seisetup.User{ID: 202, Acronym: "beltrano.silva", Name: "Beltrano da Silva"}
 	at := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
-	server.AddActivities(9001,
-		seitest.Activity{ID: 50001, User: "beltrano.silva", Unit: "SEDEMO/PROTOCOLO", Text: "Processo remetido pela unidade SEDEMO/PROTOCOLO", At: at},
-		seitest.Activity{ID: 50002, User: seitest.Username, Unit: "SEDEMO/NUPROC", Text: "Processo recebido na unidade", At: at.Add(time.Hour)},
-		seitest.Activity{ID: 50003, User: seitest.Username, Unit: "SEDEMO/NUPROC", Text: "Documento Ofício 12 assinado", At: at.Add(2 * time.Hour)},
-	)
-	server.AddDocuments(9001,
-		seitest.Document{ID: 80001, Protocol: "0012345", Type: "Ofício", Number: "12", Label: "Ofício 12 (0012345)"},
-		seitest.Document{ID: 80002, Protocol: "0012346", Type: "Despacho", Number: "3", Label: "Despacho 3 (0012346)"},
-		seitest.Document{ID: 80003, Protocol: "0012347", Type: "Anexo", Label: "Anexo (0012347)"},
-	)
+	return []seisetup.Call{
+		seisetup.SetProcesses(seitest.UnitNUPROC,
+			seisetup.Process{ID: 9001, Number: seitest.ProcessNumber(1), Type: "Diárias", Description: "Viagem a Brasília", ReturnDate: "06/11/2026"},
+			seisetup.Process{ID: 9002, Number: seitest.ProcessNumber(2), Type: "Contrato", Assignee: assignee},
+			seisetup.Process{ID: 9003, Number: seitest.ProcessNumber(3), Type: "Ofício", Generated: true},
+		),
+		seisetup.AddActivities(9001,
+			seisetup.Activity{ID: 50001, User: "beltrano.silva", Unit: "SEDEMO/PROTOCOLO", Text: "Processo remetido pela unidade SEDEMO/PROTOCOLO", At: seisetup.At(at)},
+			seisetup.Activity{ID: 50002, User: seitest.Username, Unit: "SEDEMO/NUPROC", Text: "Processo recebido na unidade", At: seisetup.At(at.Add(time.Hour))},
+			seisetup.Activity{ID: 50003, User: seitest.Username, Unit: "SEDEMO/NUPROC", Text: "Documento Ofício 12 assinado", At: seisetup.At(at.Add(2 * time.Hour))},
+		),
+		seisetup.AddDocuments(9001,
+			seisetup.Document{ID: 80001, Protocol: "0012345", Type: "Ofício", Number: "12", Label: "Ofício 12 (0012345)"},
+			seisetup.Document{ID: 80002, Protocol: "0012346", Type: "Despacho", Number: "3", Label: "Despacho 3 (0012346)"},
+			seisetup.Document{ID: 80003, Protocol: "0012347", Type: "Anexo", Label: "Anexo (0012347)"},
+		),
+	}
+}
+
+func seiSettings(overrides map[string]string) map[string]string {
+	env := map[string]string{
+		"SEI_URL":      serverURLPlaceholder,
+		"SEI_USERNAME": seitest.Username,
+		"SEI_PASSWORD": seitest.Password,
+		"SEI_ORG":      seitest.OrgAcronym,
+		"SEI_TIMEZONE": seitest.TimeZone,
+	}
+	maps.Copy(env, overrides)
+	return env
 }
 
 func diagnoseOutput(t *testing.T) string {
 	t.Helper()
 	server := seitest.New(t)
-	populateDiagnose(server)
+	if err := seisetup.Apply(server, diagnoseSetup()); err != nil {
+		t.Fatal(err)
+	}
 
-	code, stdout, stderr := runCLI(t, seiEnv(server, nil), "diagnose")
+	code, stdout, stderr := runCLI(t, withServerURL(server, seiSettings(nil)), "diagnose")
 
 	if code != 0 || stderr != "" {
 		t.Fatalf("diagnose exit code = %d, stderr = %q", code, stderr)
@@ -58,54 +87,45 @@ func diagnoseOutput(t *testing.T) string {
 	return withoutServerURL(server, stdout)
 }
 
+type interrupt struct {
+	When string `json:"when"`
+	Note string `json:"note"`
+}
+
 type commandCase struct {
-	Name     string            `json:"name"`
-	Setup    string            `json:"setup"`
-	Args     []string          `json:"args"`
-	Env      map[string]string `json:"env"`
-	Compare  string            `json:"compare"`
-	ExitCode int               `json:"exit_code"`
-	Stdout   string            `json:"stdout"`
-	Stderr   string            `json:"stderr"`
+	Name      string            `json:"name"`
+	Setup     []seisetup.Call   `json:"setup"`
+	Args      []string          `json:"args"`
+	Env       map[string]string `json:"env"`
+	Interrupt *interrupt        `json:"interrupt"`
+	Compare   string            `json:"compare"`
+	ExitCode  int               `json:"exit_code"`
+	Stdout    string            `json:"stdout"`
+	Stderr    string            `json:"stderr"`
 }
 
-type commandInput struct {
-	name        string
-	setup       string
-	args        []string
-	env         func(*seitest.Server) map[string]string
-	compare     string
-	interrupted bool
+type commandFile struct {
+	Defaults seisetup.Defaults `json:"defaults"`
+	Cases    []commandCase     `json:"cases"`
 }
 
-func commandVectors(t *testing.T) []commandCase {
+func commandVectors(t *testing.T) commandFile {
 	t.Helper()
-	setups := map[string]func(*seitest.Server){
-		"default":         func(*seitest.Server) {},
-		"diagnose":        populateDiagnose,
-		"module_inactive": func(server *seitest.Server) { server.SetModuleInactive(true) },
-		"processes_fail_500": func(server *seitest.Server) {
-			populateDiagnose(server)
-			server.FailNext(seitest.RouteProcesses, http.StatusInternalServerError, 1)
-		},
+	defaults, err := seisetup.ReadDefaults(t.Context(), seitest.New(t))
+	if err != nil {
+		t.Fatal(err)
 	}
-	inputs := commandInputs()
-	cases := make([]commandCase, len(inputs))
-	for i, input := range inputs {
+	cases := commandInputs()
+	for i := range cases {
+		c := &cases[i]
 		server := seitest.New(t)
-		setups[input.setup](server)
-		env := input.env(server)
-		code, stdout, stderr := runCommand(t, env, input.interrupted, input.args...)
-		recorded := map[string]string{}
-		for name, value := range env {
-			recorded[name] = withoutServerURL(server, value)
+		if err := seisetup.Apply(server, c.Setup); err != nil {
+			t.Fatal(err)
 		}
-		cases[i] = commandCase{
-			Name: input.name, Setup: input.setup, Args: input.args, Env: recorded, Compare: input.compare,
-			ExitCode: code, Stdout: withoutServerURL(server, stdout), Stderr: withoutServerURL(server, stderr),
-		}
+		code, stdout, stderr := runCommand(t, withServerURL(server, c.Env), c.Interrupt != nil, c.Args...)
+		c.ExitCode, c.Stdout, c.Stderr = code, withoutServerURL(server, stdout), withoutServerURL(server, stderr)
 	}
-	return cases
+	return commandFile{Defaults: defaults, Cases: cases}
 }
 
 func runCommand(t *testing.T, env map[string]string, interrupted bool, args ...string) (int, string, string) {
@@ -124,36 +144,43 @@ func runCommand(t *testing.T, env map[string]string, interrupted bool, args ...s
 	return code, stdout.String(), stderr.String()
 }
 
-func commandInputs() []commandInput {
-	with := func(overrides map[string]string) func(*seitest.Server) map[string]string {
-		return func(server *seitest.Server) map[string]string { return seiEnv(server, overrides) }
+func commandInputs() []commandCase {
+	none := []seisetup.Call{}
+	failing := append(diagnoseSetup(), seisetup.FailNext(seitest.RouteProcesses, http.StatusInternalServerError, 1))
+	beforeFirstRequest := &interrupt{
+		When: "before_first_request",
+		Note: "Go ran the command with a context cancelled before it started. The configuration is valid, so it is read; " +
+			"the first request to SEI then fails with the cancellation. A replay sends SIGINT after the process has started " +
+			"and before the fake SEI answers its first request (hold that answer until the signal is delivered). " +
+			"test-login prints nothing before every call has returned, so stdout is empty for any interrupt that lands before the last answer.",
 	}
-	only := func(env map[string]string) func(*seitest.Server) map[string]string {
-		return func(*seitest.Server) map[string]string { return env }
+	command := func(name string, setup []seisetup.Call, env map[string]string, compare string, args ...string) commandCase {
+		return commandCase{Name: name, Setup: setup, Args: args, Env: env, Compare: compare}
 	}
-	urlOnly := func(server *seitest.Server) map[string]string { return map[string]string{"SEI_URL": server.URL()} }
-	return []commandInput{
-		{name: "orgs lists every agency", setup: "default", args: []string{"orgs"}, env: urlOnly, compare: "exact"},
-		{name: "orgs without SEI_URL", setup: "default", args: []string{"orgs"}, env: only(map[string]string{}), compare: "exact"},
-		{name: "orgs with an unsupported SEI_URL", setup: "default", args: []string{"orgs"}, env: only(map[string]string{"SEI_URL": "ftp://sei.example.org"}), compare: "exact"},
-		{name: "test-login with SEI_UNITS in other letters", setup: "default", args: []string{"test-login"}, env: with(map[string]string{"SEI_UNITS": "sedemo/gab"}), compare: "exact"},
-		{name: "test-login with the current unit", setup: "default", args: []string{"test-login"}, env: with(nil), compare: "exact"},
-		{name: "test-login with every unit", setup: "default", args: []string{"test-login"}, env: with(map[string]string{"SEI_UNITS": "all"}), compare: "exact"},
-		{name: "test-login with the agency id", setup: "default", args: []string{"test-login"}, env: with(map[string]string{"SEI_ORG": "63"}), compare: "exact"},
-		{name: "test-login with a wrong password", setup: "default", args: []string{"test-login"}, env: with(map[string]string{"SEI_PASSWORD": "wrong"}), compare: "exact"},
-		{name: "test-login with a unit the user does not have", setup: "default", args: []string{"test-login"}, env: with(map[string]string{"SEI_UNITS": "SEDEMO/XYZ"}), compare: "exact"},
-		{name: "test-login with an agency missing from the login page", setup: "default", args: []string{"test-login"}, env: with(map[string]string{"SEI_ORG": "NOPE"}), compare: "exact"},
-		{name: "test-login with the module disabled", setup: "module_inactive", args: []string{"test-login"}, env: with(nil), compare: "exact"},
-		{name: "test-login lists every configuration problem", setup: "default", args: []string{"test-login"}, env: only(map[string]string{"POLL_INTERVAL": "1m"}), compare: "exact"},
-		{name: "test-login interrupted", setup: "default", args: []string{"test-login"}, env: with(nil), compare: "exact", interrupted: true},
-		{name: "diagnose without processes", setup: "default", args: []string{"diagnose"}, env: with(nil), compare: "exact"},
-		{name: "diagnose when the process listing fails", setup: "processes_fail_500", args: []string{"diagnose"}, env: with(nil), compare: "exact"},
-		{name: "diagnose with every unit", setup: "diagnose", args: []string{"diagnose"}, env: with(map[string]string{"SEI_UNITS": "all"}), compare: "exact"},
-		{name: "diagnose with a wrong password", setup: "default", args: []string{"diagnose"}, env: with(map[string]string{"SEI_PASSWORD": "wrong"}), compare: "exact"},
-		{name: "diagnose with a unit the user does not have", setup: "default", args: []string{"diagnose"}, env: with(map[string]string{"SEI_UNITS": "SEDEMO/XYZ"}), compare: "exact"},
-		{name: "diagnose lists every configuration problem", setup: "default", args: []string{"diagnose"}, env: only(map[string]string{}), compare: "exact"},
-		{name: "unknown command", setup: "default", args: []string{"test-logn"}, env: only(map[string]string{}), compare: "usage"},
-		{name: "unknown flag", setup: "default", args: []string{"orgs", "--nope"}, env: only(map[string]string{}), compare: "usage"},
-		{name: "unexpected argument", setup: "default", args: []string{"orgs", "extra"}, env: only(map[string]string{}), compare: "usage"},
+	interrupted := command("test-login interrupted", none, seiSettings(nil), "exact", "test-login")
+	interrupted.Interrupt = beforeFirstRequest
+	return []commandCase{
+		command("orgs lists every agency", none, map[string]string{"SEI_URL": serverURLPlaceholder}, "exact", "orgs"),
+		command("orgs without SEI_URL", none, map[string]string{}, "exact", "orgs"),
+		command("orgs with an unsupported SEI_URL", none, map[string]string{"SEI_URL": "ftp://sei.example.org"}, "exact", "orgs"),
+		command("test-login with SEI_UNITS in other letters", none, seiSettings(map[string]string{"SEI_UNITS": "sedemo/gab"}), "exact", "test-login"),
+		command("test-login with the current unit", none, seiSettings(nil), "exact", "test-login"),
+		command("test-login with every unit", none, seiSettings(map[string]string{"SEI_UNITS": "all"}), "exact", "test-login"),
+		command("test-login with the agency id", none, seiSettings(map[string]string{"SEI_ORG": "63"}), "exact", "test-login"),
+		command("test-login with a wrong password", none, seiSettings(map[string]string{"SEI_PASSWORD": "wrong"}), "exact", "test-login"),
+		command("test-login with a unit the user does not have", none, seiSettings(map[string]string{"SEI_UNITS": "SEDEMO/XYZ"}), "exact", "test-login"),
+		command("test-login with an agency missing from the login page", none, seiSettings(map[string]string{"SEI_ORG": "NOPE"}), "exact", "test-login"),
+		command("test-login with the module disabled", []seisetup.Call{seisetup.SetModuleInactive(true)}, seiSettings(nil), "exact", "test-login"),
+		command("test-login lists every configuration problem", none, map[string]string{"POLL_INTERVAL": "1m"}, "exact", "test-login"),
+		interrupted,
+		command("diagnose without processes", none, seiSettings(nil), "exact", "diagnose"),
+		command("diagnose when the process listing fails", failing, seiSettings(nil), "exact", "diagnose"),
+		command("diagnose with every unit", diagnoseSetup(), seiSettings(map[string]string{"SEI_UNITS": "all"}), "exact", "diagnose"),
+		command("diagnose with a wrong password", none, seiSettings(map[string]string{"SEI_PASSWORD": "wrong"}), "exact", "diagnose"),
+		command("diagnose with a unit the user does not have", none, seiSettings(map[string]string{"SEI_UNITS": "SEDEMO/XYZ"}), "exact", "diagnose"),
+		command("diagnose lists every configuration problem", none, map[string]string{}, "exact", "diagnose"),
+		command("unknown command", none, map[string]string{}, "usage", "test-logn"),
+		command("unknown flag", none, map[string]string{}, "usage", "orgs", "--nope"),
+		command("unexpected argument", none, map[string]string{}, "usage", "orgs", "extra"),
 	}
 }

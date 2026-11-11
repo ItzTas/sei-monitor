@@ -11,11 +11,15 @@ import (
 	"github.com/ItzTas/sei-monitor/internal/core"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/goldentest"
+	"github.com/ItzTas/sei-monitor/internal/goldentest/seisetup"
 	"github.com/ItzTas/sei-monitor/internal/sei"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
 )
 
 func TestGoldenVectors(t *testing.T) {
+	if !goldentest.Pinned(t) {
+		return
+	}
 	goldentest.Golden(t, "days_until.json", daysUntilVectors(t))
 	goldentest.Golden(t, "diff.json", diffVectors(t))
 	goldentest.Golden(t, "monitor_text.json", monitorTextVectors(t))
@@ -296,6 +300,10 @@ func returning(text string, overdue bool) func(*sei.Process) {
 	return func(p *sei.Process) { p.ReturnDate, p.ReturnOverdue = date(text), overdue }
 }
 
+func described(description string) func(*core.Process) {
+	return func(p *core.Process) { p.Description = description }
+}
+
 func storedAssignee(acronym string, id int64) func(*core.Process) {
 	return func(p *core.Process) { p.AssignedUser, p.AssignedUserID = acronym, id }
 }
@@ -313,7 +321,7 @@ func diffInputs() []diffInput {
 	inputs := []diffInput{
 		standard("first cycle is a silent baseline", nil, []Observation{observed(1, nil), observed(2, returning("2026-11-05", false))}, true),
 		standard("a new process only enters", []core.Process{seen(1, nil)}, []Observation{observed(1, nil), observed(2, func(p *sei.Process) { p.ReturnDate, p.Assignee = date("2026-11-05"), beltrano })}, false),
-		standard("a missing process leaves", []core.Process{seen(1, nil), seen(2, nil)}, []Observation{observed(1, nil)}, false),
+		standard("a missing process leaves", []core.Process{seen(1, nil), seen(2, described("Compra de mesas"))}, []Observation{observed(1, nil)}, false),
 		standard("a process that left and came back enters again", []core.Process{seen(2, func(p *core.Process) { p.LeftAt = diffNow.Add(-time.Hour) })}, []Observation{observed(2, nil)}, false),
 		standard("a process that already left does not leave twice", []core.Process{seen(2, func(p *core.Process) { p.LeftAt = diffNow.Add(-time.Hour) })}, nil, false),
 		standard("assignment to the user", []core.Process{seen(1, nil)}, []Observation{observed(1, assigned(fulano))}, false),
@@ -363,13 +371,13 @@ func diffInputs() []diffInput {
 		standard("a process without a seen activity is quiet", []core.Process{seen(1, func(p *core.Process) { p.LastActivityID = 0 })}, []Observation{observed(1, nil)}, false),
 		standard("every kind at once", []core.Process{
 			seen(1, storedAssignee("beltrano.silva", 202)),
-			seen(2, nil),
+			seen(2, described("Compra de mesas")),
 			seen(3, func(p *core.Process) { p.ReturnDate = "2026-11-03" }),
 			seen(4, nil),
 			seen(5, func(p *core.Process) { p.LeftAt = diffNow.Add(-time.Hour) }),
 			seen(6, func(p *core.Process) { p.LeftAt = diffNow.Add(-2 * time.Hour) }),
 			seen(7, func(p *core.Process) { p.LastActivityID = 0 }),
-			seen(8, nil),
+			seen(8, described("Reforma do auditório")),
 		}, []Observation{
 			observed(9, assigned(beltrano)),
 			observed(1, func(p *sei.Process) { p.Assignee, p.ReturnDate = fulano, date("2026-11-06") }),
@@ -409,6 +417,9 @@ func diffInputs() []diffInput {
 		diffInput{name: "nobody is the user before the first login", previous: []core.Process{seen(1, nil)}, current: []Observation{
 			observed(1, assigned(fulano)), observed(2, assigned(&sei.User{Acronym: "fulano.tal"})),
 		}, now: diffNow, zone: boaVista, warning: 2, self: Self{}},
+		standard("assignment change and a newly overdue return on the same process", []core.Process{seen(1, func(p *core.Process) {
+			p.AssignedUser, p.AssignedUserID, p.ReturnDate = "beltrano.silva", 202, "2026-11-03"
+		})}, []Observation{observed(1, func(p *sei.Process) { p.Assignee, p.ReturnDate, p.ReturnOverdue = fulano, date("2026-11-03"), true })}, false),
 	)
 }
 
@@ -444,13 +455,30 @@ type goldenStoredEvent struct {
 	Payload     event.Payload `json:"payload"`
 }
 
+type goldenErrorLink struct {
+	Depth    int     `json:"depth"`
+	Type     string  `json:"type"`
+	Message  string  `json:"message"`
+	Sentinel *string `json:"sentinel"`
+}
+
 type goldenLoginFailure struct {
 	Name     string            `json:"name"`
 	Now      string            `json:"now"`
 	APIError *goldenAPIError   `json:"api_error"`
 	Error    string            `json:"error"`
+	Chain    []goldenErrorLink `json:"chain"`
 	Reason   string            `json:"reason"`
 	Event    goldenStoredEvent `json:"event"`
+}
+
+type goldenSuccessWait struct {
+	PollIntervalNS int64 `json:"poll_interval_ns"`
+	FailuresBefore int   `json:"failures_before"`
+	FailuresAfter  int   `json:"failures_after"`
+	JitterLimitNS  int64 `json:"jitter_limit_ns"`
+	JitterNS       int64 `json:"jitter_ns"`
+	WaitNS         int64 `json:"wait_ns"`
 }
 
 type goldenErrors struct {
@@ -461,6 +489,7 @@ type goldenErrors struct {
 
 type monitorText struct {
 	Backoff      []goldenWait         `json:"backoff"`
+	SuccessWait  []goldenSuccessWait  `json:"success_wait"`
 	TooSoon      []goldenTooSoon      `json:"too_soon"`
 	Describe     []goldenDescribe     `json:"describe"`
 	LoginFailure []goldenLoginFailure `json:"login_failure"`
@@ -471,6 +500,7 @@ func monitorTextVectors(t *testing.T) monitorText {
 	t.Helper()
 	return monitorText{
 		Backoff:      backoffVectors(),
+		SuccessWait:  successWaitVectors(),
 		TooSoon:      tooSoonVectors(),
 		Describe:     describeVectors(),
 		LoginFailure: loginFailureVectors(t),
@@ -487,6 +517,7 @@ func backoffVectors() []goldenWait {
 		{15 * time.Minute, []int{1, 2, 3, 4, 5, 6, 7, 8, 20}},
 		{24 * time.Hour, []int{1, 10, 11, 12, 13}},
 		{1000 * time.Hour, []int{1, 16, 17, 18, 30}},
+		{15 * time.Minute, []int{0}},
 	}
 	var cases []goldenWait
 	for _, interval := range intervals {
@@ -499,6 +530,33 @@ func backoffVectors() []goldenWait {
 			m := New(Config{PollInterval: interval.poll}, nil, slog.New(slog.DiscardHandler), WithJitter(jitter))
 			wait := m.backoff(failures)
 			cases = append(cases, goldenWait{PollIntervalNS: int64(interval.poll), Failures: failures, JitterLimitNS: int64(limit), WaitNS: int64(wait)})
+		}
+	}
+	return cases
+}
+
+func successWaitVectors() []goldenSuccessWait {
+	inputs := []struct {
+		poll     time.Duration
+		failures int
+	}{
+		{5 * time.Minute, 0},
+		{15 * time.Minute, 3},
+		{24 * time.Hour, 17},
+	}
+	cases := make([]goldenSuccessWait, len(inputs))
+	for i, input := range inputs {
+		var limit time.Duration
+		jitter := func(l time.Duration) time.Duration {
+			limit = l
+			return l / 2
+		}
+		m := New(Config{PollInterval: input.poll}, nil, slog.New(slog.DiscardHandler), WithJitter(jitter))
+		failures := input.failures
+		wait := m.nextWait(nil, &failures)
+		cases[i] = goldenSuccessWait{
+			PollIntervalNS: int64(input.poll), FailuresBefore: input.failures, FailuresAfter: failures,
+			JitterLimitNS: int64(limit), JitterNS: int64(limit / 2), WaitNS: int64(wait),
 		}
 	}
 	return cases
@@ -548,6 +606,7 @@ func loginFailureVectors(t *testing.T) []goldenLoginFailure {
 	rejected := &sei.APIError{Route: "/autenticar", Status: 200, Message: "Usuário ou Senha Inválida."}
 	spaced := &sei.APIError{Route: "/autenticar", Status: 200, Message: " Usuário & Senha <inválidos> "}
 	silent := &sei.APIError{Route: "/autenticar", Status: 401}
+	fromClient := rejectedByTheFake(t)
 	inputs := []struct {
 		name     string
 		apiError *sei.APIError
@@ -559,12 +618,14 @@ func loginFailureVectors(t *testing.T) []goldenLoginFailure {
 		{"wrapped SEI message", rejected, fmt.Errorf("sei: log in: %w", rejected)},
 		{"joined with another error", rejected, errors.Join(rejected, errors.New("monitor: record the cycle end: connection refused"))},
 		{"not an SEI answer", nil, sei.ErrInvalidCredentials},
+		{"SEI message joined with a nil cycle-end error, as RunOnce returns it", rejected, errors.Join(rejected, nil)},
+		{"rejected by the fake SEI through the client", apiErrorIn(t, fromClient), fromClient},
 	}
 	cases := make([]goldenLoginFailure, len(inputs))
 	for i, input := range inputs {
 		reason, ev := loginFailure(input.err, now)
 		entry := goldenLoginFailure{
-			Name: input.name, Now: stamp(now), Error: input.err.Error(), Reason: reason,
+			Name: input.name, Now: stamp(now), Error: input.err.Error(), Chain: errorChain(input.err, 0), Reason: reason,
 			Event: goldenStoredEvent{
 				Kind: ev.Kind, ProcedureID: ev.ProcedureID, Ref: ev.Ref,
 				OccurredAt: stamp(ev.OccurredAt), DetectedAt: stamp(ev.DetectedAt), Payload: ev.Payload,
@@ -578,60 +639,16 @@ func loginFailureVectors(t *testing.T) []goldenLoginFailure {
 	return cases
 }
 
-type goldenSEIProcess struct {
-	ID            int64       `json:"id"`
-	Number        string      `json:"number"`
-	Type          string      `json:"type"`
-	Description   string      `json:"description"`
-	Assignee      *goldenUser `json:"assignee"`
-	ReturnDate    string      `json:"return_date"`
-	ReturnOverdue bool        `json:"return_overdue"`
-	Generated     bool        `json:"generated"`
-}
-
-type goldenSEIActivity struct {
-	ID   int64  `json:"id"`
-	User string `json:"user"`
-	Unit string `json:"unit"`
-	Text string `json:"text"`
-	At   string `json:"at"`
-}
-
-type goldenSEIDocument struct {
-	ID       int64  `json:"id"`
-	Protocol string `json:"protocol"`
-	Type     string `json:"type"`
-	Number   string `json:"number"`
-	Label    string `json:"label"`
-}
-
-type goldenUnitProcesses struct {
-	UnitID    int64              `json:"unit_id"`
-	Processes []goldenSEIProcess `json:"processes"`
-}
-
-type goldenActivities struct {
-	ProcedureID int64               `json:"procedure_id"`
-	Activities  []goldenSEIActivity `json:"activities"`
-}
-
-type goldenDocuments struct {
-	ProcedureID int64               `json:"procedure_id"`
-	Documents   []goldenSEIDocument `json:"documents"`
-}
-
 type goldenCycleResult struct {
 	ProcessesSeen int `json:"processes_seen"`
 	EventsCreated int `json:"events_created"`
 }
 
 type goldenCycle struct {
-	At            string                `json:"at"`
-	SetProcesses  []goldenUnitProcesses `json:"set_processes"`
-	AddActivities []goldenActivities    `json:"add_activities"`
-	AddDocuments  []goldenDocuments     `json:"add_documents"`
-	Result        goldenCycleResult     `json:"result"`
-	Events        []goldenStoredEvent   `json:"events"`
+	At     string              `json:"at"`
+	Setup  []seisetup.Call     `json:"setup"`
+	Result goldenCycleResult   `json:"result"`
+	Events []goldenStoredEvent `json:"events"`
 }
 
 type goldenCycleConfig struct {
@@ -639,6 +656,7 @@ type goldenCycleConfig struct {
 	Concurrency       int    `json:"concurrency"`
 	ReturnWarningDays int    `json:"return_warning_days"`
 	Zone              string `json:"zone"`
+	PrepareAt         string `json:"prepare_at"`
 }
 
 type cycleScenario struct {
@@ -647,47 +665,40 @@ type cycleScenario struct {
 	Cycles []goldenCycle     `json:"cycles"`
 }
 
-type unitProcesses struct {
-	unit      int64
-	processes []seitest.Process
+type cycleFile struct {
+	Defaults  seisetup.Defaults `json:"defaults"`
+	Scenarios []cycleScenario   `json:"scenarios"`
 }
 
-type procedureActivities struct {
-	procedure  int64
-	activities []seitest.Activity
-}
-
-type procedureDocuments struct {
-	procedure int64
-	documents []seitest.Document
-}
-
-type cycleStep struct {
-	advance    time.Duration
-	processes  []unitProcesses
-	activities []procedureActivities
-	documents  []procedureDocuments
-}
-
-func cycleVectors(t *testing.T) []cycleScenario {
+func cycleVectors(t *testing.T) cycleFile {
 	t.Helper()
 	h := newHarness(t, func(cfg *Config) { cfg.AllUnits = true })
-	scenario := cycleScenario{
-		Name:   "every kind at once",
-		Config: goldenCycleConfig{AllUnits: true, Concurrency: 3, ReturnWarningDays: 2, Zone: seitest.TimeZone},
+	defaults, err := seisetup.ReadDefaults(t.Context(), h.server)
+	if err != nil {
+		t.Fatal(err)
 	}
-	h.clock.Advance(7*time.Second + 250*time.Millisecond)
+	scenario := cycleScenario{
+		Name: "every kind at once",
+		Config: goldenCycleConfig{
+			AllUnits: true, Concurrency: 3, ReturnWarningDays: 2, Zone: seitest.TimeZone,
+			PrepareAt: stamp(start.Add(7*time.Second + 250*time.Millisecond)),
+		},
+		Cycles: cycleInputs(),
+	}
+	advanceTo(t, h.clock, scenario.Config.PrepareAt)
 	if err := h.monitor.Prepare(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	recorded := 0
-	for _, step := range cycleSteps() {
-		h.clock.Advance(step.advance)
-		cycle := applyStep(h.server, step)
-		cycle.At = stamp(h.clock.Now())
-		result := h.runOnce(t)
+	for i := range scenario.Cycles {
+		cycle := &scenario.Cycles[i]
+		advanceTo(t, h.clock, cycle.At)
+		if err := seisetup.Apply(h.server, cycle.Setup); err != nil {
+			t.Fatal(err)
+		}
+		cycle.Result = goldenCycleResult(h.runOnce(t))
 		events := recentEvents(t, h.pool)
-		cycle.Result = goldenCycleResult(result)
+		cycle.Events = []goldenStoredEvent{}
 		for _, ev := range events[recorded:] {
 			cycle.Events = append(cycle.Events, goldenStoredEvent{
 				Kind: ev.Kind, ProcedureID: ev.ProcedureID, Ref: ev.Ref,
@@ -695,157 +706,203 @@ func cycleVectors(t *testing.T) []cycleScenario {
 			})
 		}
 		recorded = len(events)
-		scenario.Cycles = append(scenario.Cycles, cycle)
 	}
-	return []cycleScenario{scenario}
+	return cycleFile{Defaults: defaults, Scenarios: []cycleScenario{scenario}}
 }
 
-func applyStep(server *seitest.Server, step cycleStep) goldenCycle {
-	cycle := goldenCycle{
-		SetProcesses:  []goldenUnitProcesses{},
-		AddActivities: []goldenActivities{},
-		AddDocuments:  []goldenDocuments{},
-		Events:        []goldenStoredEvent{},
+func advanceTo(t *testing.T, clock *fakeClock, text string) {
+	t.Helper()
+	at, err := time.Parse(time.RFC3339Nano, text)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, unit := range step.processes {
-		server.SetProcesses(unit.unit, unit.processes...)
-		record := goldenUnitProcesses{UnitID: unit.unit, Processes: []goldenSEIProcess{}}
-		for _, process := range unit.processes {
-			record.Processes = append(record.Processes, seiProcessRecord(process))
-		}
-		cycle.SetProcesses = append(cycle.SetProcesses, record)
+	if at.Before(clock.Now()) {
+		t.Fatalf("cycle time %s is before the clock %s", text, clock.Now())
 	}
-	for _, added := range step.activities {
-		server.AddActivities(added.procedure, added.activities...)
-		record := goldenActivities{ProcedureID: added.procedure}
-		for _, activity := range added.activities {
-			record.Activities = append(record.Activities, goldenSEIActivity{
-				ID: activity.ID, User: activity.User, Unit: activity.Unit, Text: activity.Text, At: stamp(activity.At),
-			})
-		}
-		cycle.AddActivities = append(cycle.AddActivities, record)
-	}
-	for _, added := range step.documents {
-		server.AddDocuments(added.procedure, added.documents...)
-		record := goldenDocuments{ProcedureID: added.procedure}
-		for _, document := range added.documents {
-			record.Documents = append(record.Documents, goldenSEIDocument(document))
-		}
-		cycle.AddDocuments = append(cycle.AddDocuments, record)
-	}
-	return cycle
+	clock.Advance(at.Sub(clock.Now()))
 }
 
-func seiProcessRecord(process seitest.Process) goldenSEIProcess {
-	record := goldenSEIProcess{
-		ID: process.ID, Number: process.Number, Type: process.Type, Description: process.Description,
-		ReturnDate: process.ReturnDate, ReturnOverdue: process.ReturnOverdue, Generated: process.Generated,
-	}
-	if process.Assignee != nil {
-		record.Assignee = &goldenUser{ID: process.Assignee.ID, Acronym: process.Assignee.Acronym, Name: process.Assignee.Name}
-	}
-	return record
-}
-
-func cycleSteps() []cycleStep {
-	beltranoUser := &seitest.User{ID: 202, Acronym: "beltrano.silva", Name: "Beltrano da Silva"}
-	fulanoUser := &seitest.User{ID: seitest.UserID, Acronym: seitest.Username, Name: seitest.UserName}
-	process := func(id int64, n int, kind string, change func(*seitest.Process)) seitest.Process {
-		p := seitest.Process{ID: id, Number: seitest.ProcessNumber(n), Type: kind}
+func cycleInputs() []goldenCycle {
+	beltranoUser := &seisetup.User{ID: 202, Acronym: "beltrano.silva", Name: "Beltrano da Silva"}
+	fulanoUser := &seisetup.User{ID: seitest.UserID, Acronym: seitest.Username, Name: seitest.UserName}
+	process := func(id int64, n int, kind string, change func(*seisetup.Process)) seisetup.Process {
+		p := seisetup.Process{ID: id, Number: seitest.ProcessNumber(n), Type: kind}
 		if change != nil {
 			change(&p)
 		}
 		return p
 	}
-	at := func(offset time.Duration) time.Time { return start.Add(offset) }
-	act := func(id int64, user, unit string, offset time.Duration, text string) seitest.Activity {
-		return seitest.Activity{ID: id, User: user, Unit: unit, Text: text, At: at(offset)}
+	act := func(id int64, user, unit string, offset time.Duration, text string) seisetup.Activity {
+		return seisetup.Activity{ID: id, User: user, Unit: unit, Text: text, At: seisetup.At(start.Add(offset))}
 	}
-	doc := func(id int64, protocol, kind, number, label string) seitest.Document {
-		return seitest.Document{ID: id, Protocol: protocol, Type: kind, Number: number, Label: label}
+	doc := func(id int64, protocol, kind, number, label string) seisetup.Document {
+		return seisetup.Document{ID: id, Protocol: protocol, Type: kind, Number: number, Label: label}
+	}
+	cycleAt := func(minutes int) string {
+		return stamp(start.Add(time.Duration(minutes)*time.Minute + 7*time.Second + 250*time.Millisecond))
 	}
 	nuproc, gab := int64(seitest.UnitNUPROC), int64(seitest.UnitGAB)
-	baseline := []seitest.Process{
-		process(9001, 1, "Contrato", func(p *seitest.Process) { p.Description, p.Assignee = "Compra de cadeiras", beltranoUser }),
-		process(9002, 2, "Diárias", nil),
-		process(9003, 3, "Ofício", func(p *seitest.Process) { p.ReturnDate = "06/11/2026" }),
-		process(9004, 4, "Contrato", func(p *seitest.Process) { p.ReturnDate = "03/11/2026" }),
+	baseline := []seisetup.Process{
+		process(9001, 1, "Contrato", func(p *seisetup.Process) { p.Description, p.Assignee = "Compra de cadeiras", beltranoUser }),
+		process(9002, 2, "Diárias", func(p *seisetup.Process) { p.Description = "Diárias para o seminário regional" }),
+		process(9003, 3, "Ofício", func(p *seisetup.Process) { p.ReturnDate = "06/11/2026" }),
+		process(9004, 4, "Contrato", func(p *seisetup.Process) { p.ReturnDate = "03/11/2026" }),
 		process(9005, 5, "Memorando", nil),
 		process(9006, 6, "Despacho", nil),
 		process(9007, 7, "Licitação", nil),
 	}
-	changed := []seitest.Process{
-		process(9001, 1, "Contrato", func(p *seitest.Process) { p.Description, p.Assignee = "Compra de cadeiras", fulanoUser }),
+	changed := []seisetup.Process{
+		process(9001, 1, "Contrato", func(p *seisetup.Process) { p.Description, p.Assignee = "Compra de cadeiras", fulanoUser }),
 		baseline[2],
-		process(9004, 4, "Contrato", func(p *seitest.Process) { p.ReturnDate, p.ReturnOverdue = "03/11/2026", true }),
+		process(9004, 4, "Contrato", func(p *seisetup.Process) { p.ReturnDate, p.ReturnOverdue = "03/11/2026", true }),
 		baseline[4],
 		baseline[5],
-		process(9009, 9, "Ofício", func(p *seitest.Process) { p.Assignee, p.Generated = fulanoUser, true }),
+		process(9009, 9, "Ofício", func(p *seisetup.Process) { p.Assignee, p.Generated = fulanoUser, true }),
 	}
-	gabBaseline := []seitest.Process{baseline[0], process(9008, 8, "Requerimento", nil)}
-	gabChanged := []seitest.Process{
+	gabBaseline := []seisetup.Process{baseline[0], process(9008, 8, "Requerimento", nil)}
+	gabChanged := []seisetup.Process{
 		changed[0], gabBaseline[1],
-		process(9010, 10, "Contrato", func(p *seitest.Process) { p.ReturnDate, p.ReturnOverdue = "01/11/2026", true }),
+		process(9010, 10, "Contrato", func(p *seisetup.Process) { p.ReturnDate, p.ReturnOverdue = "01/11/2026", true }),
 	}
-	back := append(append([]seitest.Process{}, changed...), baseline[6])
-	return []cycleStep{
+	back := append(append([]seisetup.Process{}, changed...), baseline[6])
+	return []goldenCycle{
 		{
-			processes: []unitProcesses{{nuproc, baseline}, {gab, gabBaseline}},
-			activities: []procedureActivities{
-				{9001, []seitest.Activity{
+			At: cycleAt(0),
+			Setup: []seisetup.Call{
+				seisetup.SetProcesses(nuproc, baseline...),
+				seisetup.SetProcesses(gab, gabBaseline...),
+				seisetup.AddActivities(9001,
 					act(50001, "beltrano.silva", "SEDEMO/PROTOCOLO", -72*time.Hour, "Processo gerado"),
 					act(50002, "beltrano.silva", "SEDEMO/PROTOCOLO", -48*time.Hour, "Processo remetido pela unidade SEDEMO/PROTOCOLO"),
 					act(50003, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo recebido na unidade"),
-				}},
-				{9002, []seitest.Activity{act(60001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")}},
-				{9003, []seitest.Activity{act(61001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")}},
-				{9004, []seitest.Activity{act(62001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")}},
-				{9006, []seitest.Activity{act(71001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")}},
-				{9007, []seitest.Activity{act(72001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")}},
-				{9008, []seitest.Activity{act(85005, "beltrano.silva", "SEDEMO/GAB", -24*time.Hour, "Processo gerado")}},
-			},
-			documents: []procedureDocuments{
-				{9001, []seitest.Document{doc(80001, "0080001", "Ofício", "1", "Ofício 1 (0080001)"), doc(80002, "0080002", "Despacho", "2", "Despacho 2 (0080002)")}},
+				),
+				seisetup.AddActivities(9002, act(60001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")),
+				seisetup.AddActivities(9003, act(61001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")),
+				seisetup.AddActivities(9004, act(62001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")),
+				seisetup.AddActivities(9006, act(71001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")),
+				seisetup.AddActivities(9007, act(72001, seitest.Username, "SEDEMO/NUPROC", -24*time.Hour, "Processo gerado")),
+				seisetup.AddActivities(9008, act(85005, "beltrano.silva", "SEDEMO/GAB", -24*time.Hour, "Processo gerado")),
+				seisetup.AddDocuments(9001, doc(80001, "0080001", "Ofício", "1", "Ofício 1 (0080001)"), doc(80002, "0080002", "Despacho", "2", "Despacho 2 (0080002)")),
 			},
 		},
 		{
-			advance:   15 * time.Minute,
-			processes: []unitProcesses{{nuproc, changed}, {gab, gabChanged}},
-			activities: []procedureActivities{
-				{9001, []seitest.Activity{
+			At: cycleAt(15),
+			Setup: []seisetup.Call{
+				seisetup.SetProcesses(nuproc, changed...),
+				seisetup.SetProcesses(gab, gabChanged...),
+				seisetup.AddActivities(9001,
 					act(50010, "beltrano.silva", "SEDEMO/PROTOCOLO", 5*time.Minute+3*time.Second, "Documento Ofício 3 assinado"),
 					act(50005, seitest.Username, "SEDEMO/NUPROC", 6*time.Minute+4*time.Second, "Processo recebido na unidade"),
-				}},
-				{9005, []seitest.Activity{act(70001, seitest.Username, "SEDEMO/NUPROC", 7*time.Minute, "Processo recebido na unidade")}},
-				{9008, []seitest.Activity{
+				),
+				seisetup.AddActivities(9005, act(70001, seitest.Username, "SEDEMO/NUPROC", 7*time.Minute, "Processo recebido na unidade")),
+				seisetup.AddActivities(9008,
 					act(85010, "beltrano.silva", "SEDEMO/GAB", 8*time.Minute, "Processo remetido pela unidade SEDEMO/GAB"),
 					act(85001, "beltrano.silva", "SEDEMO/GAB", 9*time.Minute, "Processo recebido na unidade"),
-				}},
-				{9009, []seitest.Activity{act(90001, seitest.Username, "SEDEMO/NUPROC", 10*time.Minute, "Processo gerado")}},
-			},
-			documents: []procedureDocuments{
-				{9001, []seitest.Document{doc(80003, "0080003", "Ofício", "3", "Ofício 3 (0080003)")}},
-				{9005, []seitest.Document{doc(81001, "0081001", "Memorando", "1", "Memorando 1 (0081001)")}},
-				{9006, []seitest.Document{doc(82001, "0082001", "Despacho", "", "Despacho (0082001)")}},
-				{9009, []seitest.Document{doc(91001, "0091001", "Ofício", "9", "Ofício 9 (0091001)")}},
+				),
+				seisetup.AddActivities(9009, act(90001, seitest.Username, "SEDEMO/NUPROC", 10*time.Minute, "Processo gerado")),
+				seisetup.AddDocuments(9001, doc(80003, "0080003", "Ofício", "3", "Ofício 3 (0080003)")),
+				seisetup.AddDocuments(9005, doc(81001, "0081001", "Memorando", "1", "Memorando 1 (0081001)")),
+				seisetup.AddDocuments(9006, doc(82001, "0082001", "Despacho", "", "Despacho (0082001)")),
+				seisetup.AddDocuments(9009, doc(91001, "0091001", "Ofício", "9", "Ofício 9 (0091001)")),
 			},
 		},
 		{
-			advance:   15 * time.Minute,
-			processes: []unitProcesses{{nuproc, back}, {gab, gabChanged}},
-			activities: []procedureActivities{
-				{9005, []seitest.Activity{act(70002, seitest.Username, "SEDEMO/NUPROC", 20*time.Minute, "Processo remetido pela unidade SEDEMO/NUPROC")}},
-				{9006, []seitest.Activity{act(71002, "", "SEDEMO/NUPROC", 21*time.Minute, "Processo recebido na unidade")}},
-				{9008, []seitest.Activity{act(85020, "beltrano.silva", "SEDEMO/GAB", 22*time.Minute, "Processo sobrestado")}},
-				{9009, []seitest.Activity{act(90002, "beltrano.silva", "SEDEMO/PROTOCOLO", 23*time.Minute+30*time.Second, "Documento Ofício 10 assinado")}},
-			},
-			documents: []procedureDocuments{
-				{9009, []seitest.Document{doc(91002, "0091002", "Ofício", "10", "Ofício 10 (0091002)")}},
+			At: cycleAt(30),
+			Setup: []seisetup.Call{
+				seisetup.SetProcesses(nuproc, back...),
+				seisetup.SetProcesses(gab, gabChanged...),
+				seisetup.AddActivities(9005, act(70002, seitest.Username, "SEDEMO/NUPROC", 20*time.Minute, "Processo remetido pela unidade SEDEMO/NUPROC")),
+				seisetup.AddActivities(9006, act(71002, "", "SEDEMO/NUPROC", 21*time.Minute, "Processo recebido na unidade")),
+				seisetup.AddActivities(9008, act(85020, "beltrano.silva", "SEDEMO/GAB", 22*time.Minute, "Processo sobrestado")),
+				seisetup.AddActivities(9009, act(90002, "beltrano.silva", "SEDEMO/PROTOCOLO", 23*time.Minute+30*time.Second, "Documento Ofício 10 assinado")),
+				seisetup.AddDocuments(9009, doc(91002, "0091002", "Ofício", "10", "Ofício 10 (0091002)")),
 			},
 		},
 		{
-			advance:   15 * time.Minute,
-			processes: []unitProcesses{{nuproc, back}, {gab, gabChanged}},
+			At: cycleAt(45),
+			Setup: []seisetup.Call{
+				seisetup.SetProcesses(nuproc, back...),
+				seisetup.SetProcesses(gab, gabChanged...),
+			},
+		},
+		{
+			At: cycleAt(60),
+			Setup: []seisetup.Call{
+				seisetup.AddActivities(9001, act(50020, seitest.Username, "SEDEMO/NUPROC", 50*time.Minute, "Documentos Ofício 4 e Despacho 5 incluídos")),
+				seisetup.AddDocuments(9001, doc(80004, "0080004", "Ofício", "4", "Ofício 4 (0080004)"), doc(80005, "0080005", "Despacho", "5", "Despacho 5 (0080005)")),
+			},
 		},
 	}
+}
+
+func rejectedByTheFake(t *testing.T) error {
+	t.Helper()
+	server := seitest.New(t)
+	creds := sei.Credentials{Username: seitest.Username, Password: core.StaticPassword(core.NewSecret("wrong")), OrgID: seitest.OrgID}
+	client := sei.New(server.APIURL(), creds, sei.Options{UserAgent: "sei-monitor/test", Location: server.Location()})
+	_, err := client.Login(t.Context())
+	if err == nil {
+		t.Fatal("the fake accepted a wrong password")
+	}
+	return err
+}
+
+func apiErrorIn(t *testing.T, err error) *sei.APIError {
+	t.Helper()
+	apiErr, ok := errors.AsType[*sei.APIError](err)
+	if !ok {
+		t.Fatalf("%v is not an SEI answer", err)
+	}
+	return apiErr
+}
+
+func errorChain(err error, depth int) []goldenErrorLink {
+	link := goldenErrorLink{Depth: depth, Type: errorType(err), Message: err.Error(), Sentinel: sentinelOf(err)}
+	links := []goldenErrorLink{link}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, child := range joined.Unwrap() {
+			links = append(links, errorChain(child, depth+1)...)
+		}
+		return links
+	}
+	if inner := errors.Unwrap(err); inner != nil {
+		links = append(links, errorChain(inner, depth+1)...)
+	}
+	return links
+}
+
+func errorType(err error) string {
+	if _, ok := err.(interface{ Unwrap() []error }); ok {
+		return "joined"
+	}
+	if errors.Unwrap(err) != nil {
+		return "wrapped"
+	}
+	if _, ok := errors.AsType[*sei.APIError](err); ok {
+		return "api_error"
+	}
+	return "plain"
+}
+
+func sentinelOf(err error) *string {
+	sentinels := []struct {
+		err  error
+		name string
+	}{
+		{sei.ErrInvalidCredentials, "invalid_credentials"},
+		{sei.ErrUnauthorized, "unauthorized"},
+		{sei.ErrModuleNotFound, "module_not_found"},
+		{sei.ErrModuleUnavailable, "module_unavailable"},
+		{sei.ErrServer, "server"},
+		{sei.ErrRedirect, "redirect"},
+		{sei.ErrUnexpectedResponse, "unexpected_response"},
+		{sei.ErrOrgNotFound, "org_not_found"},
+		{sei.ErrRefused, "refused"},
+	}
+	for _, sentinel := range sentinels {
+		if errors.Is(err, sentinel.err) {
+			return &sentinel.name
+		}
+	}
+	return nil
 }

@@ -10,6 +10,9 @@ import (
 )
 
 func TestGoldenVectors(t *testing.T) {
+	if !goldentest.Pinned(t) {
+		return
+	}
 	goldentest.Golden(t, "event_text.json", eventTextVectors(t))
 	goldentest.Golden(t, "shorten.json", shortenVectors())
 }
@@ -320,7 +323,13 @@ func loginFailureInputs(detected time.Time) []eventTextInput {
 		{name: "account_login_failed with the SEI message", zone: "America/Boa_Vista", self: "fulano.tal", event: failure("SEI rejected the login (Usuário ou Senha Inválida.)")},
 		{name: "account_login_failed without a message", zone: "UTC", self: "", event: failure("SEI rejected the login")},
 		{name: "account_login_failed without a reason", zone: "UTC", self: "fulano.tal", event: failure("")},
+		{name: "account_login_failed with every payload field", zone: "America/Boa_Vista", self: "fulano.tal", event: withEveryField(failure(""))},
 	}
+}
+
+func withEveryField(ev Event) Event {
+	ev.ProcedureID, ev.Payload = 9001, everything()
+	return ev
 }
 
 type shortenCase struct {

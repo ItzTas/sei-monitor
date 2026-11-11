@@ -187,7 +187,7 @@
         "procedure_id": 2,
         "number": "00000.000002/2026-00",
         "type": "Contrato",
-        "description": "",
+        "description": "Compra de mesas",
         "unit_id": 1001,
         "unit_acronym": "SEDEMO/NUPROC",
         "assigned_user": "",
@@ -249,7 +249,8 @@
           "payload": {
             "process_number": "00000.000002/2026-00",
             "unit": "SEDEMO/NUPROC",
-            "process_type": "Contrato"
+            "process_type": "Contrato",
+            "description": "Compra de mesas"
           }
         }
       ]
@@ -3015,7 +3016,7 @@
         "procedure_id": 2,
         "number": "00000.000002/2026-00",
         "type": "Contrato",
-        "description": "",
+        "description": "Compra de mesas",
         "unit_id": 1001,
         "unit_acronym": "SEDEMO/NUPROC",
         "assigned_user": "",
@@ -3117,7 +3118,7 @@
         "procedure_id": 8,
         "number": "00000.000008/2026-00",
         "type": "Contrato",
-        "description": "",
+        "description": "Reforma do auditório",
         "unit_id": 1001,
         "unit_acronym": "SEDEMO/NUPROC",
         "assigned_user": "",
@@ -3416,7 +3417,8 @@
           "payload": {
             "process_number": "00000.000002/2026-00",
             "unit": "SEDEMO/NUPROC",
-            "process_type": "Contrato"
+            "process_type": "Contrato",
+            "description": "Compra de mesas"
           }
         },
         {
@@ -3427,7 +3429,8 @@
           "payload": {
             "process_number": "00000.000008/2026-00",
             "unit": "SEDEMO/NUPROC",
-            "process_type": "Contrato"
+            "process_type": "Contrato",
+            "description": "Reforma do auditório"
           }
         }
       ]
@@ -4596,6 +4599,99 @@
             "unit": "SEDEMO/NUPROC",
             "process_type": "Contrato",
             "assigned_user": "fulano.tal"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "assignment change and a newly overdue return on the same process",
+    "previous": [
+      {
+        "procedure_id": 1,
+        "number": "00000.000001/2026-00",
+        "type": "Contrato",
+        "description": "",
+        "unit_id": 1001,
+        "unit_acronym": "SEDEMO/NUPROC",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_id": 202,
+        "return_date": "2026-11-03",
+        "return_overdue": false,
+        "last_activity_id": 500,
+        "document_total": 0,
+        "first_seen_at": "2026-11-02T18:00:00Z",
+        "last_seen_at": "2026-11-04T17:45:00Z",
+        "left_at": null
+      }
+    ],
+    "current": [
+      {
+        "process": {
+          "procedure_id": 1,
+          "number": "00000.000001/2026-00",
+          "type": "Contrato",
+          "description": "",
+          "assignee": {
+            "id": 101,
+            "acronym": "fulano.tal",
+            "name": "Fulano de Tal"
+          },
+          "return_date": "2026-11-03",
+          "return_overdue": true,
+          "origin": ""
+        },
+        "unit": {
+          "id": 1001,
+          "acronym": "SEDEMO/NUPROC"
+        }
+      }
+    ],
+    "rules": {
+      "now": "2026-11-04T18:00:00Z",
+      "zone": "America/Boa_Vista",
+      "return_warning_days": 2,
+      "self": {
+        "user_id": 101,
+        "acronym": "fulano.tal"
+      },
+      "baseline": false
+    },
+    "result": {
+      "present": [
+        {
+          "procedure_id": 1,
+          "entered": false,
+          "quiet": false
+        }
+      ],
+      "left": [],
+      "events": [
+        {
+          "kind": "assignment_changed",
+          "procedure_id": 1,
+          "ref": "1:2026-11-04T18:00:00Z",
+          "occurred_at": "0001-01-01T00:00:00Z",
+          "payload": {
+            "process_number": "00000.000001/2026-00",
+            "unit": "SEDEMO/NUPROC",
+            "process_type": "Contrato",
+            "assigned_user": "fulano.tal",
+            "assigned_user_name": "Fulano de Tal",
+            "previous_assigned_user": "beltrano.silva",
+            "assigned_to_self": true
+          }
+        },
+        {
+          "kind": "return_overdue",
+          "procedure_id": 1,
+          "ref": "1:2026-11-03",
+          "occurred_at": "0001-01-01T00:00:00Z",
+          "payload": {
+            "process_number": "00000.000001/2026-00",
+            "unit": "SEDEMO/NUPROC",
+            "process_type": "Contrato",
+            "return_date": "2026-11-03"
           }
         }
       ]

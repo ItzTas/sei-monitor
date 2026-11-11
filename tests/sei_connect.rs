@@ -1,0 +1,314 @@
+mod support;
+
+use std::future::Future;
+use std::sync::Arc;
+use std::time::Duration;
+
+use axum::Router;
+use axum::http::StatusCode;
+use axum::http::header::CONTENT_TYPE;
+use axum::response::IntoResponse;
+use chrono_tz::Tz;
+use tokio::net::TcpListener;
+use tokio::task::JoinHandle;
+
+use sei_monitor::password::{PasswordSource, StaticPassword};
+use sei_monitor::secret::Secret;
+use sei_monitor::sei::{
+    ErrorKind, Options, Org, SeiError, Session, Target, Unit, connect, discover, list_orgs,
+    resolve_org,
+};
+use support::fake_sei::{
+    API_PATH, FakeSei, ORG_ACRONYM, ORG_ID, PASSWORD, ROUTE_LOGIN_PAGE, ROUTE_VERSION, USERNAME,
+    default_orgs, fixture,
+};
+
+const USER_AGENT: &str = "sei-monitor/test";
+const TEST_TIMEOUT: Duration = Duration::from_secs(10);
+
+fn options(zone: Tz) -> Options {
+    Options {
+        user_agent: USER_AGENT.to_owned(),
+        zone,
+        timeout: TEST_TIMEOUT,
+    }
+}
+
+async fn bounded<T>(work: impl Future<Output = T>) -> T {
+    tokio::time::timeout(TEST_TIMEOUT, work)
+        .await
+        .expect("the call finished within the test timeout")
+}
+
+fn org(id: i64, acronym: &str) -> Org {
+    Org {
+        id,
+        acronym: acronym.to_owned(),
+    }
+}
+
+fn password() -> Arc<dyn PasswordSource> {
+    Arc::new(StaticPassword(Secret::new(PASSWORD.to_owned())))
+}
+
+fn target(fake: &FakeSei, api_url: String, org: &str) -> Target {
+    Target {
+        sei_url: fake.url(),
+        api_url,
+        org: org.to_owned(),
+        username: USERNAME.to_owned(),
+        password: password(),
+    }
+}
+
+struct HtmlNotFound {
+    url: String,
+    server: JoinHandle<()>,
+}
+
+impl HtmlNotFound {
+    async fn start() -> HtmlNotFound {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the HTML 404 listener");
+        let address = listener.local_addr().expect("read the HTML 404 address");
+        let router = Router::new().fallback(|| async {
+            let html = [(CONTENT_TYPE, "text/html; charset=utf-8")];
+            let body = "<html><body><h1>Página não encontrada</h1></body></html>";
+            (StatusCode::NOT_FOUND, html, body).into_response()
+        });
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router)
+                .await
+                .expect("serve the HTML 404 pages");
+        });
+        HtmlNotFound {
+            url: format!("http://{address}"),
+            server,
+        }
+    }
+}
+
+impl Drop for HtmlNotFound {
+    fn drop(&mut self) {
+        self.server.abort();
+    }
+}
+
+#[tokio::test]
+async fn discover_and_resolve_org() {
+    let fake = FakeSei::start();
+    let options = options(fake.zone());
+    let url = fake.url();
+
+    let api_url = bounded(discover(&url, &options)).await.expect("discover");
+    assert_eq!(api_url, fake.api_url());
+
+    let by_id = bounded(resolve_org(&url, "63", &options))
+        .await
+        .expect("org by id");
+    assert_eq!(by_id, org(ORG_ID, ""));
+    assert_eq!(fake.calls(ROUTE_LOGIN_PAGE), 0);
+
+    let by_acronym = bounded(resolve_org(&url, "sedemo", &options))
+        .await
+        .expect("org by acronym");
+    assert_eq!(by_acronym, org(ORG_ID, ORG_ACRONYM));
+
+    let orgs = bounded(list_orgs(&url, &options)).await.expect("orgs");
+    let every_org: Vec<Org> = default_orgs()
+        .into_iter()
+        .map(|(id, acronym, _)| org(id, acronym))
+        .collect();
+    assert_eq!(orgs, every_org);
+    assert_eq!(every_org.len(), 12);
+
+    let missing = bounded(resolve_org(&url, "NOSUCHORG", &options))
+        .await
+        .expect_err("an unknown agency");
+    assert_eq!(missing.kind(), Some(ErrorKind::OrgNotFound));
+    assert_eq!(
+        missing.to_string(),
+        "agency not found on the SEI login page: \"NOSUCHORG\" \
+         (the orgs subcommand lists the available acronyms)"
+    );
+}
+
+#[tokio::test]
+async fn list_orgs_reads_the_latin1_login_page_after_redirect() {
+    let fake = FakeSei::start();
+    fake.respond_next(
+        ROUTE_LOGIN_PAGE,
+        200,
+        &[("content-type", "text/html; charset=iso-8859-1")],
+        fixture("login.html"),
+    );
+
+    let orgs = bounded(list_orgs(&fake.url(), &options(fake.zone())))
+        .await
+        .expect("orgs");
+
+    assert_eq!(
+        orgs,
+        [
+            org(34, "ADEMO"),
+            org(48, "BDEMO"),
+            org(12, "CDEMO"),
+            org(63, "SEDEMO"),
+            org(77, "ÓRGÃODEMO"),
+        ]
+    );
+    assert_eq!(fake.calls(ROUTE_LOGIN_PAGE), 1);
+    assert_eq!(fake.last_user_agent(), USER_AGENT);
+}
+
+#[tokio::test]
+async fn disabled_module() {
+    let fake = FakeSei::start();
+    fake.set_module_inactive(true);
+
+    let error = bounded(discover(&fake.url(), &options(fake.zone())))
+        .await
+        .expect_err("a disabled module");
+
+    assert_eq!(error.kind(), Some(ErrorKind::ModuleUnavailable), "{error}");
+    let SeiError::Api(api) = &error else {
+        panic!("error = {error}, want an API error");
+    };
+    assert_eq!(api.route, ROUTE_VERSION);
+    assert_eq!(api.status, 401);
+    assert_eq!(error.to_string(), "sei: /versao: Módulo inativo.");
+}
+
+#[tokio::test]
+async fn module_not_found_names_both_candidates() {
+    let server = HtmlNotFound::start().await;
+
+    let error = bounded(discover(&server.url, &options(chrono_tz::UTC)))
+        .await
+        .expect_err("no module");
+
+    assert_eq!(error.kind(), Some(ErrorKind::ModuleNotFound), "{error}");
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "the mod-wssei module was not found on this SEI: tried \
+             {url}/sei/modulos/wssei/controlador_ws.php/api/v2 and \
+             {url}/sei/modulos/mod-wssei/controlador_ws.php/api/v2; \
+             set SEI_API_URL if the module lives elsewhere",
+            url = server.url
+        )
+    );
+}
+
+#[tokio::test]
+async fn connect_discovers_the_module_and_resolves_the_org() {
+    let fake = FakeSei::start();
+    let options = options(fake.zone());
+
+    let connection = bounded(connect(
+        &target(&fake, String::new(), ORG_ACRONYM),
+        &options,
+    ))
+    .await
+    .expect("connect");
+
+    assert_eq!(connection.api_url, fake.api_url());
+    assert_eq!(connection.org, org(ORG_ID, ORG_ACRONYM));
+    assert_eq!(connection.client.base_url(), fake.api_url());
+    assert_eq!(fake.logins(), 0);
+    bounded(connection.client.login())
+        .await
+        .expect("login through the connection");
+    assert_eq!(fake.logins(), 1);
+}
+
+#[tokio::test]
+async fn connect_uses_the_given_api_url() {
+    let fake = FakeSei::start();
+    let api_url = format!("{}{API_PATH}", fake.url());
+
+    let connection = bounded(connect(
+        &target(&fake, api_url.clone(), "63"),
+        &options(fake.zone()),
+    ))
+    .await
+    .expect("connect");
+
+    assert_eq!(connection.api_url, api_url);
+    assert_eq!(connection.org, org(ORG_ID, ""));
+    assert_eq!(fake.calls(ROUTE_VERSION), 0);
+    assert_eq!(fake.calls(ROUTE_LOGIN_PAGE), 0);
+}
+
+fn unit(id: i64, acronym: &str) -> Unit {
+    Unit {
+        id,
+        acronym: acronym.to_owned(),
+        description: String::new(),
+    }
+}
+
+fn session(units: Vec<Unit>) -> Session {
+    Session {
+        user_id: 101,
+        user_acronym: USERNAME.to_owned(),
+        user_name: String::new(),
+        current_unit_id: 2,
+        units,
+    }
+}
+
+fn unit_ids(units: &[Unit]) -> Vec<i64> {
+    units.iter().map(|unit| unit.id).collect()
+}
+
+#[test]
+fn select_units() {
+    let session = session(vec![
+        unit(1, "SEDEMO/NUPROC"),
+        unit(2, "SEDEMO/GAB"),
+        unit(3, "SEDEMO/CPL"),
+    ]);
+    let cases: [(&str, Vec<String>, bool, Vec<i64>); 3] = [
+        ("current unit by default", Vec::new(), false, vec![2]),
+        ("every unit", Vec::new(), true, vec![1, 2, 3]),
+        (
+            "chosen units in the given order",
+            vec!["sedemo/cpl".to_owned(), "SEDEMO/NUPROC".to_owned()],
+            false,
+            vec![3, 1],
+        ),
+    ];
+    for (name, acronyms, all, ids) in cases {
+        let units = session
+            .select_units(&acronyms, all)
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(unit_ids(&units), ids, "{name}");
+    }
+}
+
+#[test]
+fn select_units_keeps_an_unknown_current_unit_by_id() {
+    let session = session(vec![unit(1, "SEDEMO/NUPROC")]);
+
+    let units = session.select_units(&[], false).expect("the current unit");
+
+    assert_eq!(units, [unit(2, "")]);
+}
+
+#[test]
+fn select_units_names_the_user_units_when_one_is_unknown() {
+    let session = session(vec![unit(1, "SEDEMO/NUPROC"), unit(2, "SEDEMO/GAB")]);
+
+    let error = session
+        .select_units(&["SEDEMO/XYZ".to_owned()], false)
+        .expect_err("an unknown unit");
+
+    assert_eq!(error.kind(), Some(ErrorKind::UnknownUnit));
+    assert_eq!(
+        error.to_string(),
+        "unit not found among the user's units: \"SEDEMO/XYZ\" \
+         (yours are SEDEMO/NUPROC, SEDEMO/GAB)"
+    );
+}

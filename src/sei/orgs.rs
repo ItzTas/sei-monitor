@@ -1,0 +1,186 @@
+mod charset;
+mod entity;
+mod media_type;
+#[cfg(test)]
+mod tests;
+mod tokenizer;
+mod tree;
+
+use encoding_rs::Encoding;
+use html5ever::driver::{ParseOpts, parse_document};
+use html5ever::tendril::TendrilSink;
+use html5ever::tokenizer::TokenizerOpts;
+use reqwest::Response;
+use reqwest::header::CONTENT_TYPE;
+use scraper::{ElementRef, Html};
+
+use self::charset::{Detected, PREVIEW_SIZE, determine};
+use self::tree::GoTreeSink;
+use super::errors::SeiError;
+use super::http::{MAX_BODY_SIZE, Options, describe_transport, page_client};
+use super::json::go_lossy_utf8;
+use super::types::Org;
+use crate::gotext::{atoi, equal_fold, fields, trim};
+
+const ORG_SELECT: &str = "selOrgao";
+
+pub async fn list_orgs(sei_url: &str, options: &Options) -> Result<Vec<Org>, SeiError> {
+    let client = page_client(options);
+    let request = client
+        .get(format!("{sei_url}/sei/"))
+        .build()
+        .map_err(|error| transport("build the login page request", error))?;
+    let response = client
+        .execute(request)
+        .await
+        .map_err(|error| transport("open the login page", error))?;
+    let status = response.status().as_u16();
+    if status != 200 {
+        return Err(SeiError::LoginPageStatus(status));
+    }
+    let content_type = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .map(|value| go_lossy_utf8(value.as_bytes()));
+    let body = read_page(response).await?;
+    parse_login_page(content_type.as_deref(), &body)
+}
+
+pub async fn resolve_org(sei_url: &str, value: &str, options: &Options) -> Result<Org, SeiError> {
+    let value = trim(value);
+    if let Some(id) = atoi(value).filter(|id| *id > 0) {
+        return Ok(Org {
+            id,
+            acronym: String::new(),
+        });
+    }
+    list_orgs(sei_url, options)
+        .await?
+        .into_iter()
+        .find(|org| equal_fold(&org.acronym, value))
+        .ok_or_else(|| SeiError::OrgNotFound(value.to_owned()))
+}
+
+pub(crate) fn parse_login_page(
+    content_type: Option<&str>,
+    body: &[u8],
+) -> Result<Vec<Org>, SeiError> {
+    if body.is_empty() {
+        return Err(SeiError::Transport {
+            context: "decode the login page".to_owned(),
+            detail: "EOF".to_owned(),
+        });
+    }
+    let text = decode(determine(content_type, body), body);
+    let orgs = agency_options(&parse(&text));
+    if orgs.is_empty() {
+        return Err(SeiError::NoAgencyList);
+    }
+    Ok(orgs)
+}
+
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "parse_login_page also needs to know when Go leaves the bytes undecoded"
+    )
+)]
+pub(crate) fn detect_encoding(content_type: Option<&str>, body: &[u8]) -> &'static Encoding {
+    determine(content_type, body).encoding
+}
+
+async fn read_page(mut response: Response) -> Result<Vec<u8>, SeiError> {
+    let mut body = Vec::new();
+    while body.len() < MAX_BODY_SIZE {
+        let chunk = response
+            .chunk()
+            .await
+            .map_err(|error| page_read_failure(body.len(), error))?;
+        let Some(chunk) = chunk else {
+            break;
+        };
+        let room = MAX_BODY_SIZE - body.len();
+        body.extend_from_slice(&chunk[..chunk.len().min(room)]);
+    }
+    Ok(body)
+}
+
+fn page_read_failure(read: usize, error: reqwest::Error) -> SeiError {
+    if read < PREVIEW_SIZE {
+        return transport("decode the login page", error);
+    }
+    transport("read the login page", error)
+}
+
+fn transport(context: &str, error: reqwest::Error) -> SeiError {
+    SeiError::Transport {
+        context: context.to_owned(),
+        detail: describe_transport(error),
+    }
+}
+
+fn decode(detected: Detected, body: &[u8]) -> String {
+    if !detected.transcode {
+        return go_lossy_utf8(body);
+    }
+    let text = detected.encoding.decode_without_bom_handling(body).0;
+    if !detected.encoding.is_single_byte() {
+        return text.into_owned();
+    }
+    text.chars().map(without_c1_control).collect()
+}
+
+fn without_c1_control(c: char) -> char {
+    match c {
+        '\u{80}'..='\u{9F}' => '\u{FFFD}',
+        _ => c,
+    }
+}
+
+fn parse(text: &str) -> Html {
+    let options = ParseOpts {
+        tokenizer: TokenizerOpts {
+            discard_bom: false,
+            ..TokenizerOpts::default()
+        },
+        ..ParseOpts::default()
+    };
+    parse_document(GoTreeSink::new(), options).one(text)
+}
+
+fn agency_options(document: &Html) -> Vec<Org> {
+    document
+        .tree
+        .root()
+        .descendants()
+        .filter_map(ElementRef::wrap)
+        .find(is_agency_select)
+        .map(options)
+        .unwrap_or_default()
+}
+
+fn is_agency_select(element: &ElementRef) -> bool {
+    let element = element.value();
+    &*element.name.local == "select"
+        && (element.attr("id") == Some(ORG_SELECT) || element.attr("name") == Some(ORG_SELECT))
+}
+
+fn options(select: ElementRef) -> Vec<Org> {
+    select
+        .descendants()
+        .filter_map(ElementRef::wrap)
+        .filter(|element| &*element.value().name.local == "option")
+        .filter_map(option_org)
+        .collect()
+}
+
+fn option_org(option: ElementRef) -> Option<Org> {
+    let value = option.value().attr("value").unwrap_or_default();
+    let id = atoi(trim(value)).filter(|id| *id > 0)?;
+    let text: String = option.text().collect();
+    Some(Org {
+        id,
+        acronym: fields(&text).join(" "),
+    })
+}

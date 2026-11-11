@@ -21,10 +21,6 @@ pub(crate) fn api_client(options: &Options) -> reqwest::Client {
     client(options, Policy::none())
 }
 
-#[expect(
-    dead_code,
-    reason = "the login page reader of the discovery task is its first caller"
-)]
 pub(crate) fn page_client(options: &Options) -> reqwest::Client {
     client(options, Policy::limited(MAX_PAGE_REDIRECTS))
 }

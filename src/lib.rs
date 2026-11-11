@@ -1,5 +1,6 @@
 pub mod config;
 pub mod duration;
+pub mod event;
 #[cfg(test)]
 mod golden;
 pub mod gotext;

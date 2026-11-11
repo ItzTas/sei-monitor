@@ -2,11 +2,12 @@ mod support;
 
 use std::future::Future;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use axum::Router;
-use axum::http::StatusCode;
-use axum::http::header::CONTENT_TYPE;
+use axum::http::header::{CONTENT_TYPE, LOCATION};
+use axum::http::{StatusCode, Uri};
 use axum::response::IntoResponse;
 use chrono_tz::Tz;
 use tokio::net::TcpListener;
@@ -311,4 +312,81 @@ fn select_units_names_the_user_units_when_one_is_unknown() {
         "unit not found among the user's units: \"SEDEMO/XYZ\" \
          (yours are SEDEMO/NUPROC, SEDEMO/GAB)"
     );
+}
+
+struct RedirectChain {
+    url: String,
+    requests: Arc<AtomicUsize>,
+    server: JoinHandle<()>,
+}
+
+impl RedirectChain {
+    async fn start(redirects: usize) -> RedirectChain {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the redirect chain listener");
+        let address = listener
+            .local_addr()
+            .expect("read the redirect chain address");
+        let requests = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&requests);
+        let router = Router::new().fallback(move |uri: Uri| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            async move { chain_step(&uri, redirects) }
+        });
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router)
+                .await
+                .expect("serve the redirect chain");
+        });
+        RedirectChain {
+            url: format!("http://{address}"),
+            requests,
+            server,
+        }
+    }
+
+    fn requests(&self) -> usize {
+        self.requests.load(Ordering::SeqCst)
+    }
+}
+
+impl Drop for RedirectChain {
+    fn drop(&mut self) {
+        self.server.abort();
+    }
+}
+
+fn chain_step(uri: &Uri, redirects: usize) -> axum::response::Response {
+    let step = uri
+        .path()
+        .strip_prefix("/hop/")
+        .map_or(0, |step| step.parse().expect("a numbered hop"));
+    if step < redirects {
+        let next = format!("/hop/{}", step + 1);
+        return (StatusCode::FOUND, [(LOCATION, next)]).into_response();
+    }
+    let latin1 = [(CONTENT_TYPE, "text/html; charset=iso-8859-1")];
+    (latin1, fixture("login.html")).into_response()
+}
+
+#[tokio::test]
+async fn login_page_follows_at_most_nine_redirects() {
+    let nine = RedirectChain::start(9).await;
+    let orgs = bounded(list_orgs(&nine.url, &options(Tz::UTC)))
+        .await
+        .expect("orgs after nine redirects");
+    assert_eq!(orgs.len(), 5);
+    assert_eq!(orgs[3], org(ORG_ID, ORG_ACRONYM));
+    assert_eq!(nine.requests(), 10);
+
+    let ten = RedirectChain::start(10).await;
+    let error = bounded(list_orgs(&ten.url, &options(Tz::UTC)))
+        .await
+        .expect_err("a tenth redirect");
+    assert!(
+        matches!(&error, SeiError::Transport { context, .. } if context == "open the login page"),
+        "{error:?}"
+    );
+    assert_eq!(ten.requests(), 10);
 }

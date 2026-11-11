@@ -10,7 +10,7 @@ use zeroize::Zeroizing;
 
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 pub(crate) const MAX_BODY_SIZE: usize = 16 << 20;
-const MAX_PAGE_REDIRECTS: usize = 10;
+const MAX_PAGE_REDIRECTS: usize = 9;
 
 #[derive(Clone)]
 pub struct Options {

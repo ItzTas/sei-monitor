@@ -488,22 +488,43 @@ async fn documents_are_read_again_from_the_new_total_when_the_saved_page_is_empt
     assert_eq!(document_total(&h).await, 21);
 }
 
+async fn after_empty_document_pages(store: &Store, empty_pages: usize) -> (Harness, usize) {
+    let h = with_documents(store, numbered_documents(80001..=80120)).await;
+    h.fake
+        .add_documents(9001, vec![document(80121, "Ofício 121")]);
+    let json_type = [("Content-Type", "application/json")];
+    for _ in 0..empty_pages {
+        let empty = br#"{"sucesso":true,"data":[],"total":121}"#.to_vec();
+        h.fake.respond_next(ROUTE_DOCUMENTS, 200, &json_type, empty);
+    }
+    let calls = h.fake.calls(ROUTE_DOCUMENTS);
+    h.run_once().await;
+    let made = h.fake.calls(ROUTE_DOCUMENTS) - calls;
+    (h, made)
+}
+
+#[tokio::test]
+async fn an_empty_saved_page_is_read_again_from_the_page_of_the_new_total() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+
+    let (h, calls) = after_empty_document_pages(&store, 1).await;
+
+    assert_eq!(calls, 2);
+    assert_eq!(document_refs(&h).await, ["80121"]);
+    assert_eq!(document_total(&h).await, 121);
+}
+
 #[tokio::test]
 async fn a_saved_page_that_stays_empty_is_read_from_the_first_page() {
     let Some((_database, store)) = database_store().await else {
         return;
     };
-    let h = with_documents(&store, numbered_documents(80001..=80120)).await;
-    h.fake
-        .add_documents(9001, vec![document(80121, "Ofício 121")]);
-    let empty = br#"{"sucesso":true,"data":[],"total":121}"#.to_vec();
-    let json_type = [("Content-Type", "application/json")];
-    h.fake.respond_next(ROUTE_DOCUMENTS, 200, &json_type, empty);
-    let calls = h.fake.calls(ROUTE_DOCUMENTS);
 
-    h.run_once().await;
+    let (h, calls) = after_empty_document_pages(&store, 2).await;
 
-    assert_eq!(h.fake.calls(ROUTE_DOCUMENTS) - calls, 4);
+    assert_eq!(calls, 5);
     assert_eq!(document_refs(&h).await, ["80121"]);
     assert_eq!(document_total(&h).await, 121);
 }

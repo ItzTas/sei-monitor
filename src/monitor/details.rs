@@ -247,10 +247,11 @@ async fn read_documents(
     saved_total: i64,
 ) -> Result<(Vec<Document>, i64), SeiError> {
     let mut start = first_page(saved_total);
+    let mut retried = false;
     loop {
         match read_document_pages(client, presence, start).await? {
             DocumentRead::Read { documents, total } => return Ok((documents, total)),
-            DocumentRead::Emptied { total } => start = restart_page(start, total),
+            DocumentRead::Emptied { total } => (start, retried) = restart(start, total, retried),
         }
     }
 }
@@ -292,12 +293,15 @@ fn first_page(total: i64) -> usize {
     usize::try_from((total - 1) / count(DOCUMENT_PAGE_SIZE)).unwrap_or(usize::MAX)
 }
 
-fn restart_page(emptied: usize, total: i64) -> usize {
+fn restart(emptied: usize, total: i64, retried: bool) -> (usize, bool) {
     let page = first_page(total);
     if page < emptied {
-        return page;
+        return (page, retried);
     }
-    0
+    if !retried {
+        return (page, true);
+    }
+    (0, true)
 }
 
 fn place(presence: &Presence) -> (i64, i64) {

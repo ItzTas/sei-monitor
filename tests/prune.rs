@@ -9,8 +9,9 @@ use sei_monitor::monitor::Clock;
 use sei_monitor::store::Trigger;
 use support::fake_sei::{FakeProcess, ROUTE_PROCESSES, UNIT_NUPROC};
 use support::harness::{
-    FIFTEEN_MINUTES, Harness, activity, bounded, database_store, populate, process, start,
+    FIFTEEN_MINUTES, Harness, activity, bounded, database_store, populate, process, start, store_as,
 };
+use support::logs::{captured, logged};
 
 const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 
@@ -222,4 +223,62 @@ async fn a_failed_cycle_removes_nothing() {
     let events = h.events().await;
     assert_eq!(ids(&events), ids(&before));
     assert_eq!(procedure_ids(&h).await, [9001, 9002]);
+}
+
+#[tokio::test]
+async fn acknowledged_events_stay_until_the_cutoff_passes_them() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |config| config.retention_days = 30);
+    let before = after_a_change(&h).await;
+    assert!(!before.is_empty());
+    h.monitor.acknowledge(highest_id(&before));
+
+    h.clock.advance(days(29) + Duration::from_secs(60 * 60));
+    h.run_once().await;
+    assert_eq!(ids(&h.events().await), ids(&before));
+    assert_eq!(procedure_ids(&h).await, [9001, 9002]);
+
+    h.clock.advance(days(1));
+    h.run_once().await;
+    assert_eq!(h.events().await, []);
+    assert_eq!(procedure_ids(&h).await, [9001]);
+}
+
+#[tokio::test]
+async fn a_failed_prune_leaves_the_cycle_successful() {
+    let Some((database, store)) = database_store().await else {
+        return;
+    };
+    let denied = store_as(&database, "sei_prune_denied", "DELETE ON events").await;
+    let h = Harness::new(&denied, |config| config.retention_days = 30);
+    populate(&h.fake);
+    h.prepare().await;
+
+    let (result, logs) = captured(bounded(h.monitor.run_once(Trigger::Scheduled))).await;
+
+    assert_eq!(result.expect("a cycle whose prune fails").processes_seen, 2);
+    let run = store
+        .last_cycle_run(h.account_id())
+        .await
+        .expect("last run")
+        .expect("a run");
+    assert_eq!(run.error, "");
+    assert_eq!(run.processes_seen, 2);
+    assert!(run.finished_at.is_some());
+    let failure = logged(&[
+        ("error", "db error"),
+        ("level", "WARN"),
+        ("message", "could not remove old records"),
+    ]);
+    let message = (
+        "message".to_owned(),
+        "could not remove old records".to_owned(),
+    );
+    let prune_lines: Vec<_> = logs
+        .iter()
+        .filter(|event| event.contains(&message))
+        .collect();
+    assert_eq!(prune_lines, [&failure]);
 }

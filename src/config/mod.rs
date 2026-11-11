@@ -3,7 +3,7 @@ mod reader;
 pub(crate) mod tests;
 mod url;
 
-use std::ffi::CString;
+use std::ffi::{CString, OsString};
 use std::fs;
 use std::future::{Future, ready};
 use std::io;
@@ -30,21 +30,30 @@ pub const MIN_POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 type Lookup = Box<dyn Fn(&str) -> Option<String> + Send + Sync>;
 type ReadFile = Box<dyn Fn(&str) -> std::io::Result<Vec<u8>> + Send + Sync>;
+type InvalidUtf8 = Box<dyn Fn(&str) -> bool + Send + Sync>;
 
 pub struct Source {
     pub lookup: Lookup,
     pub read_file: ReadFile,
+    pub invalid_utf8: InvalidUtf8,
 }
 
 impl Source {
     pub fn environment() -> Source {
         Source {
-            lookup: Box::new(|name| {
-                std::env::var_os(name).map(|value| value.to_string_lossy().into_owned())
-            }),
+            lookup: Box::new(|name| lossy(std::env::var_os(name))),
             read_file: Box::new(|path| fs::read(path)),
+            invalid_utf8: Box::new(|name| not_utf8(std::env::var_os(name))),
         }
     }
+}
+
+fn lossy(value: Option<OsString>) -> Option<String> {
+    value.map(|value| value.to_string_lossy().into_owned())
+}
+
+fn not_utf8(value: Option<OsString>) -> bool {
+    value.is_some_and(|value| value.to_str().is_none())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

@@ -19,6 +19,7 @@ pub(crate) fn source<K: AsRef<str>, V: AsRef<str>>(env: &[(K, V)]) -> Source {
     Source {
         lookup: Box::new(move |name| env.get(name).cloned()),
         read_file: Box::new(|_| Err(io::ErrorKind::NotFound.into())),
+        invalid_utf8: Box::new(|_| false),
     }
 }
 
@@ -213,6 +214,101 @@ fn log_filter_follows_the_level() {
     }
 }
 
+fn not_utf8_source(
+    changes: &[(&'static str, &'static str)],
+    invalid: &'static [&'static str],
+    files: &'static [(&'static str, &'static [u8])],
+) -> Source {
+    let env: BTreeMap<String, String> = with(changes)
+        .into_iter()
+        .map(|(name, value)| (name.to_owned(), value.to_owned()))
+        .collect();
+    Source {
+        lookup: Box::new(move |name| env.get(name).cloned()),
+        read_file: Box::new(move |path| {
+            files
+                .iter()
+                .find(|(file, _)| *file == path)
+                .map(|(_, content)| content.to_vec())
+                .ok_or_else(|| io::ErrorKind::NotFound.into())
+        }),
+        invalid_utf8: Box::new(move |name| invalid.contains(&name)),
+    }
+}
+
+#[test]
+fn secrets_that_are_not_valid_utf8_are_refused() {
+    let cases: [(Source, &[&str]); 4] = [
+        (
+            not_utf8_source(&[("SEI_PASSWORD", "pw\u{fffd}")], &["SEI_PASSWORD"], &[]),
+            &["SEI_PASSWORD: the value is not valid UTF-8"],
+        ),
+        (
+            not_utf8_source(
+                &[("DATABASE_URL", "postgres://u:\u{fffd}@h/db")],
+                &["DATABASE_URL"],
+                &[],
+            ),
+            &[
+                "DATABASE_URL: the value is not valid UTF-8",
+                "DATABASE_URL: set the Postgres address, postgres://user:password@host/database",
+            ],
+        ),
+        (
+            not_utf8_source(
+                &[
+                    ("SEI_PASSWORD", ""),
+                    ("SEI_PASSWORD_FILE", "/run/secrets/sei"),
+                ],
+                &[],
+                &[("/run/secrets/sei", b"pw\xff\n")],
+            ),
+            &["SEI_PASSWORD_FILE: /run/secrets/sei is not valid UTF-8"],
+        ),
+        (
+            not_utf8_source(
+                &[
+                    ("DATABASE_URL", ""),
+                    ("DATABASE_URL_FILE", "/run/secrets/database"),
+                ],
+                &[],
+                &[("/run/secrets/database", b"postgres://u:\xc3@h/db\n")],
+            ),
+            &[
+                "DATABASE_URL_FILE: /run/secrets/database is not valid UTF-8",
+                "DATABASE_URL: set the Postgres address, postgres://user:password@host/database",
+            ],
+        ),
+    ];
+    for (source, want) in cases {
+        assert_eq!(problems(PluginConfig::load(&source)), want);
+    }
+}
+
+#[test]
+fn settings_that_are_not_secrets_keep_the_lossy_value() {
+    let source = not_utf8_source(&[("SEI_ORG", "SED\u{fffd}MO")], &["SEI_ORG"], &[]);
+
+    let config = match PluginConfig::load(&source) {
+        Ok(config) => config,
+        Err(err) => panic!("{err}"),
+    };
+
+    assert_eq!(config.sei.org, "SED\u{fffd}MO");
+}
+
+#[test]
+fn environment_values_that_are_not_utf8_are_flagged() {
+    use std::os::unix::ffi::OsStringExt;
+
+    let invalid = || Some(OsString::from_vec(b"pw\xff".to_vec()));
+    assert!(not_utf8(invalid()));
+    assert_eq!(lossy(invalid()).as_deref(), Some("pw\u{fffd}"));
+    assert!(!not_utf8(Some(OsString::from("pw"))));
+    assert!(!not_utf8(None));
+    assert_eq!(lossy(None), None);
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ConfigCase {
@@ -252,6 +348,7 @@ fn case_source(case: &ConfigCase) -> Source {
                 .map(|content| content.clone().into_bytes())
                 .ok_or_else(|| io::ErrorKind::NotFound.into())
         }),
+        invalid_utf8: Box::new(|_| false),
     }
 }
 

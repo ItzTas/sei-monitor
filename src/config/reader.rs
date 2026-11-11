@@ -65,9 +65,17 @@ impl<'a> Reader<'a> {
             return Secret::default();
         }
         if path.is_empty() {
-            return direct;
+            return self.utf8_direct(name, direct);
         }
         self.secret_file(name, &path)
+    }
+
+    fn utf8_direct(&mut self, name: &str, direct: Secret) -> Secret {
+        if direct.is_empty() || !(self.source.invalid_utf8)(name) {
+            return direct;
+        }
+        self.problem(format!("{name}: the value is not valid UTF-8"));
+        Secret::default()
     }
 
     fn direct_secret(&self, name: &str) -> Secret {
@@ -86,8 +94,11 @@ impl<'a> Reader<'a> {
                 return Secret::default();
             }
         };
-        let text = Zeroizing::new(String::from_utf8_lossy(&content).into_owned());
-        let value = trim_final_newline(&text);
+        let Ok(text) = std::str::from_utf8(&content) else {
+            self.problem(format!("{name}_FILE: {path} is not valid UTF-8"));
+            return Secret::default();
+        };
+        let value = trim_final_newline(text);
         if value.is_empty() {
             self.problem(format!("{name}_FILE: {path} is empty"));
         }

@@ -5,9 +5,12 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 
-use support::fake_sei::{FakeSei, PASSWORD, ROUTE_LOGIN_PAGE, ROUTE_VERSION};
+use support::fake_sei::{
+    FakeSei, MODULE_VERSION, PASSWORD, ROUTE_ACTIVITIES, ROUTE_DOCUMENTS, ROUTE_LOGIN,
+    ROUTE_LOGIN_PAGE, ROUTE_PROCESSES, ROUTE_VERSION, SEI_VERSION,
+};
 use support::process::{Exited, run_to_exit, start_command};
 
 const COMMANDS: &str = include_str!(concat!(
@@ -239,6 +242,65 @@ fn test_login_never_prints_the_password() {
         secrets.extend(run.issued_tokens.iter().map(String::as_str));
         assert_hidden(&text, &secrets);
     }
+}
+
+fn canned_json(fake: &FakeSei, route: &str, body: &Value) {
+    let headers = [("content-type", "application/json")];
+    fake.respond_next(route, 200, &headers, body.to_string().into_bytes());
+}
+
+#[test]
+fn diagnose_stops_at_the_first_rejected_login() {
+    let fake = FakeSei::start();
+    let case = case_named("test-login with the current unit");
+    let env = with_url(&case.env, &fake.url());
+    fake.set_password("changed-while-diagnose-runs");
+    let login = json!({"sucesso": true, "data": {
+        "loginData": {"IdUsuario": "101", "IdUnidadeAtual": "1001", "sigla": "fulano.tal", "nome": "Fulano de Tal"},
+        "unidades": [{"id": "1001", "sigla": "SEDEMO/NUPROC", "descricao": "Núcleo"}],
+        "token": "a-token-the-fake-never-issued",
+    }});
+    let version = json!({"sucesso": true, "data": {"sei": SEI_VERSION, "wssei": MODULE_VERSION}});
+    let listing = json!({"sucesso": true, "total": "1", "data": [
+        {"id": "9001", "atributos": {"idProcedimento": "9001"}},
+    ]});
+    canned_json(&fake, ROUTE_LOGIN, &login);
+    canned_json(&fake, ROUTE_VERSION, &version);
+    canned_json(&fake, ROUTE_VERSION, &version);
+    canned_json(&fake, ROUTE_PROCESSES, &listing);
+
+    let exited = run_to_exit(&["diagnose"], &pairs(&env), EXIT_LIMIT);
+
+    assert_eq!(
+        fake.failed_logins(),
+        1,
+        "rejected logins\nstdout:\n{}\nstderr:\n{}",
+        exited.stdout,
+        exited.stderr
+    );
+    assert_eq!(exited.status.code(), Some(1), "{}", exited.stderr);
+    assert_eq!(
+        exited.stdout,
+        "sei-monitor diagnose\nSEI 5.0.5, mod-wssei 3.0.4; units: 1 available, 1 watched (checks use the first one)\n\n[1] Pagination with limit=2\n"
+    );
+    assert_eq!(
+        exited.stderr,
+        "error: sei: /autenticar: Usuário ou Senha Inválida.\n"
+    );
+    let calls = [
+        ROUTE_LOGIN,
+        ROUTE_VERSION,
+        ROUTE_PROCESSES,
+        ROUTE_ACTIVITIES,
+        ROUTE_DOCUMENTS,
+    ]
+    .map(|route| fake.calls(route));
+    assert_eq!(
+        calls,
+        [2, 2, 2, 0, 0],
+        "calls on login, version, processes, activities, documents"
+    );
+    assert_eq!(fake.logins(), 0);
 }
 
 #[test]

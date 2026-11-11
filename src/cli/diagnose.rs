@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
-use std::io::{self, Write};
+use std::io::Write;
 
 use anyhow::anyhow;
 use serde_json::{Map, Value};
@@ -78,13 +78,16 @@ pub async fn diagnose(source: &Source, out: &mut dyn Write) -> anyhow::Result<()
 }
 
 impl Diagnosis<'_> {
-    async fn run(&mut self) -> io::Result<()> {
+    async fn run(&mut self) -> anyhow::Result<()> {
         let all = [("limit", "100"), ("start", "0")];
-        let processes = match self.list(&Endpoint::at(PROCESSES), &all).await {
+        let processes = match self.list(&Endpoint::at(PROCESSES), &all).await? {
             Ok(processes) => processes,
             Err(failure) => {
                 let reason = describe_failure(&[failure]);
-                return writeln!(self.out, "\ncould not list the processes: {reason}");
+                return Ok(writeln!(
+                    self.out,
+                    "\ncould not list the processes: {reason}"
+                )?);
             }
         };
         let procedure = scalar(
@@ -135,15 +138,19 @@ impl Diagnosis<'_> {
         Ok(())
     }
 
-    fn section(&mut self, title: &str) -> io::Result<()> {
-        writeln!(self.out, "\n{title}")
+    fn section(&mut self, title: &str) -> anyhow::Result<()> {
+        Ok(writeln!(self.out, "\n{title}")?)
     }
 
-    fn line(&mut self, text: impl Display) -> io::Result<()> {
-        writeln!(self.out, "    {text}")
+    fn line(&mut self, text: impl Display) -> anyhow::Result<()> {
+        Ok(writeln!(self.out, "    {text}")?)
     }
 
-    async fn list(&self, endpoint: &Endpoint, query: &[(&str, &str)]) -> Result<Listing, SeiError> {
+    async fn list(
+        &self,
+        endpoint: &Endpoint,
+        query: &[(&str, &str)],
+    ) -> anyhow::Result<Result<Listing, SeiError>> {
         let mut values: Vec<(&str, String)> = endpoint
             .query
             .iter()
@@ -151,7 +158,10 @@ impl Diagnosis<'_> {
             .map(|(key, value)| (*key, value.clone()))
             .collect();
         values.extend(query.iter().map(|(key, value)| (*key, (*value).to_owned())));
-        let page = self.client.raw(self.unit, &endpoint.path, &values).await?;
+        let page = match self.client.raw(self.unit, &endpoint.path, &values).await {
+            Ok(page) => page,
+            Err(failure) => return stop_at_a_rejected_login(failure),
+        };
         let items = match &page.data {
             Some(Value::Array(list)) => list
                 .iter()
@@ -159,19 +169,23 @@ impl Diagnosis<'_> {
                 .collect(),
             _ => Vec::new(),
         };
-        Ok(Listing {
+        Ok(Ok(Listing {
             items,
             has_data: page.data.is_some(),
             total: page.total,
-        })
+        }))
     }
 
-    async fn pagination(&mut self, name: &str, endpoint: Option<&Endpoint>) -> io::Result<()> {
+    async fn pagination(&mut self, name: &str, endpoint: Option<&Endpoint>) -> anyhow::Result<()> {
         let Some(endpoint) = endpoint else {
             return self.line(format_args!("{name}: no process to check with"));
         };
-        let first = self.list(endpoint, &[("limit", "2"), ("start", "0")]).await;
-        let second = self.list(endpoint, &[("limit", "2"), ("start", "1")]).await;
+        let first = self
+            .list(endpoint, &[("limit", "2"), ("start", "0")])
+            .await?;
+        let second = self
+            .list(endpoint, &[("limit", "2"), ("start", "1")])
+            .await?;
         let (first, second) = match (first, second) {
             (Ok(first), Ok(second)) => (ids(&first.items), ids(&second.items)),
             (first, second) => {
@@ -189,7 +203,7 @@ impl Diagnosis<'_> {
         ))
     }
 
-    async fn coverage(&mut self, kind: &str) -> io::Result<()> {
+    async fn coverage(&mut self, kind: &str) -> anyhow::Result<()> {
         let label = match kind {
             "" => "default call".to_owned(),
             kind => format!("tipo={kind}"),
@@ -198,7 +212,7 @@ impl Diagnosis<'_> {
             .into_iter()
             .filter(|(_, value)| !value.is_empty())
             .collect();
-        let listing = match self.list(&Endpoint::at(PROCESSES), &query).await {
+        let listing = match self.list(&Endpoint::at(PROCESSES), &query).await? {
             Ok(listing) => listing,
             Err(failure) => {
                 return self.line(format_args!("{label}: {}", describe_failure(&[failure])));
@@ -225,7 +239,7 @@ impl Diagnosis<'_> {
         ))
     }
 
-    fn returns(&mut self, processes: &[Item]) -> io::Result<()> {
+    fn returns(&mut self, processes: &[Item]) -> anyhow::Result<()> {
         let (mut scheduled, mut carried) = (0, 0);
         let (mut kinds, mut shapes) = (BTreeMap::new(), BTreeMap::new());
         for item in processes {
@@ -256,7 +270,7 @@ impl Diagnosis<'_> {
         ))
     }
 
-    fn links(&mut self, processes: &[Item]) -> io::Result<()> {
+    fn links(&mut self, processes: &[Item]) -> anyhow::Result<()> {
         let mut found = BTreeSet::new();
         for item in processes {
             collect_link_keys("", item, &mut found);
@@ -276,7 +290,7 @@ impl Diagnosis<'_> {
         processes: &Listing,
         activities: Option<&Endpoint>,
         documents: Option<&Endpoint>,
-    ) -> io::Result<()> {
+    ) -> anyhow::Result<()> {
         let process_fields: &Fields = &[
             ("id", &["id"]),
             ("idProcedimento", &["atributos", "idProcedimento"]),
@@ -305,7 +319,7 @@ impl Diagnosis<'_> {
             let Some(endpoint) = endpoint else {
                 continue;
             };
-            let Ok(sample) = self.list(endpoint, &SAMPLE).await else {
+            let Ok(sample) = self.list(endpoint, &SAMPLE).await? else {
                 continue;
             };
             self.line(format_args!(
@@ -314,7 +328,7 @@ impl Diagnosis<'_> {
             ))?;
         }
         let beyond = [("limit", "1"), ("start", "100000")];
-        let empty = match self.list(&Endpoint::at(PROCESSES), &beyond).await {
+        let empty = match self.list(&Endpoint::at(PROCESSES), &beyond).await? {
             Ok(empty) => empty,
             Err(failure) => {
                 return self.line(format_args!("empty page: {}", describe_failure(&[failure])));
@@ -327,16 +341,23 @@ impl Diagnosis<'_> {
         ))
     }
 
-    async fn order(&mut self, name: &str, endpoint: Option<&Endpoint>) -> io::Result<()> {
+    async fn order(&mut self, name: &str, endpoint: Option<&Endpoint>) -> anyhow::Result<()> {
         let Some(endpoint) = endpoint else {
             return self.line(format_args!("{name}: no process to check with"));
         };
-        let verdict = match self.list(endpoint, &SAMPLE).await {
+        let verdict = match self.list(endpoint, &SAMPLE).await? {
             Ok(listing) => sequence(&ids(&listing.items)).to_owned(),
             Err(failure) => describe_failure(&[failure]),
         };
         self.line(format_args!("{name}: {verdict}"))
     }
+}
+
+fn stop_at_a_rejected_login(failure: SeiError) -> anyhow::Result<Result<Listing, SeiError>> {
+    if failure.kind() == Some(ErrorKind::InvalidCredentials) {
+        return Err(failure.into());
+    }
+    Ok(Err(failure))
 }
 
 fn page_verdict(first: usize, second: usize, shared: usize) -> &'static str {

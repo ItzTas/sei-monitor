@@ -2,6 +2,7 @@
 
 pub mod clock;
 pub mod fake_sei;
+pub mod logs;
 
 use monitor_hub_plugin::migrate::up;
 use monitor_hub_plugin_testkit::{Database, database};

@@ -17,6 +17,7 @@ use tokio::task::JoinHandle;
 use tokio_postgres::error::SqlState;
 use tokio_postgres::{Client, NoTls};
 
+use support::logs::{LoggedEvent, captured, logged};
 use support::{database_url_as, migrated_database};
 
 const PASSWORD: &str = "hunter2";
@@ -1459,65 +1460,104 @@ async fn a_run_starts_while_a_cycle_of_its_account_is_open() {
     );
 }
 
+async fn store_broken(client: &Client, account_id: i64, kind: &str, payload: &str) -> i64 {
+    let reference = format!("broken-{kind}-{payload}");
+    client
+        .query_one(
+            "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
+             VALUES ($1, $2, 9001, $3, $4, $4, $5) RETURNING id",
+            &[&account_id, &kind, &reference, &repo_now(), &payload],
+        )
+        .await
+        .expect("store a broken event")
+        .get(0)
+}
+
+fn readable(account_id: i64, reference: &str) -> CycleChanges {
+    CycleChanges {
+        events: vec![event(Kind::ActivityAdded, 9001, reference)],
+        ..cycle(account_id, repo_now())
+    }
+}
+
 #[tokio::test]
-async fn an_unreadable_stored_event_names_itself() {
+async fn unreadable_stored_events_are_skipped_and_reported_once() {
     let Some(db) = migrated_database().await else {
         return;
     };
     let pooled = store(&db.url);
     let account = account(&pooled).await;
-    let changes = |reference: &str| CycleChanges {
-        events: vec![event(Kind::ActivityAdded, 9001, reference)],
-        ..cycle(account.id, repo_now())
-    };
-    apply(&pooled, changes("before")).await;
     let client = connect(&db.url).await;
-    let mut broken = Vec::new();
-    for (kind, reference, payload) in [
-        ("activity_added", "garbled", "{\"activity_text\":"),
-        ("activity_renamed", "unknown", "{}"),
-    ] {
-        let id: i64 = client
-            .query_one(
-                "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
-                 VALUES ($1, $2, 9001, $3, $4, $4, $5) RETURNING id",
-                &[&account.id, &kind, &reference, &repo_now(), &payload],
-            )
-            .await
-            .expect("store a broken event")
-            .get(0);
-        broken.push(id);
-    }
-    let after = apply(&pooled, changes("after")).await;
+    let before = apply(&pooled, readable(account.id, "before")).await;
+    let unknown = store_broken(&client, account.id, "activity_renamed", "{}").await;
+    let garbled = store_broken(
+        &client,
+        account.id,
+        "activity_added",
+        r#"{"assigned_to_self":"do-not-print"}"#,
+    )
+    .await;
+    let after = apply(&pooled, readable(account.id, "after")).await;
 
-    let garbled = pooled
-        .events_after(account.id, 0, 100)
-        .await
-        .expect_err("a garbled payload was read");
-    assert!(
-        matches!(garbled, StoreError::Payload { event_id, .. } if event_id == broken[0]),
-        "{garbled:?}"
+    let (first, logs) = captured(pooled.events_after(account.id, 0, 100)).await;
+
+    assert_eq!(
+        first.expect("the readable events"),
+        [before, after].concat()
     );
-    assert!(
-        garbled
-            .to_string()
-            .starts_with(&format!("event {} has an unreadable payload: ", broken[0])),
-        "{garbled}"
-    );
-    let unknown = pooled
-        .events_after(account.id, broken[0], 100)
-        .await
-        .expect_err("an unknown kind was read");
-    let StoreError::Payload { event_id, detail } = &unknown else {
-        panic!("{unknown:?}")
+    let skipped = |event_id: i64, error: &str| {
+        logged(&[
+            ("message", "skipping a stored event that cannot be read"),
+            ("level", "ERROR"),
+            ("event_id", &event_id.to_string()),
+            ("error", error),
+        ])
     };
-    assert_eq!(*event_id, broken[1]);
-    assert!(detail.contains("activity_renamed"), "{detail}");
+    assert_eq!(
+        logs,
+        vec![
+            skipped(unknown, "its kind is not one sei-monitor knows"),
+            skipped(
+                garbled,
+                "its payload is not an event payload: a field has the wrong type at line 1, column 34"
+            ),
+        ]
+    );
+
+    let (again, logs) = captured(pooled.events_after(account.id, 0, 100)).await;
+    assert_eq!(again.expect("the same events again").len(), 2);
+    assert_eq!(logs, Vec::<LoggedEvent>::new());
+}
+
+#[tokio::test]
+async fn a_page_of_unreadable_events_is_not_the_end() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let client = connect(&db.url).await;
+    for payload in ["{", r#"{"unit":7}"#] {
+        store_broken(&client, account.id, "activity_added", payload).await;
+    }
+    let mut readable_events = Vec::new();
+    for reference in ["a1", "a2"] {
+        readable_events.extend(apply(&pooled, readable(account.id, reference)).await);
+    }
+    store_broken(&client, account.id, "activity_added", r#""x""#).await;
+
     assert_eq!(
         pooled
-            .events_after(account.id, broken[1], 100)
+            .events_after(account.id, 0, 2)
             .await
-            .expect("the events after the broken ones"),
-        after
+            .expect("the events after a page of unreadable ones"),
+        readable_events
+    );
+    assert_eq!(
+        pooled
+            .events_after(account.id, readable_events[1].id, 2)
+            .await
+            .expect("only unreadable events left"),
+        Vec::new()
     );
 }

@@ -13,6 +13,7 @@ use tokio::task::{JoinError, JoinHandle};
 use tokio_postgres::{Client, Config, NoTls};
 
 use crate::secret::Secret;
+use events::Skipped;
 
 pub use records::{
     Account, AccountInfo, AccountKey, CycleChanges, CycleRun, DocumentRow, ProcessRow, Pruned,
@@ -60,8 +61,6 @@ pub enum StoreError {
     Database(#[from] tokio_postgres::Error),
     #[error(transparent)]
     Migrate(#[from] MigrateError),
-    #[error("event {event_id} has an unreadable payload: {detail}")]
-    Payload { event_id: i64, detail: String },
 }
 
 pub struct WriterLock {
@@ -116,6 +115,7 @@ impl WriterLock {
 #[derive(Clone)]
 pub struct Store {
     pool: Pool,
+    skipped: Skipped,
 }
 
 impl Store {
@@ -128,12 +128,19 @@ impl Store {
             .wait_timeout(Some(CONNECT_TIMEOUT))
             .build()
             .expect("the pool has a runtime for its timeouts");
-        Ok(Store { pool })
+        Ok(Store {
+            pool,
+            skipped: Skipped::default(),
+        })
     }
 
     async fn client(&self) -> Result<deadpool_postgres::Client, StoreError> {
         self.pool.get().await.map_err(pool_error)
     }
+}
+
+fn count(total: usize) -> i64 {
+    i64::try_from(total).unwrap_or(i64::MAX)
 }
 
 fn pool_config(database_url: &Secret) -> Result<Config, StoreError> {

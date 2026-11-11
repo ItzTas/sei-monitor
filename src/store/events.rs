@@ -1,9 +1,15 @@
+use std::collections::BTreeSet;
+use std::error::Error;
+use std::sync::{Arc, Mutex, PoisonError};
+
 use chrono::{DateTime, Utc};
+use serde_json::error::Category;
 use tokio_postgres::Row;
+use tracing::error;
 
 use super::records::Pruned;
-use super::{Store, StoreError};
-use crate::event::{Event, Kind};
+use super::{Store, StoreError, count};
+use crate::event::{Event, Kind, Payload};
 
 const EVENTS_AFTER: &str =
     "SELECT id, account_id, kind, procedure_id, ref, occurred_at, detected_at, payload
@@ -15,6 +21,36 @@ const PRUNE_EVENTS_BEFORE: &str =
 const PRUNE_PROCESSES_LEFT_BEFORE: &str =
     "DELETE FROM processes WHERE account_id = $1 AND left_at < $2";
 
+const REPORTED_LIMIT: usize = 1024;
+
+#[derive(Clone, Default)]
+pub(super) struct Skipped(Arc<Mutex<BTreeSet<i64>>>);
+
+impl Skipped {
+    fn first_report(&self, event_id: i64) -> bool {
+        let mut reported = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        if !reported.insert(event_id) {
+            return false;
+        }
+        if reported.len() > REPORTED_LIMIT {
+            reported.pop_first();
+        }
+        true
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+enum Unreadable {
+    #[error("its kind is not one sei-monitor knows")]
+    Kind,
+    #[error("its payload is not an event payload: {problem} at line {line}, column {column}")]
+    Payload {
+        problem: &'static str,
+        line: usize,
+        column: usize,
+    },
+}
+
 impl Store {
     pub async fn events_after(
         &self,
@@ -22,12 +58,25 @@ impl Store {
         after: i64,
         limit: i64,
     ) -> Result<Vec<Event>, StoreError> {
-        let rows = self
-            .client()
-            .await?
-            .query(EVENTS_AFTER, &[&account_id, &after, &limit])
-            .await?;
-        rows.iter().map(stored_event).collect()
+        let client = self.client().await?;
+        let mut events = Vec::new();
+        let mut cursor = after;
+        loop {
+            let wanted = limit - count(events.len());
+            let rows = client
+                .query(EVENTS_AFTER, &[&account_id, &cursor, &wanted])
+                .await?;
+            for row in &rows {
+                cursor = row.try_get("id")?;
+                let Some(event) = self.readable(row, cursor)? else {
+                    continue;
+                };
+                events.push(event);
+            }
+            if count(rows.len()) < wanted || count(events.len()) >= limit {
+                return Ok(events);
+            }
+        }
     }
 
     pub async fn prune_before(
@@ -47,27 +96,59 @@ impl Store {
         transaction.commit().await?;
         Ok(Pruned { events, processes })
     }
+
+    fn readable(&self, row: &Row, id: i64) -> Result<Option<Event>, StoreError> {
+        let (kind, payload) = match decode(row.try_get("kind")?, row.try_get("payload")?) {
+            Ok(decoded) => decoded,
+            Err(unreadable) => {
+                self.skip(id, &unreadable);
+                return Ok(None);
+            }
+        };
+        Ok(Some(Event {
+            id,
+            account_id: row.try_get("account_id")?,
+            kind,
+            procedure_id: row.try_get("procedure_id")?,
+            reference: row.try_get("ref")?,
+            occurred_at: Some(row.try_get("occurred_at")?),
+            detected_at: Some(row.try_get("detected_at")?),
+            payload,
+        }))
+    }
+
+    fn skip(&self, event_id: i64, unreadable: &Unreadable) {
+        if !self.skipped.first_report(event_id) {
+            return;
+        }
+        error!(
+            event_id,
+            error = unreadable as &dyn Error,
+            "skipping a stored event that cannot be read"
+        );
+    }
 }
 
-fn stored_event(row: &Row) -> Result<Event, StoreError> {
-    let id: i64 = row.try_get("id")?;
-    let kind: &str = row.try_get("kind")?;
-    let kind = Kind::parse(kind).ok_or_else(|| unreadable(id, format!("unknown kind {kind:?}")))?;
-    let payload: &str = row.try_get("payload")?;
-    let payload =
-        serde_json::from_str(payload).map_err(|error| unreadable(id, error.to_string()))?;
-    Ok(Event {
-        id,
-        account_id: row.try_get("account_id")?,
-        kind,
-        procedure_id: row.try_get("procedure_id")?,
-        reference: row.try_get("ref")?,
-        occurred_at: Some(row.try_get("occurred_at")?),
-        detected_at: Some(row.try_get("detected_at")?),
-        payload,
-    })
+fn decode(kind: &str, payload: &str) -> Result<(Kind, Payload), Unreadable> {
+    let kind = Kind::parse(kind).ok_or(Unreadable::Kind)?;
+    let payload = serde_json::from_str(payload).map_err(|error| payload_problem(&error))?;
+    Ok((kind, payload))
 }
 
-fn unreadable(event_id: i64, detail: String) -> StoreError {
-    StoreError::Payload { event_id, detail }
+fn payload_problem(error: &serde_json::Error) -> Unreadable {
+    let problems = [
+        (Category::Syntax, "it is not valid JSON"),
+        (Category::Eof, "the JSON ends early"),
+        (Category::Data, "a field has the wrong type"),
+        (Category::Io, "it could not be read"),
+    ];
+    let (_, problem) = problems
+        .into_iter()
+        .find(|(category, _)| *category == error.classify())
+        .expect("every JSON error category has a text");
+    Unreadable::Payload {
+        problem,
+        line: error.line(),
+        column: error.column(),
+    }
 }

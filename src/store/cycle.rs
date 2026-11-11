@@ -5,7 +5,7 @@ use tokio_postgres::{Row, Transaction};
 use super::accounts::lock_account;
 use super::records::{CycleChanges, ProcessRow};
 use super::runs::finish_run;
-use super::{Store, StoreError};
+use super::{Store, StoreError, count};
 use crate::event::{Event, Payload};
 
 const LIST_ACCOUNT_PROCESSES: &str =
@@ -251,10 +251,6 @@ fn go_json(payload: &Payload) -> String {
         escaped.push_str(code);
     }
     escaped
-}
-
-fn count(total: usize) -> i64 {
-    i64::try_from(total).unwrap_or(i64::MAX)
 }
 
 fn process_row(row: &Row) -> Result<ProcessRow, tokio_postgres::Error> {

@@ -548,6 +548,34 @@ async fn a_cycle_runs_on_a_spawned_task() {
 }
 
 #[tokio::test]
+async fn a_successful_cycle_clears_the_stored_pause_reason() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    let key = AccountKey {
+        sei_base_url: h.fake.url(),
+        username: USERNAME.to_owned(),
+        org_id: ORG_ID,
+    };
+    let reason = "SEI rejected the login (Usuário ou Senha Inválida.)";
+    let account = store.ensure_account(&key, start()).await.expect("account");
+    store
+        .set_paused_reason(account.id, reason)
+        .await
+        .expect("pause reason");
+    h.prepare().await;
+    assert_eq!(h.monitor.state().paused_reason, reason);
+
+    h.run_once().await;
+
+    assert_eq!(h.monitor.state().paused_reason, "");
+    let stored = store.ensure_account(&key, start()).await.expect("account");
+    assert_eq!(stored.paused_reason, "");
+}
+
+#[tokio::test]
 async fn prepare_reads_the_agency_acronym_when_the_org_is_given_by_id() {
     let Some((_database, store)) = database_store().await else {
         return;

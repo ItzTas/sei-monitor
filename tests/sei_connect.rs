@@ -10,6 +10,7 @@ use axum::http::header::{CONTENT_TYPE, LOCATION};
 use axum::http::{StatusCode, Uri};
 use axum::response::IntoResponse;
 use chrono_tz::Tz;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 
@@ -389,4 +390,76 @@ async fn login_page_follows_at_most_nine_redirects() {
         "{error:?}"
     );
     assert_eq!(ten.requests(), 10);
+}
+
+struct RawServer {
+    url: String,
+    server: JoinHandle<()>,
+}
+
+impl RawServer {
+    async fn start(answer: Vec<u8>) -> RawServer {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the raw listener");
+        let address = listener.local_addr().expect("read the raw address");
+        let server = tokio::spawn(async move {
+            loop {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    return;
+                };
+                let answer = answer.clone();
+                tokio::spawn(async move {
+                    let mut request = [0; 4096];
+                    let _ = stream.read(&mut request).await;
+                    let _ = stream.write_all(&answer).await;
+                    let _ = stream.shutdown().await;
+                });
+            }
+        });
+        RawServer {
+            url: format!("http://{address}"),
+            server,
+        }
+    }
+}
+
+impl Drop for RawServer {
+    fn drop(&mut self) {
+        self.server.abort();
+    }
+}
+
+fn announced_longer(page: &str) -> Vec<u8> {
+    format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{page}",
+        page.len() + 5000
+    )
+    .into_bytes()
+}
+
+#[tokio::test]
+async fn login_page_cut_short_in_its_first_kilobyte_is_read_with_what_arrived() {
+    let page = r#"<select id="selOrgao"><option value="1">A</option><option value="2">B</option></select>"#;
+    let server = RawServer::start(announced_longer(page)).await;
+
+    let orgs = bounded(list_orgs(&server.url, &options(chrono_tz::UTC)))
+        .await
+        .expect("the agencies that arrived");
+
+    assert_eq!(orgs, [org(1, "A"), org(2, "B")]);
+}
+
+#[tokio::test]
+async fn login_page_cut_short_before_any_byte_has_no_agency_list() {
+    let server = RawServer::start(announced_longer("")).await;
+
+    let error = bounded(list_orgs(&server.url, &options(chrono_tz::UTC)))
+        .await
+        .expect_err("no agency list");
+
+    assert_eq!(
+        error.to_string(),
+        "sei: the login page has no agency list (selOrgao field)"
+    );
 }

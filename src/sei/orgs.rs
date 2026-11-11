@@ -7,6 +7,8 @@ mod tokenizer;
 mod tree;
 
 use std::borrow::Cow;
+use std::error::Error;
+use std::io;
 
 use encoding_rs::Encoding;
 use html5ever::driver::{ParseOpts, parse_document};
@@ -93,14 +95,35 @@ pub(crate) fn detect_encoding(content_type: Option<&str>, body: &[u8]) -> &'stat
 }
 
 async fn read_page(response: Response) -> Result<Vec<u8>, SeiError> {
-    read_body(response).await.map_err(page_read_failure)
+    read_body(response).await.or_else(page_read_failure)
 }
 
-fn page_read_failure(partial: PartialBody) -> SeiError {
-    if partial.received() < PREVIEW_SIZE {
-        return transport("decode the login page", partial.error);
+fn page_read_failure(partial: PartialBody) -> Result<Vec<u8>, SeiError> {
+    if partial.received() >= PREVIEW_SIZE {
+        return Err(transport("read the login page", partial.error));
     }
-    transport("read the login page", partial.error)
+    if !ended_early(&partial.error) {
+        return Err(transport("decode the login page", partial.error));
+    }
+    let received = partial.into_received();
+    if received.is_empty() {
+        return Err(SeiError::NoAgencyList);
+    }
+    Ok(received)
+}
+
+fn ended_early(error: &reqwest::Error) -> bool {
+    let mut cause: Option<&(dyn Error + 'static)> = Some(error);
+    while let Some(current) = cause {
+        let unexpected_eof = current
+            .downcast_ref::<io::Error>()
+            .is_some_and(|error| error.kind() == io::ErrorKind::UnexpectedEof);
+        if unexpected_eof {
+            return true;
+        }
+        cause = current.source();
+    }
+    false
 }
 
 fn transport(context: &str, error: reqwest::Error) -> SeiError {

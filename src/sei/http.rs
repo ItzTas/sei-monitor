@@ -60,6 +60,10 @@ impl PartialBody {
     pub(crate) fn received(&self) -> usize {
         self.received.bytes.len()
     }
+
+    pub(crate) fn into_received(self) -> Vec<u8> {
+        self.received.into_bytes()
+    }
 }
 
 pub(crate) async fn read_body(mut response: Response) -> Result<Vec<u8>, PartialBody> {

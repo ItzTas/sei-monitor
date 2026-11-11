@@ -1124,9 +1124,11 @@ version = "2.0.0"
 dependencies = [
  "axum",
  "base64",
+ "bytes",
  "chrono",
  "chrono-tz",
  "encoding_rs",
+ "flate2",
  "futures-util",
  "libc",
  "reqwest",
@@ -1136,6 +1138,7 @@ dependencies = [
  "tokio",
  "unicode-normalization",
  "unicode-properties",
+ "webpki-root-certs",
  "zeroize",
 ]
 

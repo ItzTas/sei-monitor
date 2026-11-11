@@ -1,14 +1,14 @@
-#[cfg_attr(not(test), expect(dead_code))]
+mod client;
 mod errors;
-#[cfg_attr(not(test), expect(dead_code))]
 mod html;
-#[cfg_attr(not(test), expect(dead_code))]
+mod http;
 mod json;
 mod types;
-#[cfg_attr(not(test), expect(dead_code))]
 mod wire;
 
+pub use client::{Client, Credentials, PROCESS_PAGE_SIZE};
 pub use errors::{ApiError, ErrorKind, SeiError};
+pub use http::{Options, REQUEST_TIMEOUT};
 pub use types::{
     Activity, Document, Org, Page, Process, ProcessQuery, RawPage, Session, Unit, User, Version,
 };

@@ -120,13 +120,6 @@ pub fn is_self(id: i64, acronym: &str, user: &CurrentUser) -> bool {
     !acronym.is_empty() && equal_fold(acronym, &user.acronym)
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the monitoring cycle of Task 13 is the first caller"
-    )
-)]
 pub(crate) fn activity_event(presence: &Presence, activity: &Activity) -> Event {
     let mut payload = base_payload(presence);
     payload.activity_text.clone_from(&activity.text);
@@ -142,13 +135,6 @@ pub(crate) fn activity_event(presence: &Presence, activity: &Activity) -> Event 
     event
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the monitoring cycle of Task 13 is the first caller"
-    )
-)]
 pub(crate) fn document_event(presence: &Presence, document: &Document) -> Event {
     let mut payload = base_payload(presence);
     payload.document_name.clone_from(&document.name);

@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+pub mod clock;
 pub mod fake_sei;
 
 use monitor_hub_plugin::migrate::up;

@@ -854,6 +854,36 @@ async fn processes_leave_and_come_back() {
 }
 
 #[tokio::test]
+async fn a_process_both_seen_and_left_in_one_cycle_ends_left() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let both = process(9001, "00000.000001/2026-00");
+
+    apply(
+        &pooled,
+        CycleChanges {
+            processes: vec![both.clone()],
+            left: vec![9001],
+            ..cycle(account.id, repo_now())
+        },
+    )
+    .await;
+
+    assert_eq!(
+        pooled.processes(account.id).await.expect("processes"),
+        vec![ProcessRow {
+            first_seen_at: Some(repo_now()),
+            last_seen_at: Some(repo_now()),
+            left_at: Some(repo_now()),
+            ..both
+        }]
+    );
+}
+
+#[tokio::test]
 async fn events_are_stored_once_per_key() {
     let Some(db) = migrated_database().await else {
         return;

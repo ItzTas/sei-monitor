@@ -11,6 +11,7 @@ use tokio::process::{Child, Command};
 use tokio::time::{Instant, sleep_until, timeout};
 use zeroize::Zeroizing;
 
+use crate::duration::format_go_duration;
 use crate::secret::Secret;
 
 pub const PASSWORD_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
@@ -309,46 +310,7 @@ fn simple_uppercase(c: char) -> char {
 }
 
 fn go_duration(duration: Duration) -> String {
-    if duration.is_zero() {
-        return "0s".to_owned();
-    }
-    if duration < Duration::from_secs(1) {
-        return go_subsecond(duration.subsec_nanos());
-    }
-    let seconds = duration.as_secs();
-    let tail = format!(
-        "{}{}s",
-        seconds % 60,
-        go_fraction(duration.subsec_nanos(), 9)
-    );
-    let (hours, minutes) = (seconds / 3600, seconds / 60 % 60);
-    if hours > 0 {
-        return format!("{hours}h{minutes}m{tail}");
-    }
-    if minutes > 0 {
-        return format!("{minutes}m{tail}");
-    }
-    tail
-}
-
-fn go_subsecond(nanos: u32) -> String {
-    let (unit, digits, name) = match nanos {
-        1_000_000.. => (1_000_000, 6, "ms"),
-        1_000.. => (1_000, 3, "µs"),
-        _ => (1, 0, "ns"),
-    };
-    format!(
-        "{}{}{name}",
-        nanos / unit,
-        go_fraction(nanos % unit, digits)
-    )
-}
-
-fn go_fraction(rest: u32, digits: usize) -> String {
-    if rest == 0 {
-        return String::new();
-    }
-    format!(".{rest:0digits$}").trim_end_matches('0').to_owned()
+    format_go_duration(i64::try_from(duration.as_nanos()).unwrap_or(i64::MAX))
 }
 
 pub(crate) fn trim_final_newline(text: &str) -> &str {

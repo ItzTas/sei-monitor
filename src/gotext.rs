@@ -215,18 +215,129 @@ mod tests {
         }
     }
 
+    const GO_CASE: &str = include_str!("gotext/testdata/simple_case.txt");
+    const REGENERATE: &str =
+        "go run src/gotext/testdata/simple_case.go > src/gotext/testdata/simple_case.txt";
+
+    struct GoCase {
+        toolchain: &'static str,
+        mappings: Vec<(char, [char; 3])>,
+    }
+
+    fn go_case() -> GoCase {
+        let mut lines = GO_CASE.lines();
+        let toolchain = lines.next().unwrap_or_default();
+        let mappings = lines
+            .map(|line| {
+                let chars: Vec<char> = line
+                    .split(' ')
+                    .map(|hex| char::from_u32(u32::from_str_radix(hex, 16).unwrap()).unwrap())
+                    .collect();
+                (chars[0], [chars[1], chars[2], chars[3]])
+            })
+            .collect();
+        GoCase {
+            toolchain,
+            mappings,
+        }
+    }
+
+    fn std_lower(c: char) -> char {
+        c.to_lowercase().next().unwrap_or(c)
+    }
+
+    fn std_upper(c: char) -> char {
+        let mut upper = c.to_uppercase();
+        match (upper.next(), upper.next()) {
+            (Some(single), None) => single,
+            _ => c,
+        }
+    }
+
+    fn table_source(name: &str, entries: &[(char, char)]) -> String {
+        if entries.is_empty() {
+            return format!("pub(super) const {name}: [(char, char); 0] = [];\n");
+        }
+        let rows: String = entries
+            .iter()
+            .map(|(from, to)| {
+                format!(
+                    "    ('\\u{{{:x}}}', '\\u{{{:x}}}'),\n",
+                    u32::from(*from),
+                    u32::from(*to)
+                )
+            })
+            .collect();
+        format!(
+            "pub(super) const {name}: [(char, char); {}] = [\n{rows}];\n",
+            entries.len()
+        )
+    }
+
+    fn tables_for_this_toolchain(mappings: &[(char, [char; 3])]) -> String {
+        let pick = |rule: &dyn Fn(char, [char; 3]) -> Option<char>| -> Vec<(char, char)> {
+            mappings
+                .iter()
+                .filter_map(|(c, go)| rule(*c, *go).map(|to| (*c, to)))
+                .collect()
+        };
+        let lower = pick(&|c, [lower, _, _]| (std_lower(c) != lower).then_some(lower));
+        let upper = pick(&|c, [_, upper, _]| (std_upper(c) != upper).then_some(upper));
+        let fold = pick(&|c, [lower, upper, fold]| {
+            let fallback = if lower != c { lower } else { upper };
+            (fold != fallback).then_some(fold)
+        });
+        [
+            table_source("LOWER", &lower),
+            table_source("UPPER", &upper),
+            table_source("FOLD", &fold),
+        ]
+        .join("\n")
+    }
+
     #[test]
-    fn upper_case_follows_go_simple_mappings() {
-        let cases = [
-            ("ınfo", "INFO"),
-            ("ſ", "S"),
-            ("ß", "ß"),
-            ("ᾳ", "ᾼ"),
-            ("\u{a7cf}", "\u{a7ce}"),
-            ("SEDEMO/nuproc", "SEDEMO/NUPROC"),
+    fn case_mappings_match_go_for_every_char() {
+        let go = go_case();
+        let mut listed = go.mappings.iter().peekable();
+        let mut differing = Vec::new();
+        for c in (0..=u32::from(char::MAX)).filter_map(char::from_u32) {
+            let want = match listed.next_if(|(listed, _)| *listed == c) {
+                Some((_, mappings)) => *mappings,
+                None => [c, c, c],
+            };
+            if [simple_lower(c), simple_upper(c), simple_fold(c)] != want {
+                differing.push(c);
+            }
+        }
+        assert!(
+            listed.next().is_none(),
+            "src/gotext/testdata/simple_case.txt is not sorted; regenerate it with `{REGENERATE}`"
+        );
+        assert!(
+            differing.is_empty(),
+            "{} chars map differently from Go's unicode.ToLower, ToUpper or SimpleFold \
+             (expected list from {}), first {:?}. If Go changed, regenerate the list from the \
+             repository root with `{REGENERATE}`. Then replace src/gotext/tables.rs with these \
+             exception tables, computed for this Rust toolchain:\n\n{}",
+            differing.len(),
+            go.toolchain,
+            &differing[..differing.len().min(10)],
+            tables_for_this_toolchain(&go.mappings)
+        );
+    }
+
+    #[test]
+    fn exception_tables_are_strictly_sorted() {
+        let tables: [(&str, &[(char, char)]); 3] = [
+            ("LOWER", &tables::LOWER),
+            ("UPPER", &tables::UPPER),
+            ("FOLD", &tables::FOLD),
         ];
-        for (input, want) in cases {
-            assert_eq!(to_upper(input), want, "{input:?}");
+        for (name, table) in tables {
+            assert!(
+                table.windows(2).all(|pair| pair[0].0 < pair[1].0),
+                "{name} in src/gotext/tables.rs is not strictly sorted"
+            );
         }
     }
 }

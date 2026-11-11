@@ -205,4 +205,31 @@ mod tests {
 
         assert_eq!(view["occurred_at"], "0001-01-01T00:00:00Z");
     }
+
+    #[test]
+    fn times_are_written_like_go_marshals_them() {
+        let cases = [
+            (123_456_789, "2026-11-04T17:13:05.123456789Z"),
+            (500_000_000, "2026-11-04T17:13:05.5Z"),
+            (120_000_000, "2026-11-04T17:13:05.12Z"),
+            (1, "2026-11-04T17:13:05.000000001Z"),
+            (1_000, "2026-11-04T17:13:05.000001Z"),
+            (0, "2026-11-04T17:13:05Z"),
+        ];
+        for (nanos, want) in cases {
+            let at = Utc
+                .with_ymd_and_hms(2026, 11, 4, 17, 13, 5)
+                .unwrap()
+                .with_nanosecond(nanos)
+                .unwrap();
+            let event = Event {
+                occurred_at: Some(at),
+                ..sample_event()
+            };
+
+            let view = encode(&formatter(false, "").view(&event));
+
+            assert_eq!(view["occurred_at"], want, "{nanos} nanoseconds");
+        }
+    }
 }

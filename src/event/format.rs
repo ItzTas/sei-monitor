@@ -309,11 +309,10 @@ fn join_non_empty(parts: &[&str]) -> String {
 mod tests {
     use chrono::TimeZone;
     use serde::Deserialize;
-    use serde_json::Value;
+    use serde_json::{Value, json};
 
     use super::*;
     use crate::golden;
-    use crate::gotext::to_lower;
     use crate::timezone::load_zone;
 
     const NUMBER: &str = "00000.000001/2026-00";
@@ -670,6 +669,16 @@ mod tests {
         );
 
         assert_eq!(utc(false, "").body(&document), "");
+        for kind in [
+            Kind::ProcessEntered,
+            Kind::ProcessLeft,
+            Kind::ActivityAdded,
+            Kind::AssignmentChanged,
+            Kind::ReturnDueSoon,
+            Kind::ReturnOverdue,
+        ] {
+            assert_eq!(utc(false, "").body(&event(kind, process())), "", "{kind:?}");
+        }
         assert!(utc(true, "").body(&document).starts_with("When: "));
         assert_eq!(
             utc(false, "").body(&failure),
@@ -801,13 +810,38 @@ mod tests {
         Value::Object(kept)
     }
 
-    fn assert_hidden(case: &EventTextCase, shown: &[(&str, String)]) {
+    fn strings_in<'a>(value: &'a Value, found: &mut Vec<&'a str>) {
+        match value {
+            Value::String(text) => found.push(text),
+            Value::Array(items) => items.iter().for_each(|item| strings_in(item, found)),
+            Value::Object(map) => {
+                for (key, item) in map {
+                    found.push(key);
+                    strings_in(item, found);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn contains_folded(text: &str, needle: &str) -> bool {
+        let width = needle.chars().count();
+        let starts: Vec<usize> = text
+            .char_indices()
+            .map(|(index, _)| index)
+            .chain([text.len()])
+            .collect();
+        (0..starts.len())
+            .filter(|from| from + width < starts.len())
+            .any(|from| equal_fold(&text[starts[from]..starts[from + width]], needle))
+    }
+
+    fn assert_hidden(case: &EventTextCase, shown: &[(&str, Vec<&str>)]) {
         for hidden in &case.hidden {
-            let needle = to_lower(hidden);
-            for (place, text) in shown {
+            for (place, texts) in shown {
                 assert!(
-                    !to_lower(text).contains(&needle),
-                    "{}: {place} shows {hidden:?}:\n{text}",
+                    !texts.iter().any(|text| contains_folded(text, hidden)),
+                    "{}: {place} shows {hidden:?}: {texts:?}",
                     case.name
                 );
             }
@@ -815,9 +849,24 @@ mod tests {
     }
 
     #[test]
+    fn hidden_values_are_found_in_decoded_strings_whatever_their_letters() {
+        let value = json!({"detail": {"list": ["x \"Quoted\" y"]}});
+        let mut found = Vec::new();
+
+        strings_in(&value, &mut found);
+
+        assert!(found.iter().any(|text| contains_folded(text, "\"QUOTED\"")));
+        assert!(!value.to_string().contains("\"QUOTED\""));
+        assert!(!found.iter().any(|text| contains_folded(text, "absent")));
+        assert!(contains_folded("ÃÇÃ", "ãçã"));
+        assert!(!contains_folded("ab", "abc"));
+    }
+
+    #[test]
     fn event_text_matches_go() {
         let cases = golden::cases::<EventTextCase>("event_text", "");
-        let mut declared = 0;
+        let declaring = cases.iter().filter(|case| !case.hidden.is_empty()).count();
+        let mut checked = 0;
         for case in cases {
             let formatter = Formatter {
                 zone: load_zone(&case.zone).unwrap(),
@@ -838,21 +887,23 @@ mod tests {
             if case.hidden.is_empty() {
                 continue;
             }
-            declared += 1;
+            checked += 1;
+            let title = formatter.title(&event);
+            let (mut in_view, mut in_payload) = (Vec::new(), Vec::new());
+            strings_in(&view_json, &mut in_view);
+            strings_in(&payload, &mut in_payload);
             assert_hidden(
                 &case,
                 &[
-                    ("title", formatter.title(&event)),
-                    ("details", details.join("\n")),
-                    ("view", view_json.to_string()),
-                    ("payload", payload.to_string()),
+                    ("title", vec![title.as_str()]),
+                    ("details", details.iter().map(String::as_str).collect()),
+                    ("view", in_view),
+                    ("payload", in_payload),
                 ],
             );
         }
-        assert!(
-            declared >= 14,
-            "only {declared} cases declare hidden strings"
-        );
+        assert!(declaring > 0, "the vector has no masking cases");
+        assert_eq!(checked, declaring, "masking cases were skipped");
     }
 
     #[derive(Deserialize)]

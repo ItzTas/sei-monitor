@@ -1,0 +1,4715 @@
+[
+  {
+    "name": "process_entered (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 14:00"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "process_entered (full)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 14:00"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "process_entered with every payload field (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 15:00"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "document_protocol": "0012345",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "process_entered with every payload field (full)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 15:00",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)",
+      "Document: Ofício 12 (0012345)",
+      "Return date: 2026-11-06",
+      "Assigned to: beltrano.silva (Beltrano da Silva)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "process_entered assigned to the user, stored acronym in other letters (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "assigned_user": "Fulano.Tal",
+        "assigned_user_name": "Fulano de Tal",
+        "assigned_to_self": true
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "FULANO.TAL",
+    "full": false,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00 (assigned to you)",
+    "details": [
+      "When: 2026-11-04 14:00"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00 (assigned to you)",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_to_me": true
+      }
+    },
+    "hidden": [
+      "Fulano.Tal",
+      "Fulano de Tal"
+    ]
+  },
+  {
+    "name": "process_entered assigned to the user, stored acronym in other letters (full)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "assigned_user": "Fulano.Tal",
+        "assigned_user_name": "Fulano de Tal",
+        "assigned_to_self": true
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "FULANO.TAL",
+    "full": true,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00 (assigned to you)",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Type: Contrato",
+      "Assigned to: you"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00 (assigned to you)",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "assigned_to_me": true
+      }
+    },
+    "hidden": [
+      "Fulano.Tal",
+      "Fulano de Tal"
+    ]
+  },
+  {
+    "name": "process_entered whose assignee is the user without assigned_to_self (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "Fulano.Tal",
+        "assigned_user_name": "Fulano de Tal"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 14:00"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_to_me": true
+      }
+    },
+    "hidden": [
+      "Fulano.Tal",
+      "Fulano de Tal"
+    ]
+  },
+  {
+    "name": "process_entered whose assignee is the user without assigned_to_self (full)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "Fulano.Tal",
+        "assigned_user_name": "Fulano de Tal"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Assigned to: you"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_to_me": true
+      }
+    },
+    "hidden": [
+      "Fulano.Tal",
+      "Fulano de Tal"
+    ]
+  },
+  {
+    "name": "process_entered assigned to the user with an empty self (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "fulano.tal",
+        "assigned_user_name": "Fulano de Tal",
+        "assigned_to_self": true
+      }
+    },
+    "zone": "UTC",
+    "self": "",
+    "full": false,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00 (assigned to you)",
+    "details": [
+      "When: 2026-11-04 18:00"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00 (assigned to you)",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_to_me": true
+      }
+    },
+    "hidden": [
+      "fulano.tal",
+      "Fulano de Tal"
+    ]
+  },
+  {
+    "name": "process_entered assigned to the user with an empty self (full)",
+    "event": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "fulano.tal",
+        "assigned_user_name": "Fulano de Tal",
+        "assigned_to_self": true
+      }
+    },
+    "zone": "UTC",
+    "self": "",
+    "full": true,
+    "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00 (assigned to you)",
+    "details": [
+      "When: 2026-11-04 18:00",
+      "Assigned to: you"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_entered",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New process in SEDEMO/NUPROC: 00000.000001/2026-00 (assigned to you)",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_to_me": true
+      }
+    },
+    "hidden": [
+      "fulano.tal",
+      "Fulano de Tal"
+    ]
+  },
+  {
+    "name": "process_left with every payload field (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "process_left",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "UTC",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 left SEDEMO/NUPROC",
+    "details": [
+      "When: 2026-11-04 18:00"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_left",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 left SEDEMO/NUPROC",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "document_protocol": "0012345",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "process_left with every payload field (full)",
+    "event": {
+      "id": 42,
+      "kind": "process_left",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "UTC",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 left SEDEMO/NUPROC",
+    "details": [
+      "When: 2026-11-04 18:00",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)",
+      "Document: Ofício 12 (0012345)",
+      "Return date: 2026-11-06",
+      "Assigned to: beltrano.silva (Beltrano da Silva)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_left",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 left SEDEMO/NUPROC",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "process_left (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "process_left",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 left SEDEMO/NUPROC",
+    "details": [
+      "When: 2026-11-04 14:00"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_left",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 left SEDEMO/NUPROC",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "process_left (full)",
+    "event": {
+      "id": 42,
+      "kind": "process_left",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 left SEDEMO/NUPROC",
+    "details": [
+      "When: 2026-11-04 14:00"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "process_left",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 left SEDEMO/NUPROC",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "document_added with every payload field (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "document_added",
+      "procedure_id": 9001,
+      "ref": "80001",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New document on process 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "document_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New document on process 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "document_protocol": "0012345",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "document_added with every payload field (full)",
+    "event": {
+      "id": 42,
+      "kind": "document_added",
+      "procedure_id": 9001,
+      "ref": "80001",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "New document on process 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)",
+      "Document: Ofício 12 (0012345)",
+      "Return date: 2026-11-06",
+      "Assigned to: beltrano.silva (Beltrano da Silva)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "document_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New document on process 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "document_added (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "document_added",
+      "procedure_id": 9001,
+      "ref": "80001",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New document on process 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 15:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "document_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New document on process 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "document_added (full)",
+    "event": {
+      "id": 42,
+      "kind": "document_added",
+      "procedure_id": 9001,
+      "ref": "80001",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "New document on process 00000.000001/2026-00",
+    "details": [
+      "When: 2026-11-04 15:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "document_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New document on process 00000.000001/2026-00",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_overdue with every payload field (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_overdue",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-06",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is overdue",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_overdue",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is overdue",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "document_protocol": "0012345",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_overdue with every payload field (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_overdue",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-06",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is overdue",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)",
+      "Document: Ofício 12 (0012345)",
+      "Return date: 2026-11-06",
+      "Assigned to: beltrano.silva (Beltrano da Silva)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_overdue",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is overdue",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_overdue without a date (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_overdue",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is overdue",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_overdue",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is overdue",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_overdue without a date (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_overdue",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is overdue",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_overdue",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is overdue",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added in the SEI time zone (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added in the SEI time zone (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with every payload field (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 14:13)",
+    "details": [
+      "When: 2026-11-04 14:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 14:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "document_protocol": "0012345",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with every payload field (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 14:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)",
+      "Document: Ofício 12 (0012345)",
+      "Return date: 2026-11-06",
+      "Assigned to: beltrano.silva (Beltrano da Silva)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with a description (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 14:13)",
+    "details": [
+      "When: 2026-11-04 14:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 14:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with a description (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 14:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added in UTC (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "UTC",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 17:13)",
+    "details": [
+      "When: 2026-11-04 17:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 17:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added in UTC (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "UTC",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 17:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added without a description uses the type (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "activity_text": "Processo recebido na unidade",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added without a description uses the type (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "activity_text": "Processo recebido na unidade",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Contrato): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Activity: Processo recebido na unidade (SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Contrato): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "activity_text": "Processo recebido na unidade",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with a description of only spaces uses the type (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": " \t \n ",
+        "activity_text": "Processo recebido na unidade"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with a description of only spaces uses the type (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": " \t \n ",
+        "activity_text": "Processo recebido na unidade"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Contrato): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description:  \t \n ",
+      "Activity: Processo recebido na unidade"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Contrato): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": " \t \n ",
+        "activity_text": "Processo recebido na unidade"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added without a description or a type (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "activity_text": "Processo recebido na unidade"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added without a description or a type (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "activity_text": "Processo recebido na unidade"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00: Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Activity: Processo recebido na unidade"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00: Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "activity_text": "Processo recebido na unidade"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with an empty text (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with an empty text (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: (beltrano.silva, SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with a text of only spaces (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": " \n\t　 ",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with a text of only spaces (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": " \n\t　 ",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: (beltrano.silva, SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": " \n\t　 ",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with long texts (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "description": "Aquisição de cadeiras ergonômicas para o setor de protocolo",
+        "activity_text": "Processo remetido pela unidade SEDEMO/NUPROC\n  para a unidade SEDEMO/PROTOCOLO com retorno programado"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with long texts (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "description": "Aquisição de cadeiras ergonômicas para o setor de protocolo",
+        "activity_text": "Processo remetido pela unidade SEDEMO/NUPROC\n  para a unidade SEDEMO/PROTOCOLO com retorno programado"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Aquisição de cadeiras ergonômicas para…): Processo remetido pela unidade SEDEMO/NUPROC para a unidade SEDEMO/PROTOCOLO co…",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Description: Aquisição de cadeiras ergonômicas para o setor de protocolo",
+      "Activity: Processo remetido pela unidade SEDEMO/NUPROC\n  para a unidade SEDEMO/PROTOCOLO com retorno programado"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Aquisição de cadeiras ergonômicas para…): Processo remetido pela unidade SEDEMO/NUPROC para a unidade SEDEMO/PROTOCOLO co…",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "description": "Aquisição de cadeiras ergonômicas para o setor de protocolo",
+        "activity_text": "Processo remetido pela unidade SEDEMO/NUPROC\n  para a unidade SEDEMO/PROTOCOLO com retorno programado"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with texts that are long in bytes but not in runes (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "description": "ãããããããããããããããããããããããããããããããããããããããã",
+        "activity_text": "çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with texts that are long in bytes but not in runes (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "description": "ãããããããããããããããããããããããããããããããããããããããã",
+        "activity_text": "çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (ãããããããããããããããããããããããããããããããããããããããã): çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Description: ãããããããããããããããããããããããããããããããããããããããã",
+      "Activity: çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (ãããããããããããããããããããããããããããããããããããããããã): çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "description": "ãããããããããããããããããããããããããããããããããããããããã",
+        "activity_text": "çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with texts one rune over the limits (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "description": "ããããããããããããããããããããããããããããããããããããããããã",
+        "activity_text": "éçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with texts one rune over the limits (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "description": "ããããããããããããããããããããããããããããããããããããããããã",
+        "activity_text": "éçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (ããããããããããããããããããããããããããããããããããããããã…): éçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã…",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Description: ããããããããããããããããããããããããããããããããããããããããã",
+      "Activity: éçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (ããããããããããããããããããããããããããããããããããããããã…): éçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã…",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "description": "ããããããããããããããããããããããããããããããããããããããããã",
+        "activity_text": "éçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with texts one rune under the limits (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "description": "ããããããããããããããããããããããããããããããããããããããã",
+        "activity_text": "çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãç"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with texts one rune under the limits (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "description": "ããããããããããããããããããããããããããããããããããããããã",
+        "activity_text": "çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãç"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (ããããããããããããããããããããããããããããããããããããããã): çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãç",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Description: ããããããããããããããããããããããããããããããããããããããã",
+      "Activity: çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãç"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (ããããããããããããããããããããããããããããããããããããããã): çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãç",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "description": "ããããããããããããããããããããããããããããããããããããããã",
+        "activity_text": "çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãç"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with spaces at the cut and tabs and line breaks (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Solicitação\tde   diárias e passagens para\n\nservidor em viagem",
+        "activity_text": "Despacho\tnº 12 assinado\r\n por fulano.tal na unidade SEDEMO/NUPROC, com ciência de todos os interessados"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added with spaces at the cut and tabs and line breaks (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Solicitação\tde   diárias e passagens para\n\nservidor em viagem",
+        "activity_text": "Despacho\tnº 12 assinado\r\n por fulano.tal na unidade SEDEMO/NUPROC, com ciência de todos os interessados"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Solicitação de diárias e passagens para…): Despacho nº 12 assinado por fulano.tal na unidade SEDEMO/NUPROC, com ciência de…",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Solicitação\tde   diárias e passagens para\n\nservidor em viagem",
+      "Activity: Despacho\tnº 12 assinado\r\n por fulano.tal na unidade SEDEMO/NUPROC, com ciência de todos os interessados"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Solicitação de diárias e passagens para…): Despacho nº 12 assinado por fulano.tal na unidade SEDEMO/NUPROC, com ciência de…",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Solicitação\tde   diárias e passagens para\n\nservidor em viagem",
+        "activity_text": "Despacho\tnº 12 assinado\r\n por fulano.tal na unidade SEDEMO/NUPROC, com ciência de todos os interessados"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added at an unknown time (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "0001-01-01T00:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (unknown time)",
+    "details": [
+      "When: unknown time",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (unknown time)",
+      "occurred_at": "0001-01-01T00:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added at an unknown time (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "0001-01-01T00:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+    "details": [
+      "When: unknown time",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+      "occurred_at": "0001-01-01T00:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added by the user, stored acronym in other letters (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "FULANO.TAL",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "activity_by_me": true
+      }
+    },
+    "hidden": [
+      "FULANO.TAL"
+    ]
+  },
+  {
+    "name": "activity_added by the user, stored acronym in other letters (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "FULANO.TAL",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (you, SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "activity_by_me": true
+      }
+    },
+    "hidden": [
+      "FULANO.TAL"
+    ]
+  },
+  {
+    "name": "activity_added by the user with an empty self (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "FULANO.TAL",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added by the user with an empty self (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "FULANO.TAL",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "",
+    "full": true,
+    "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (FULANO.TAL, SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "FULANO.TAL",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added by someone whose acronym contains the user's (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "fulano.tal2",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added by someone whose acronym contains the user's (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "fulano.tal2",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (fulano.tal2, SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "fulano.tal2",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added without a user (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added without a user (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (SEDEMO/PROTOCOLO)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_unit": "SEDEMO/PROTOCOLO"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added without a user or a unit (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "New activity on process 00000.000001/2026-00 (2026-11-04 13:13)",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "activity_added without a user or a unit (full)",
+    "event": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "ref": "50001",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+    "details": [
+      "When: 2026-11-04 13:13",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "activity_added",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "00000.000001/2026-00 (Compra de cadeiras): Processo recebido na unidade",
+      "occurred_at": "2026-11-04T17:13:05Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed with every payload field (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 was assigned to someone else",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to someone else",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "document_protocol": "0012345",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed with every payload field (full)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 was assigned to beltrano.silva",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)",
+      "Document: Ofício 12 (0012345)",
+      "Return date: 2026-11-06",
+      "Assigned to: beltrano.silva (Beltrano da Silva)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to beltrano.silva",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed to the user, stored acronym in other letters (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "Fulano.Tal",
+        "assigned_user_name": "Fulano de Tal",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "FULANO.TAL",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 was assigned to you",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to you",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_to_me": true
+      }
+    },
+    "hidden": [
+      "Fulano.Tal",
+      "Fulano de Tal"
+    ]
+  },
+  {
+    "name": "assignment_changed to the user, stored acronym in other letters (full)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "Fulano.Tal",
+        "assigned_user_name": "Fulano de Tal",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "FULANO.TAL",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 was assigned to you",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Assigned to: you"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to you",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_to_me": true,
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "hidden": [
+      "Fulano.Tal",
+      "Fulano de Tal"
+    ]
+  },
+  {
+    "name": "assignment_changed with assigned_to_self and another assignee (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "assigned_to_self": true
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 was assigned to you",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to you",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_to_me": true
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed with assigned_to_self and another assignee (full)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "assigned_to_self": true
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 was assigned to you",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Assigned to: you"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to you",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_to_me": true,
+        "previous_assigned_user": "sicrano.souza"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed to someone else (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 was assigned to someone else",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to someone else",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed to someone else (full)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 was assigned to beltrano.silva",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Assigned to: beltrano.silva (Beltrano da Silva)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to beltrano.silva",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed to nobody (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 is no longer assigned to anyone",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 is no longer assigned to anyone",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed to nobody (full)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 is no longer assigned to anyone",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 is no longer assigned to anyone",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed from the user to someone else (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "fulano.TAL"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 was assigned to someone else",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to someone else",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": [
+      "fulano.TAL"
+    ]
+  },
+  {
+    "name": "assignment_changed from the user to someone else (full)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "fulano.TAL"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 was assigned to beltrano.silva",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Assigned to: beltrano.silva (Beltrano da Silva)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to beltrano.silva",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva"
+      }
+    },
+    "hidden": [
+      "fulano.TAL"
+    ]
+  },
+  {
+    "name": "assignment_changed from the user to nobody (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "previous_assigned_user": "FULANO.TAL"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 is no longer assigned to anyone",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 is no longer assigned to anyone",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": [
+      "FULANO.TAL"
+    ]
+  },
+  {
+    "name": "assignment_changed from the user to nobody (full)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "previous_assigned_user": "FULANO.TAL"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 is no longer assigned to anyone",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 is no longer assigned to anyone",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": [
+      "FULANO.TAL"
+    ]
+  },
+  {
+    "name": "assignment_changed to the user with an empty self (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "Fulano.Tal",
+        "assigned_user_name": "Fulano de Tal",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 was assigned to someone else",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to someone else",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed to the user with an empty self (full)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "Fulano.Tal",
+        "assigned_user_name": "Fulano de Tal",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 was assigned to Fulano.Tal",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Assigned to: Fulano.Tal (Fulano de Tal)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to Fulano.Tal",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_user": "Fulano.Tal",
+        "assigned_user_name": "Fulano de Tal",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed to someone whose acronym contains the user's (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "fulano.tal2",
+        "assigned_user_name": "Fulano Segundo",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Process 00000.000001/2026-00 was assigned to someone else",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to someone else",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "assignment_changed to someone whose acronym contains the user's (full)",
+    "event": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "assigned_user": "fulano.tal2",
+        "assigned_user_name": "Fulano Segundo",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Process 00000.000001/2026-00 was assigned to fulano.tal2",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Assigned to: fulano.tal2 (Fulano Segundo)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "assignment_changed",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Process 00000.000001/2026-00 was assigned to fulano.tal2",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "assigned_user": "fulano.tal2",
+        "assigned_user_name": "Fulano Segundo",
+        "previous_assigned_user": "beltrano.silva"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59 local, date the day before (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-03",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-03"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in -1 days (2026-11-03)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in -1 days (2026-11-03)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-03"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59 local, date the day before (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-03",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-03"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in -1 days (2026-11-03)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2026-11-03"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in -1 days (2026-11-03)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-03"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59 local, date today (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-04"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-04)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-04)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-04"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59 local, date today (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-04"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-04)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2026-11-04"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-04)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-04"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59 local, date tomorrow (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-05",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-05"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due tomorrow (2026-11-05)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due tomorrow (2026-11-05)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-05"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59 local, date tomorrow (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-05",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-05"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due tomorrow (2026-11-05)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2026-11-05"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due tomorrow (2026-11-05)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-05"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59 local, date in 2 days (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-06",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-06"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in 2 days (2026-11-06)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in 2 days (2026-11-06)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-06"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59 local, date in 2 days (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-06",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-06"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in 2 days (2026-11-06)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2026-11-06"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in 2 days (2026-11-06)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-06"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 00:00 local, date the day before (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-04"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in -1 days (2026-11-04)",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in -1 days (2026-11-04)",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "2026-11-04"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 00:00 local, date the day before (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-04"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in -1 days (2026-11-04)",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2026-11-04"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in -1 days (2026-11-04)",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "2026-11-04"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 00:00 local, date today (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-05",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-05"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-05)",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-05)",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "2026-11-05"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 00:00 local, date today (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-05",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-05"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-05)",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2026-11-05"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-05)",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "2026-11-05"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 00:00 local, date tomorrow (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-06",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-06"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due tomorrow (2026-11-06)",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due tomorrow (2026-11-06)",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "2026-11-06"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 00:00 local, date tomorrow (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-06",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-06"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due tomorrow (2026-11-06)",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2026-11-06"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due tomorrow (2026-11-06)",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "2026-11-06"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 03:59 UTC, date today (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-05",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-05"
+      }
+    },
+    "zone": "UTC",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-05)",
+    "details": [
+      "When: 2026-11-05 03:59",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-05)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-05"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 03:59 UTC, date today (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-05",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-05"
+      }
+    },
+    "zone": "UTC",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-05)",
+    "details": [
+      "When: 2026-11-05 03:59",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2026-11-05"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-05)",
+      "occurred_at": "2026-11-05T03:59:00Z",
+      "detected_at": "2026-11-05T03:59:00Z",
+      "detail": {
+        "return_date": "2026-11-05"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59:59 in Sao Paulo, date today (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04",
+      "occurred_at": "2026-11-05T02:59:59Z",
+      "detected_at": "2026-11-05T02:59:59Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-04"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-04)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-04)",
+      "occurred_at": "2026-11-05T02:59:59Z",
+      "detected_at": "2026-11-05T02:59:59Z",
+      "detail": {
+        "return_date": "2026-11-04"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon at 23:59:59 in Sao Paulo, date today (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-04",
+      "occurred_at": "2026-11-05T02:59:59Z",
+      "detected_at": "2026-11-05T02:59:59Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2026-11-04"
+      }
+    },
+    "zone": "America/Sao_Paulo",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-04)",
+    "details": [
+      "When: 2026-11-04 23:59",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2026-11-04"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due today (2026-11-04)",
+      "occurred_at": "2026-11-05T02:59:59Z",
+      "detected_at": "2026-11-05T02:59:59Z",
+      "detail": {
+        "return_date": "2026-11-04"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon a year ahead (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2027-11-05",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2027-11-05"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in 365 days (2027-11-05)",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in 365 days (2027-11-05)",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "2027-11-05"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon a year ahead (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2027-11-05",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "2027-11-05"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in 365 days (2027-11-05)",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC",
+      "Return date: 2027-11-05"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in 365 days (2027-11-05)",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "2027-11-05"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon without a date (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due soon",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due soon",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon without a date (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due soon",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due soon",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon with a date in another layout (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:05/11/2026",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "05/11/2026"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due soon",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due soon",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "05/11/2026"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon with a date in another layout (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:05/11/2026",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "return_date": "05/11/2026"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due soon",
+    "details": [
+      "When: 2026-11-05 00:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due soon",
+      "occurred_at": "2026-11-05T04:00:00Z",
+      "detected_at": "2026-11-05T04:00:00Z",
+      "detail": {
+        "return_date": "05/11/2026"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon with every payload field (minimal)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-06",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in 2 days (2026-11-06)",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in 2 days (2026-11-06)",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "document_protocol": "0012345",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "return_due_soon with every payload field (full)",
+    "event": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "ref": "9001:2026-11-06",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "process_number": "00000.000001/2026-00",
+        "unit": "SEDEMO/NUPROC",
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "Scheduled return of process 00000.000001/2026-00 is due in 2 days (2026-11-06)",
+    "details": [
+      "When: 2026-11-04 14:00",
+      "Unit: SEDEMO/NUPROC",
+      "Type: Contrato",
+      "Description: Compra de cadeiras",
+      "Activity: Processo recebido na unidade (beltrano.silva, SEDEMO/PROTOCOLO)",
+      "Document: Ofício 12 (0012345)",
+      "Return date: 2026-11-06",
+      "Assigned to: beltrano.silva (Beltrano da Silva)"
+    ],
+    "view": {
+      "id": 42,
+      "kind": "return_due_soon",
+      "procedure_id": 9001,
+      "process_number": "00000.000001/2026-00",
+      "unit": "SEDEMO/NUPROC",
+      "title": "Scheduled return of process 00000.000001/2026-00 is due in 2 days (2026-11-06)",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "process_type": "Contrato",
+        "description": "Compra de cadeiras",
+        "activity_text": "Processo recebido na unidade",
+        "activity_user": "beltrano.silva",
+        "activity_unit": "SEDEMO/PROTOCOLO",
+        "document_name": "Ofício 12 (0012345)",
+        "document_type": "Ofício",
+        "document_protocol": "0012345",
+        "assigned_user": "beltrano.silva",
+        "assigned_user_name": "Beltrano da Silva",
+        "previous_assigned_user": "sicrano.souza",
+        "return_date": "2026-11-06",
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "account_login_failed with the SEI message (minimal)",
+    "event": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 0,
+      "ref": "login:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "sei-monitor could not log in to SEI",
+    "details": [
+      "Reason: SEI rejected the login (Usuário ou Senha Inválida.)",
+      "Monitoring is paused until sei-monitor restarts with the configuration fixed."
+    ],
+    "view": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "title": "sei-monitor could not log in to SEI",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "account_login_failed with the SEI message (full)",
+    "event": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 0,
+      "ref": "login:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "zone": "America/Boa_Vista",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "sei-monitor could not log in to SEI",
+    "details": [
+      "Reason: SEI rejected the login (Usuário ou Senha Inválida.)",
+      "Monitoring is paused until sei-monitor restarts with the configuration fixed."
+    ],
+    "view": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "title": "sei-monitor could not log in to SEI",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "account_login_failed without a message (minimal)",
+    "event": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 0,
+      "ref": "login:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "reason": "SEI rejected the login"
+      }
+    },
+    "zone": "UTC",
+    "self": "",
+    "full": false,
+    "title": "sei-monitor could not log in to SEI",
+    "details": [
+      "Reason: SEI rejected the login",
+      "Monitoring is paused until sei-monitor restarts with the configuration fixed."
+    ],
+    "view": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "title": "sei-monitor could not log in to SEI",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "reason": "SEI rejected the login"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "account_login_failed without a message (full)",
+    "event": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 0,
+      "ref": "login:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {
+        "reason": "SEI rejected the login"
+      }
+    },
+    "zone": "UTC",
+    "self": "",
+    "full": true,
+    "title": "sei-monitor could not log in to SEI",
+    "details": [
+      "Reason: SEI rejected the login",
+      "Monitoring is paused until sei-monitor restarts with the configuration fixed."
+    ],
+    "view": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "title": "sei-monitor could not log in to SEI",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {
+        "reason": "SEI rejected the login"
+      }
+    },
+    "hidden": []
+  },
+  {
+    "name": "account_login_failed without a reason (minimal)",
+    "event": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 0,
+      "ref": "login:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {}
+    },
+    "zone": "UTC",
+    "self": "fulano.tal",
+    "full": false,
+    "title": "sei-monitor could not log in to SEI",
+    "details": [
+      "Reason: ",
+      "Monitoring is paused until sei-monitor restarts with the configuration fixed."
+    ],
+    "view": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "title": "sei-monitor could not log in to SEI",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  },
+  {
+    "name": "account_login_failed without a reason (full)",
+    "event": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "procedure_id": 0,
+      "ref": "login:2026-11-04T18:00:00Z",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "payload": {}
+    },
+    "zone": "UTC",
+    "self": "fulano.tal",
+    "full": true,
+    "title": "sei-monitor could not log in to SEI",
+    "details": [
+      "Reason: ",
+      "Monitoring is paused until sei-monitor restarts with the configuration fixed."
+    ],
+    "view": {
+      "id": 7,
+      "kind": "account_login_failed",
+      "title": "sei-monitor could not log in to SEI",
+      "occurred_at": "2026-11-04T18:00:00Z",
+      "detected_at": "2026-11-04T18:00:00Z",
+      "detail": {}
+    },
+    "hidden": []
+  }
+]

@@ -1,0 +1,363 @@
+[
+  {
+    "name": "orgs lists every agency",
+    "setup": "default",
+    "args": [
+      "orgs"
+    ],
+    "env": {
+      "SEI_URL": "<SEI_URL>"
+    },
+    "compare": "exact",
+    "exit_code": 0,
+    "stdout": "ACRONYM  ID\nADEMO    34\nBDEMO    48\nCDEMO    12\nDDEMO    15\nEDEMO    21\nFDEMO    25\nGDEMO    40\nHDEMO    50\nIDEMO    70\nJDEMO    72\nKDEMO    80\nSEDEMO   63\n",
+    "stderr": ""
+  },
+  {
+    "name": "orgs without SEI_URL",
+    "setup": "default",
+    "args": [
+      "orgs"
+    ],
+    "env": {},
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: invalid configuration:\n  - SEI_URL is required (the SEI address, e.g. https://sei.rr.gov.br)\n"
+  },
+  {
+    "name": "orgs with an unsupported SEI_URL",
+    "setup": "default",
+    "args": [
+      "orgs"
+    ],
+    "env": {
+      "SEI_URL": "ftp://sei.example.org"
+    },
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: invalid configuration:\n  - SEI_URL: use a full address starting with https://\n"
+  },
+  {
+    "name": "test-login with SEI_UNITS in other letters",
+    "setup": "default",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_UNITS": "sedemo/gab",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 0,
+    "stdout": "API:       <SEI_URL>/sei/modulos/wssei/controlador_ws.php/api/v2\nAgency:    SEDEMO (id 63)\nLogin:     ok, as fulano.tal (Fulano de Tal)\nVersions:  SEI 5.0.5, mod-wssei 3.0.4\nYour units:\n  SEDEMO/NUPROC (current)\n  SEDEMO/GAB\nWatched:   SEDEMO/GAB\n",
+    "stderr": ""
+  },
+  {
+    "name": "test-login with the current unit",
+    "setup": "default",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 0,
+    "stdout": "API:       <SEI_URL>/sei/modulos/wssei/controlador_ws.php/api/v2\nAgency:    SEDEMO (id 63)\nLogin:     ok, as fulano.tal (Fulano de Tal)\nVersions:  SEI 5.0.5, mod-wssei 3.0.4\nYour units:\n  SEDEMO/NUPROC (current)\n  SEDEMO/GAB\nWatched:   SEDEMO/NUPROC\n",
+    "stderr": ""
+  },
+  {
+    "name": "test-login with every unit",
+    "setup": "default",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_UNITS": "all",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 0,
+    "stdout": "API:       <SEI_URL>/sei/modulos/wssei/controlador_ws.php/api/v2\nAgency:    SEDEMO (id 63)\nLogin:     ok, as fulano.tal (Fulano de Tal)\nVersions:  SEI 5.0.5, mod-wssei 3.0.4\nYour units:\n  SEDEMO/NUPROC (current)\n  SEDEMO/GAB\nWatched:   SEDEMO/NUPROC, SEDEMO/GAB\n",
+    "stderr": ""
+  },
+  {
+    "name": "test-login with the agency id",
+    "setup": "default",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "SEI_ORG": "63",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 0,
+    "stdout": "API:       <SEI_URL>/sei/modulos/wssei/controlador_ws.php/api/v2\nAgency:    id 63\nLogin:     ok, as fulano.tal (Fulano de Tal)\nVersions:  SEI 5.0.5, mod-wssei 3.0.4\nYour units:\n  SEDEMO/NUPROC (current)\n  SEDEMO/GAB\nWatched:   SEDEMO/NUPROC\n",
+    "stderr": ""
+  },
+  {
+    "name": "test-login with a wrong password",
+    "setup": "default",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "wrong",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: sei: /autenticar: Usuário ou Senha Inválida.\n"
+  },
+  {
+    "name": "test-login with a unit the user does not have",
+    "setup": "default",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_UNITS": "SEDEMO/XYZ",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: SEI_UNITS: unit not found among the user's units: \"SEDEMO/XYZ\" (yours are SEDEMO/NUPROC, SEDEMO/GAB)\n"
+  },
+  {
+    "name": "test-login with an agency missing from the login page",
+    "setup": "default",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "SEI_ORG": "NOPE",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: agency not found on the SEI login page: \"NOPE\" (the orgs subcommand lists the available acronyms)\n"
+  },
+  {
+    "name": "test-login with the module disabled",
+    "setup": "module_inactive",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: sei: /versao: Módulo inativo.\n"
+  },
+  {
+    "name": "test-login lists every configuration problem",
+    "setup": "default",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "POLL_INTERVAL": "1m"
+    },
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: invalid configuration:\n  - SEI_URL is required (the SEI address, e.g. https://sei.rr.gov.br)\n  - SEI_USERNAME is required\n  - SEI_PASSWORD is required (or SEI_PASSWORD_FILE, or SEI_PASSWORD_CMD)\n  - SEI_ORG is required (acronym or numeric id; the orgs subcommand lists them)\n"
+  },
+  {
+    "name": "test-login interrupted",
+    "setup": "default",
+    "args": [
+      "test-login"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 130,
+    "stdout": "",
+    "stderr": "interrupted\n"
+  },
+  {
+    "name": "diagnose without processes",
+    "setup": "default",
+    "args": [
+      "diagnose"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 0,
+    "stdout": "sei-monitor diagnose\nSEI 5.0.5, mod-wssei 3.0.4; units: 2 available, 1 watched (checks use the first one)\n\n[1] Pagination with limit=2\n    /processo/listar: page 0 has 0 ids, page 1 has 0, 0 in common -> not enough items to tell\n    /atividade/listar: no process to check with\n    /documento/listar: no process to check with\n\n[2] Coverage of /processo/listar by processoGeradoRecebido\n    default call: total 0; G=0 R=0 other=0\n    tipo=R:       total 0; G=0 R=0 other=0\n    tipo=G:       total 0; G=0 R=0 other=0\n\n[3] Scheduled returns (first 100 processes)\n    retornoProgramado=S: 0; retornoData: none\n    dataProgramada: none\n    retornoProgramado=N with retornoData filled: 0 (sei-monitor ignores those)\n\n[4] Fields that may hold a link\n    none in the process items\n    a stable link to a process still needs a manual check in the browser\n\n[5] Field types\n    process: id none; idProcedimento none; usuarioAtribuido none; total string\n    empty page: data key absent, total string\n\n[6] Order\n    activities: no process to check with\n    documents: no process to check with\n",
+    "stderr": ""
+  },
+  {
+    "name": "diagnose when the process listing fails",
+    "setup": "processes_fail_500",
+    "args": [
+      "diagnose"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 0,
+    "stdout": "sei-monitor diagnose\nSEI 5.0.5, mod-wssei 3.0.4; units: 2 available, 1 watched (checks use the first one)\n\ncould not list the processes: SEI answered with an internal error\n",
+    "stderr": ""
+  },
+  {
+    "name": "diagnose with every unit",
+    "setup": "diagnose",
+    "args": [
+      "diagnose"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_UNITS": "all",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 0,
+    "stdout": "sei-monitor diagnose\nSEI 5.0.5, mod-wssei 3.0.4; units: 2 available, 2 watched (checks use the first one)\n\n[1] Pagination with limit=2\n    /processo/listar: page 0 has 2 ids, page 1 has 1, 0 in common -> start is a page number\n    /atividade/listar: page 0 has 2 ids, page 1 has 1, 0 in common -> start is a page number\n    /documento/listar: page 0 has 2 ids, page 1 has 1, 0 in common -> start is a page number\n\n[2] Coverage of /processo/listar by processoGeradoRecebido\n    default call: total 3; G=1 R=2 other=0\n    tipo=R:       total 2; G=0 R=2 other=0\n    tipo=G:       total 1; G=1 R=0 other=0\n\n[3] Scheduled returns (first 100 processes)\n    retornoProgramado=S: 1; retornoData: object{dataProgramada,unidade} x1\n    dataProgramada: 99/99/9999 x1\n    retornoProgramado=N with retornoData filled: 2 (sei-monitor ignores those)\n\n[4] Fields that may hold a link\n    none in the process items\n    a stable link to a process still needs a manual check in the browser\n\n[5] Field types\n    process: id string x3; idProcedimento string x3; usuarioAtribuido null x2, object x1; total string\n    activity: id string x3; data string x3; hora string x3; usuario string x3\n    document: id string x3; nomeComposto string x3; protocoloFormatado string x3\n    empty page: data key absent, total string\n\n[6] Order\n    activities: newest first (ids going down)\n    documents: oldest first (ids going up)\n",
+    "stderr": ""
+  },
+  {
+    "name": "diagnose with a wrong password",
+    "setup": "default",
+    "args": [
+      "diagnose"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "wrong",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: sei: /autenticar: Usuário ou Senha Inválida.\n"
+  },
+  {
+    "name": "diagnose with a unit the user does not have",
+    "setup": "default",
+    "args": [
+      "diagnose"
+    ],
+    "env": {
+      "SEI_ORG": "SEDEMO",
+      "SEI_PASSWORD": "senha-de-teste",
+      "SEI_TIMEZONE": "America/Boa_Vista",
+      "SEI_UNITS": "SEDEMO/XYZ",
+      "SEI_URL": "<SEI_URL>",
+      "SEI_USERNAME": "fulano.tal"
+    },
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: SEI_UNITS: unit not found among the user's units: \"SEDEMO/XYZ\" (yours are SEDEMO/NUPROC, SEDEMO/GAB)\n"
+  },
+  {
+    "name": "diagnose lists every configuration problem",
+    "setup": "default",
+    "args": [
+      "diagnose"
+    ],
+    "env": {},
+    "compare": "exact",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "error: invalid configuration:\n  - SEI_URL is required (the SEI address, e.g. https://sei.rr.gov.br)\n  - SEI_USERNAME is required\n  - SEI_PASSWORD is required (or SEI_PASSWORD_FILE, or SEI_PASSWORD_CMD)\n  - SEI_ORG is required (acronym or numeric id; the orgs subcommand lists them)\n"
+  },
+  {
+    "name": "unknown command",
+    "setup": "default",
+    "args": [
+      "test-logn"
+    ],
+    "env": {},
+    "compare": "usage",
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "unknown command \"test-logn\" for \"sei-monitor\"\n\nDid you mean this?\n\ttest-login\nRun 'sei-monitor --help' for usage.\n"
+  },
+  {
+    "name": "unknown flag",
+    "setup": "default",
+    "args": [
+      "orgs",
+      "--nope"
+    ],
+    "env": {},
+    "compare": "usage",
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "unknown flag: --nope\nRun 'sei-monitor --help' for usage.\n"
+  },
+  {
+    "name": "unexpected argument",
+    "setup": "default",
+    "args": [
+      "orgs",
+      "extra"
+    ],
+    "env": {},
+    "compare": "usage",
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "unknown command \"extra\" for \"sei-monitor orgs\"\nRun 'sei-monitor --help' for usage.\n"
+  }
+]

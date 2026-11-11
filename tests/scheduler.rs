@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use sei_monitor::event::Kind;
-use sei_monitor::monitor::{Clock, Monitor, TriggerError};
+use sei_monitor::monitor::{Clock, Monitor, MonitorError, TriggerError};
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{AccountKey, CycleRun, Store, Trigger};
 use tokio::task::JoinHandle;
@@ -64,6 +64,41 @@ async fn last_run(h: &Harness) -> CycleRun {
         .await
         .expect("last cycle run")
         .expect("a cycle ran")
+}
+
+fn account_key(h: &Harness) -> AccountKey {
+    AccountKey {
+        sei_base_url: h.fake.url(),
+        username: USERNAME.to_owned(),
+        org_id: ORG_ID,
+    }
+}
+
+async fn stored_reason(h: &Harness) -> Option<String> {
+    let account = h.store.ensure_account(&account_key(h), h.clock.now()).await;
+    account.ok().map(|account| account.paused_reason)
+}
+
+async fn pause_recorded(h: &Harness) -> bool {
+    eventually(|| async {
+        let reason_stored = stored_reason(h)
+            .await
+            .is_some_and(|reason| !reason.is_empty());
+        h.monitor.state().paused && reason_stored && !h.events().await.is_empty()
+    })
+    .await
+}
+
+async fn fire_pending_sleeps(h: &Harness, limit: usize) -> usize {
+    let mut fired = 0;
+    while fired < limit
+        && let Ok(sleep) = tokio::time::timeout(SETTLE, h.clock.next_sleep()).await
+    {
+        fired += 1;
+        h.clock.advance(sleep.duration);
+        sleep.fire.send(()).expect("the monitor is waiting");
+    }
+    fired
 }
 
 fn store_that_never_connects() -> Store {
@@ -298,4 +333,50 @@ async fn trigger_cycle_checks_in_order() {
     assert!(stalled, "the cycle never started");
     assert_eq!(running, Err(TriggerError::Running));
     assert!(released, "an aborted run kept the monitor busy");
+}
+
+#[tokio::test]
+async fn a_paused_monitor_refuses_cycles_and_new_runs() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    h.fake.set_password(CHANGED_PASSWORD);
+    let first = spawn_run(&h.monitor);
+    assert!(pause_recorded(&h).await, "the pause was never recorded");
+
+    let direct = bounded(h.monitor.run_once(Trigger::Manual)).await;
+    drop(first);
+    let _respawned = spawn_run(&h.monitor);
+    let retries = fire_pending_sleeps(&h, 3).await;
+    tokio::time::sleep(SETTLE).await;
+
+    assert_eq!(h.fake.failed_logins(), 1, "after {retries} retries");
+    assert!(matches!(direct, Err(MonitorError::Paused)), "{direct:?}");
+    assert_eq!(retries, 0, "the respawned run scheduled a cycle");
+    assert!(h.monitor.state().paused);
+}
+
+#[tokio::test]
+async fn a_second_run_returns_while_the_first_is_alive() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    let _first = spawn_run(&h.monitor);
+    let scheduled = h.clock.next_sleep().await;
+    let logins = h.fake.logins();
+
+    bounded(tokio::spawn(Arc::clone(&h.monitor).run()))
+        .await
+        .expect("join the second run");
+    h.clock.advance(scheduled.duration);
+    scheduled.fire.send(()).expect("the first run is waiting");
+    h.clock.next_sleep().await;
+
+    assert_eq!(h.fake.logins(), logins);
+    let run = last_run(&h).await;
+    assert_eq!((run.error.as_str(), run.processes_seen), ("", 2));
 }

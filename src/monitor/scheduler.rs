@@ -52,10 +52,15 @@ impl Monitor {
     }
 
     pub async fn run(self: Arc<Self>) {
+        let Ok(mut manual) = self.manual_signals.try_lock() else {
+            return;
+        };
+        if self.inner().state.paused {
+            return std::future::pending().await;
+        }
         if !self.prepare_until_ready().await {
             return;
         }
-        let mut manual = self.manual_signals.lock().await;
         let mut trigger = Trigger::Scheduled;
         let mut failures = 0;
         loop {
@@ -343,6 +348,7 @@ mod tests {
         let texts = ErrorTexts::deserialize(&document["errors"]).expect("the error texts");
         assert_eq!(TriggerError::Running.to_string(), texts.running);
         assert_eq!(TriggerError::Paused.to_string(), texts.paused);
+        assert_eq!(MonitorError::Paused.to_string(), texts.paused);
         assert_eq!(TriggerError::NotReady.to_string(), texts.not_ready);
     }
 }

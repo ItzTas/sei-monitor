@@ -102,6 +102,10 @@ pub enum MonitorError {
     Running,
     #[error("sei-monitor has not reached SEI yet")]
     NotReady,
+    #[error(
+        "monitoring is paused because SEI rejected the login; restart sei-monitor after fixing the configuration"
+    )]
+    Paused,
 }
 
 pub struct Monitor {
@@ -251,6 +255,9 @@ impl Monitor {
 
     fn begin(&self) -> Result<(Prepared, DateTime<Utc>), MonitorError> {
         let mut inner = self.inner();
+        if inner.state.paused {
+            return Err(MonitorError::Paused);
+        }
         if inner.state.running {
             return Err(MonitorError::Running);
         }

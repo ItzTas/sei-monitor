@@ -2,17 +2,32 @@
 
 pub mod clock;
 pub mod fake_sei;
+pub mod go;
 pub mod harness;
 pub mod logs;
 pub mod process;
+pub mod webhook;
+
+use std::io;
 
 use monitor_hub_plugin::migrate::up;
 use monitor_hub_plugin_testkit::{Database, database};
+use sei_monitor::config::{Source, load_sei_url};
 use sei_monitor::store::MIGRATIONS;
 use tokio_postgres::NoTls;
 
 pub fn ci() -> bool {
     std::env::var_os("CI").is_some_and(|value| !value.is_empty())
+}
+
+pub fn normalized_sei_url(raw: &str) -> String {
+    let raw = raw.to_owned();
+    let source = Source {
+        lookup: Box::new(move |name| (name == "SEI_URL").then(|| raw.clone())),
+        read_file: Box::new(|_| Err(io::ErrorKind::NotFound.into())),
+        invalid_utf8: Box::new(|_| false),
+    };
+    load_sei_url(&source).unwrap_or_else(|error| panic!("normalize the SEI address: {error}"))
 }
 
 pub async fn migrated_database() -> Option<Database> {

@@ -317,7 +317,7 @@ fn first_line(stdout: impl Read + Send + 'static) -> Receiver<String> {
     line
 }
 
-fn collect_lines(pipe: impl Read + Send + 'static, into: Arc<Mutex<String>>) {
+pub fn collect_lines(pipe: impl Read + Send + 'static, into: Arc<Mutex<String>>) {
     thread::spawn(move || {
         let mut reader = BufReader::new(pipe);
         let mut line = String::new();

@@ -19,6 +19,18 @@ const SECOND_NANOS: i64 = 1_000_000_000;
 const HELD_SUFFIX: &str =
     "; still paused after a restart: request a check once the configuration is fixed";
 
+enum Readiness {
+    Ready,
+    Paused,
+    Stopped,
+}
+
+enum PrepareFailure<'a> {
+    Retry,
+    Fatal,
+    Rejected(&'a SeiError),
+}
+
 enum Standing {
     Active,
     Held,
@@ -109,13 +121,18 @@ impl Monitor {
     }
 
     async fn start(&self) -> bool {
-        if !self.prepare_until_ready().await {
-            return false;
+        match self.prepare_until_ready().await {
+            Readiness::Ready => self.hold_a_recorded_rejection().await,
+            Readiness::Paused => {}
+            Readiness::Stopped => return false,
         }
+        true
+    }
+
+    async fn hold_a_recorded_rejection(&self) {
         if let Some(reason) = self.rejection_on_record() {
             self.hold(&reason).await;
         }
-        true
     }
 
     fn standing(&self) -> Standing {
@@ -187,20 +204,23 @@ impl Monitor {
         self.store.apply_cycle(&changes).await.map(drop)
     }
 
-    async fn prepare_until_ready(&self) -> bool {
+    async fn prepare_until_ready(&self) -> Readiness {
         let mut failures = 0u32;
         loop {
             let Err(failure) = self.prepare().await else {
                 self.inner().state.prepare_error = None;
-                return true;
+                return Readiness::Ready;
             };
-            if is_fatal(&failure) {
-                self.inner().state.fatal = Some(failure.to_string());
-                error!(
-                    error = &failure as &dyn Error,
-                    "sei-monitor cannot monitor SEI with this configuration; fix it and restart sei-monitor"
-                );
-                return false;
+            match prepare_failure(&failure) {
+                PrepareFailure::Retry => {}
+                PrepareFailure::Fatal => {
+                    self.stop(&failure);
+                    return Readiness::Stopped;
+                }
+                PrepareFailure::Rejected(rejection) => {
+                    self.pause(rejection).await;
+                    return Readiness::Paused;
+                }
             }
             failures = failures.saturating_add(1);
             let wait = backoff(failures, self.config.poll_interval, &*self.jitter);
@@ -212,6 +232,14 @@ impl Monitor {
             );
             self.clock.sleep(wait).await;
         }
+    }
+
+    fn stop(&self, failure: &MonitorError) {
+        self.inner().state.fatal = Some(failure.to_string());
+        error!(
+            error = failure as &dyn Error,
+            "sei-monitor cannot monitor SEI with this configuration; fix it and restart sei-monitor"
+        );
     }
 
     fn retry_after(&self, last_started_at: Option<DateTime<Utc>>) -> Option<Duration> {
@@ -238,6 +266,9 @@ impl Monitor {
             reason = %reason,
             "SEI rejected the login; monitoring is paused until sei-monitor restarts with the configuration fixed"
         );
+        if account_id == 0 {
+            return;
+        }
         let (paused, recorded) = tokio::join!(
             self.store.set_paused_reason(account_id, &reason),
             self.record_event(account_id, now, event)
@@ -289,14 +320,15 @@ fn rejected_login(outcome: &Result<CycleResult, MonitorError>) -> Option<&SeiErr
     (error.kind() == Some(ErrorKind::InvalidCredentials)).then_some(error)
 }
 
-fn is_fatal(error: &MonitorError) -> bool {
+fn prepare_failure(error: &MonitorError) -> PrepareFailure<'_> {
     let MonitorError::Sei(error) = error else {
-        return false;
+        return PrepareFailure::Retry;
     };
-    matches!(
-        error.kind(),
-        Some(ErrorKind::OrgNotFound | ErrorKind::ModuleNotFound)
-    )
+    match error.kind() {
+        Some(ErrorKind::InvalidCredentials) => PrepareFailure::Rejected(error),
+        Some(ErrorKind::OrgNotFound | ErrorKind::ModuleNotFound) => PrepareFailure::Fatal,
+        _ => PrepareFailure::Retry,
+    }
 }
 
 fn next_wait(
@@ -349,6 +381,7 @@ mod tests {
 
     use super::*;
     use crate::golden;
+    use crate::sei::ApiError;
 
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -393,6 +426,54 @@ mod tests {
             draw
         };
         (limits, jitter)
+    }
+
+    fn api_error(route: &str, kind: ErrorKind) -> MonitorError {
+        MonitorError::Sei(SeiError::Api(ApiError {
+            route: route.to_owned(),
+            status: 401,
+            message: "Usuário ou Senha Inválida.".to_owned(),
+            kind,
+        }))
+    }
+
+    #[test]
+    fn a_failed_preparation_is_retried_paused_or_fatal() {
+        let rejected = api_error("/autenticar", ErrorKind::InvalidCredentials);
+        assert!(matches!(
+            prepare_failure(&rejected),
+            PrepareFailure::Rejected(SeiError::Api(ApiError {
+                kind: ErrorKind::InvalidCredentials,
+                ..
+            }))
+        ));
+        let fatal = [
+            MonitorError::Sei(SeiError::OrgNotFound("NOPE".to_owned())),
+            MonitorError::Sei(SeiError::ModuleNotFound {
+                first: "a".to_owned(),
+                second: "b".to_owned(),
+            }),
+        ];
+        for error in &fatal {
+            assert!(
+                matches!(prepare_failure(error), PrepareFailure::Fatal),
+                "{error}"
+            );
+        }
+        let retried = [
+            api_error("/versao", ErrorKind::ModuleUnavailable),
+            MonitorError::Sei(SeiError::Transport {
+                context: "look for mod-wssei".to_owned(),
+                detail: "connection refused".to_owned(),
+            }),
+            MonitorError::Sei(SeiError::LoginPageStatus(502)),
+        ];
+        for error in &retried {
+            assert!(
+                matches!(prepare_failure(error), PrepareFailure::Retry),
+                "{error}"
+            );
+        }
     }
 
     #[test]

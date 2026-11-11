@@ -4,6 +4,7 @@ pub mod event;
 #[cfg(test)]
 mod golden;
 pub mod gotext;
+pub mod monitor;
 pub mod password;
 pub mod secret;
 pub mod sei;

@@ -1,0 +1,348 @@
+use std::error::Error;
+use std::sync::Arc;
+use std::time::Duration;
+
+use chrono::{DateTime, TimeDelta, Utc};
+use tracing::{error, warn};
+
+use super::{CycleResult, Monitor, MonitorError, login_failure};
+use crate::config::MIN_POLL_INTERVAL;
+use crate::duration::{format_go_duration, round_go_duration};
+use crate::sei::{ErrorKind, SeiError};
+use crate::store::{CycleChanges, Trigger};
+
+const FIRST_RETRY_DELAY: Duration = Duration::from_secs(30);
+const MAX_DOUBLINGS: u32 = 16;
+const SECOND_NANOS: i64 = 1_000_000_000;
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum TriggerError {
+    #[error(
+        "monitoring is paused because SEI rejected the login; restart sei-monitor after fixing the configuration"
+    )]
+    Paused,
+    #[error("sei-monitor has not reached SEI yet")]
+    NotReady,
+    #[error("a cycle is already running")]
+    Running,
+    #[error(
+        "the last cycle started less than {} ago; try again in {}",
+        go_text(MIN_POLL_INTERVAL),
+        go_seconds(*.retry_after)
+    )]
+    TooSoon { retry_after: Duration },
+}
+
+impl Monitor {
+    pub fn trigger_cycle(&self) -> Result<(), TriggerError> {
+        let inner = self.inner();
+        if inner.state.paused {
+            return Err(TriggerError::Paused);
+        }
+        if inner.prepared.is_none() {
+            return Err(TriggerError::NotReady);
+        }
+        if inner.state.running {
+            return Err(TriggerError::Running);
+        }
+        if let Some(retry_after) = self.retry_after(inner.state.last_started_at) {
+            return Err(TriggerError::TooSoon { retry_after });
+        }
+        self.manual.try_send(()).map_err(|_| TriggerError::Running)
+    }
+
+    pub async fn run(self: Arc<Self>) {
+        if !self.prepare_until_ready().await {
+            return;
+        }
+        let mut manual = self.manual_signals.lock().await;
+        let mut trigger = Trigger::Scheduled;
+        let mut failures = 0;
+        loop {
+            let outcome = self.run_once(trigger).await;
+            if let Some(rejection) = rejected_login(&outcome) {
+                self.pause(rejection).await;
+                return std::future::pending().await;
+            }
+            let wait = next_wait(
+                outcome.as_ref().err(),
+                &mut failures,
+                self.config.poll_interval,
+                &*self.jitter,
+            );
+            self.schedule(wait);
+            trigger = tokio::select! {
+                () = self.clock.sleep(wait) => Trigger::Scheduled,
+                Some(()) = manual.recv() => Trigger::Manual,
+            };
+        }
+    }
+
+    async fn prepare_until_ready(&self) -> bool {
+        let mut failures = 0u32;
+        loop {
+            let Err(failure) = self.prepare().await else {
+                self.inner().state.prepare_error = None;
+                return true;
+            };
+            if is_fatal(&failure) {
+                self.inner().state.fatal = Some(failure.to_string());
+                error!(
+                    error = &failure as &dyn Error,
+                    "sei-monitor cannot monitor SEI with this configuration; fix it and restart sei-monitor"
+                );
+                return false;
+            }
+            failures = failures.saturating_add(1);
+            let wait = backoff(failures, self.config.poll_interval, &*self.jitter);
+            self.inner().state.prepare_error = Some(failure.to_string());
+            warn!(
+                error = &failure as &dyn Error,
+                retry_in = %go_seconds(wait),
+                "could not reach SEI; trying again"
+            );
+            self.clock.sleep(wait).await;
+        }
+    }
+
+    fn retry_after(&self, last_started_at: Option<DateTime<Utc>>) -> Option<Duration> {
+        let since = self.clock.now() - last_started_at?;
+        let minimum = TimeDelta::from_std(MIN_POLL_INTERVAL).expect("five minutes fit a TimeDelta");
+        if since >= minimum {
+            return None;
+        }
+        (minimum - since).to_std().ok()
+    }
+
+    fn schedule(&self, wait: Duration) {
+        let next = TimeDelta::from_std(wait)
+            .ok()
+            .and_then(|wait| self.clock.now().checked_add_signed(wait));
+        self.inner().state.next_cycle_at = next;
+    }
+
+    async fn pause(&self, cause: &SeiError) {
+        let now = self.clock.now();
+        let (reason, event) = login_failure(cause, now);
+        let account_id = self.mark_paused(&reason);
+        error!(
+            reason = %reason,
+            "SEI rejected the login; monitoring is paused until sei-monitor restarts with the configuration fixed"
+        );
+        let changes = CycleChanges {
+            account_id,
+            run_id: None,
+            now,
+            finished_at: now,
+            baseline: false,
+            processes: Vec::new(),
+            left: Vec::new(),
+            documents: Vec::new(),
+            events: vec![event],
+        };
+        let (paused, recorded) = tokio::join!(
+            self.store.set_paused_reason(account_id, &reason),
+            self.store.apply_cycle(&changes)
+        );
+        if let Err(failure) = paused {
+            error!(error = &failure as &dyn Error, "could not record the pause");
+        }
+        if let Err(failure) = recorded {
+            error!(
+                error = &failure as &dyn Error,
+                "could not record the login failure event"
+            );
+        }
+    }
+
+    fn mark_paused(&self, reason: &str) -> i64 {
+        let mut inner = self.inner();
+        inner.state.paused = true;
+        inner.state.paused_reason = reason.to_owned();
+        inner.state.next_cycle_at = None;
+        if let Some(prepared) = inner.prepared.as_mut() {
+            prepared.account.paused_reason = reason.to_owned();
+        }
+        inner.state.account_id
+    }
+}
+
+fn rejected_login(outcome: &Result<CycleResult, MonitorError>) -> Option<&SeiError> {
+    let Err(MonitorError::Sei(error)) = outcome else {
+        return None;
+    };
+    (error.kind() == Some(ErrorKind::InvalidCredentials)).then_some(error)
+}
+
+fn is_fatal(error: &MonitorError) -> bool {
+    let MonitorError::Sei(error) = error else {
+        return false;
+    };
+    matches!(
+        error.kind(),
+        Some(ErrorKind::OrgNotFound | ErrorKind::ModuleNotFound)
+    )
+}
+
+fn next_wait(
+    failure: Option<&MonitorError>,
+    failures: &mut u32,
+    poll_interval: Duration,
+    jitter: &(dyn Fn(Duration) -> Duration + Send + Sync),
+) -> Duration {
+    let Some(failure) = failure else {
+        *failures = 0;
+        return poll_interval + jitter(poll_interval / 10);
+    };
+    *failures = failures.saturating_add(1);
+    let wait = backoff(*failures, poll_interval, jitter);
+    warn!(
+        error = failure as &dyn Error,
+        retry_in = %go_seconds(wait),
+        "cycle failed"
+    );
+    wait
+}
+
+fn backoff(
+    failures: u32,
+    poll_interval: Duration,
+    jitter: &(dyn Fn(Duration) -> Duration + Send + Sync),
+) -> Duration {
+    let doublings = failures.saturating_sub(1).min(MAX_DOUBLINGS);
+    let delay = (FIRST_RETRY_DELAY * 2u32.pow(doublings)).min(poll_interval.max(FIRST_RETRY_DELAY));
+    delay + jitter(delay / 10)
+}
+
+fn nanos(duration: Duration) -> i64 {
+    i64::try_from(duration.as_nanos()).unwrap_or(i64::MAX)
+}
+
+fn go_text(duration: Duration) -> String {
+    format_go_duration(nanos(duration))
+}
+
+fn go_seconds(duration: Duration) -> String {
+    format_go_duration(round_go_duration(nanos(duration), SECOND_NANOS))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use serde::Deserialize;
+
+    use super::*;
+    use crate::golden;
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct BackoffCase {
+        poll_interval_ns: u64,
+        failures: u32,
+        jitter_limit_ns: u64,
+        wait_ns: u64,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct SuccessWaitCase {
+        poll_interval_ns: u64,
+        failures_before: u32,
+        failures_after: u32,
+        jitter_limit_ns: u64,
+        jitter_ns: u64,
+        wait_ns: u64,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct TooSoonCase {
+        retry_after_ns: u64,
+        text: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct ErrorTexts {
+        running: String,
+        paused: String,
+        not_ready: String,
+    }
+
+    fn recording(draw: Duration) -> (Arc<Mutex<Vec<Duration>>>, impl Fn(Duration) -> Duration) {
+        let limits = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&limits);
+        let jitter = move |limit| {
+            seen.lock().expect("the limits").push(limit);
+            draw
+        };
+        (limits, jitter)
+    }
+
+    #[test]
+    fn backoff_matches_go() {
+        let cases = golden::cases::<BackoffCase>("monitor_text", "/backoff");
+        for case in &cases {
+            let (limits, jitter) = recording(Duration::ZERO);
+            let wait = backoff(
+                case.failures,
+                Duration::from_nanos(case.poll_interval_ns),
+                &jitter,
+            );
+            let label = (case.poll_interval_ns, case.failures);
+            assert_eq!(wait, Duration::from_nanos(case.wait_ns), "{label:?}");
+            assert_eq!(
+                *limits.lock().expect("the limits"),
+                [Duration::from_nanos(case.jitter_limit_ns)],
+                "{label:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn success_wait_matches_go() {
+        let cases = golden::cases::<SuccessWaitCase>("monitor_text", "/success_wait");
+        for case in &cases {
+            let (limits, jitter) = recording(Duration::from_nanos(case.jitter_ns));
+            let mut failures = case.failures_before;
+            let wait = next_wait(
+                None,
+                &mut failures,
+                Duration::from_nanos(case.poll_interval_ns),
+                &jitter,
+            );
+            let label = (case.poll_interval_ns, case.failures_before);
+            assert_eq!(wait, Duration::from_nanos(case.wait_ns), "{label:?}");
+            assert_eq!(failures, case.failures_after, "{label:?}");
+            assert_eq!(
+                *limits.lock().expect("the limits"),
+                [Duration::from_nanos(case.jitter_limit_ns)],
+                "{label:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn too_soon_matches_go() {
+        for case in golden::cases::<TooSoonCase>("monitor_text", "/too_soon") {
+            let error = TriggerError::TooSoon {
+                retry_after: Duration::from_nanos(case.retry_after_ns),
+            };
+            assert_eq!(error.to_string(), case.text, "{}", case.retry_after_ns);
+        }
+    }
+
+    #[test]
+    fn error_texts_match_go() {
+        let document: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/testdata/golden/monitor_text.json"
+        )))
+        .expect("monitor_text.json is JSON");
+        let texts = ErrorTexts::deserialize(&document["errors"]).expect("the error texts");
+        assert_eq!(TriggerError::Running.to_string(), texts.running);
+        assert_eq!(TriggerError::Paused.to_string(), texts.paused);
+        assert_eq!(TriggerError::NotReady.to_string(), texts.not_ready);
+    }
+}

@@ -1,6 +1,7 @@
 mod details;
 pub mod diff;
 mod prune;
+mod scheduler;
 
 use std::error::Error;
 use std::future::Future;
@@ -11,6 +12,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
+use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
 use self::details::{build_changes, fetch_details, observe_units};
@@ -22,6 +24,8 @@ use crate::sei::{
     Client, Connection, Options, SeiError, Session, Target, Unit, connect, list_orgs,
 };
 use crate::store::{Account, AccountInfo, AccountKey, Store, StoreError, Trigger};
+
+pub use self::scheduler::TriggerError;
 
 const MAX_ERROR_LENGTH: usize = 500;
 const MILLISECOND_NANOS: i64 = 1_000_000;
@@ -104,9 +108,10 @@ pub struct Monitor {
     config: MonitorConfig,
     store: Store,
     clock: Arc<dyn Clock>,
-    #[expect(dead_code, reason = "the scheduler of Task 15 is the first reader")]
     jitter: Jitter,
     acked: AtomicI64,
+    manual: mpsc::Sender<()>,
+    manual_signals: tokio::sync::Mutex<mpsc::Receiver<()>>,
     inner: Mutex<Inner>,
 }
 
@@ -148,12 +153,15 @@ impl Monitor {
             concurrency: config.concurrency.max(1),
             ..config
         };
+        let (manual, manual_signals) = mpsc::channel(1);
         Arc::new(Monitor {
             config,
             store,
             clock,
             jitter,
             acked: AtomicI64::new(0),
+            manual,
+            manual_signals: tokio::sync::Mutex::new(manual_signals),
             inner: Mutex::new(Inner {
                 prepared: None,
                 logins: 0,

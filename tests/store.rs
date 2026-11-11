@@ -1629,3 +1629,53 @@ async fn a_read_gives_up_after_walking_too_many_unreadable_events() {
         "too many stored events cannot be read: 100000 rows read"
     );
 }
+
+#[tokio::test]
+async fn past_the_reported_limit_one_line_says_so_and_reads_stay_quiet() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let client = connect(&db.url).await;
+    store_unreadable_run(&client, account.id, 3_000).await;
+    let reported: Vec<i64> = client
+        .query("SELECT id FROM events ORDER BY id LIMIT 1024", &[])
+        .await
+        .expect("the first ids")
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+
+    let (first, logs) = captured(read_within(&pooled, account.id, 0, 100)).await;
+
+    assert_eq!(first.expect("no readable events"), Vec::new());
+    let mut expected: Vec<LoggedEvent> = reported
+        .iter()
+        .map(|event_id| {
+            logged(&[
+                ("message", "skipping a stored event that cannot be read"),
+                ("level", "ERROR"),
+                ("event_id", &event_id.to_string()),
+                (
+                    "error",
+                    "its payload is not an event payload: the JSON ends early at line 1, column 1",
+                ),
+            ])
+        })
+        .collect();
+    expected.push(logged(&[
+        (
+            "message",
+            "more stored events cannot be read than are reported one by one",
+        ),
+        ("level", "ERROR"),
+        ("limit", "1024"),
+    ]));
+    assert_eq!(logs.len(), expected.len());
+    assert_eq!(logs, expected);
+
+    let (again, logs) = captured(read_within(&pooled, account.id, 0, 100)).await;
+    assert_eq!(again.expect("no readable events again"), Vec::new());
+    assert_eq!(logs, Vec::<LoggedEvent>::new());
+}

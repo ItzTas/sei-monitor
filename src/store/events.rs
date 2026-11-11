@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::HashSet;
 use std::error::Error;
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -25,19 +25,33 @@ const REPORTED_LIMIT: usize = 1024;
 const BATCH: i64 = 1000;
 const WALK_LIMIT: u64 = 100_000;
 
+#[derive(Default)]
+struct Reported {
+    ids: HashSet<i64>,
+    full: bool,
+}
+
 #[derive(Clone, Default)]
-pub(super) struct Skipped(Arc<Mutex<BTreeSet<i64>>>);
+pub(super) struct Skipped(Arc<Mutex<Reported>>);
+
+enum Report {
+    OneByOne,
+    Full,
+    Quiet,
+}
 
 impl Skipped {
-    fn first_report(&self, event_id: i64) -> bool {
+    fn report(&self, event_id: i64) -> Report {
         let mut reported = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        if !reported.insert(event_id) {
-            return false;
+        if reported.full || reported.ids.contains(&event_id) {
+            return Report::Quiet;
         }
-        if reported.len() > REPORTED_LIMIT {
-            reported.pop_first();
+        if reported.ids.len() < REPORTED_LIMIT {
+            reported.ids.insert(event_id);
+            return Report::OneByOne;
         }
-        true
+        reported.full = true;
+        Report::Full
     }
 }
 
@@ -128,14 +142,18 @@ impl Store {
     }
 
     fn skip(&self, event_id: i64, unreadable: &Unreadable) {
-        if !self.skipped.first_report(event_id) {
-            return;
+        match self.skipped.report(event_id) {
+            Report::OneByOne => error!(
+                event_id,
+                error = unreadable as &dyn Error,
+                "skipping a stored event that cannot be read"
+            ),
+            Report::Full => error!(
+                limit = REPORTED_LIMIT,
+                "more stored events cannot be read than are reported one by one"
+            ),
+            Report::Quiet => {}
         }
-        error!(
-            event_id,
-            error = unreadable as &dyn Error,
-            "skipping a stored event that cannot be read"
-        );
     }
 }
 

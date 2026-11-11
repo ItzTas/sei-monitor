@@ -3,6 +3,7 @@ const UPPER_HEX: &[u8; 16] = b"0123456789ABCDEF";
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Mode {
     Path,
+    PathSegment,
     Host,
     Zone,
     UserPassword,
@@ -28,6 +29,7 @@ pub(super) fn should_escape(c: u8, mode: Mode) -> bool {
 fn reserved_escapes(c: u8, mode: Mode) -> bool {
     match mode {
         Mode::Path => c == b'?',
+        Mode::PathSegment => matches!(c, b'/' | b';' | b',' | b'?'),
         Mode::UserPassword => matches!(c, b'@' | b'/' | b'?' | b':'),
         Mode::Fragment => false,
         Mode::Host | Mode::Zone => true,

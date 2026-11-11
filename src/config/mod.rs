@@ -20,6 +20,7 @@ use crate::secret::Secret;
 use crate::timezone::load_zone;
 use lookpath::look_path;
 use reader::Reader;
+pub(crate) use url::path_escape;
 use url::{normalize_api_url, normalize_sei_url};
 
 pub const DEFAULT_TIME_ZONE: &str = "America/Sao_Paulo";

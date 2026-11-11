@@ -304,6 +304,7 @@ impl Client {
             let value = token_header(token).ok_or_else(|| SeiError::Transport {
                 context: build_context(),
                 detail: "the session token is not a valid header value".to_owned(),
+                timed_out: false,
             })?;
             builder = builder.header("token", value);
         }
@@ -340,6 +341,7 @@ async fn answer_body(route: &str, response: Response) -> Result<Vec<u8>, SeiErro
         .await
         .map_err(|error| SeiError::Decode {
             route: route.to_owned(),
+            timed_out: error.is_timeout(),
             detail: describe_transport(error),
         })
 }
@@ -347,6 +349,7 @@ async fn answer_body(route: &str, response: Response) -> Result<Vec<u8>, SeiErro
 fn transport(context: String, error: reqwest::Error) -> SeiError {
     SeiError::Transport {
         context,
+        timed_out: error.is_timeout(),
         detail: describe_transport(error),
     }
 }

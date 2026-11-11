@@ -46,9 +46,17 @@ pub enum SeiError {
     #[error(transparent)]
     Api(ApiError),
     #[error("sei: {context}: {detail}")]
-    Transport { context: String, detail: String },
+    Transport {
+        context: String,
+        detail: String,
+        timed_out: bool,
+    },
     #[error("sei: read the {route} answer: {detail}")]
-    Decode { route: String, detail: String },
+    Decode {
+        route: String,
+        detail: String,
+        timed_out: bool,
+    },
     #[error("sei: /autenticar: {0}")]
     Password(#[source] PasswordCommandError),
     #[error("sei: /autenticar: SEI did not return a session token")]
@@ -86,6 +94,19 @@ impl SeiError {
             SeiError::UnknownUnit { .. } => Some(ErrorKind::UnknownUnit),
             _ => None,
         }
+    }
+
+    pub(crate) fn timed_out(&self) -> bool {
+        matches!(
+            self,
+            SeiError::Transport {
+                timed_out: true,
+                ..
+            } | SeiError::Decode {
+                timed_out: true,
+                ..
+            }
+        )
     }
 }
 
@@ -227,6 +248,7 @@ pub(super) mod tests {
                 SeiError::Transport {
                     context: "decode the login page".to_owned(),
                     detail: "EOF".to_owned(),
+                    timed_out: false,
                 },
                 "sei: decode the login page: EOF",
             ),
@@ -234,6 +256,7 @@ pub(super) mod tests {
                 SeiError::Decode {
                     route: "/versao".to_owned(),
                     detail: "expected an object".to_owned(),
+                    timed_out: false,
                 },
                 "sei: read the /versao answer: expected an object",
             ),
@@ -322,6 +345,7 @@ pub(super) mod tests {
                 SeiError::Transport {
                     context: "c".to_owned(),
                     detail: "d".to_owned(),
+                    timed_out: false,
                 },
                 None,
             ),
@@ -329,6 +353,7 @@ pub(super) mod tests {
                 SeiError::Decode {
                     route: "r".to_owned(),
                     detail: "d".to_owned(),
+                    timed_out: false,
                 },
                 None,
             ),

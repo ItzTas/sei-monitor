@@ -21,6 +21,10 @@ pub(crate) struct GoUrl {
     fragment: Vec<u8>,
 }
 
+pub(crate) fn path_escape(text: &str) -> String {
+    escape(text.as_bytes(), Mode::PathSegment)
+}
+
 pub(crate) fn parse_url(value: &str) -> Result<GoUrl, ()> {
     let (rest, fragment) = value.split_once('#').unwrap_or((value, ""));
     let mut url = parse(rest)?;
@@ -232,6 +236,20 @@ mod tests {
         for (input, sei, api) in cases {
             assert_eq!(normalize_sei_url(input).as_deref(), Ok(sei), "{input}");
             assert_eq!(normalize_api_url(input).as_deref(), Ok(api), "{input}");
+        }
+    }
+
+    #[test]
+    fn path_escape_matches_go() {
+        let cases = [
+            ("9001", "9001"),
+            ("a b/c;d,e?f", "a%20b%2Fc%3Bd%2Ce%3Ff"),
+            ("$&+=:@-_.~", "$&+=:@-_.~"),
+            ("!*'()[]#%\"", "%21%2A%27%28%29%5B%5D%23%25%22"),
+            ("é", "%C3%A9"),
+        ];
+        for (input, escaped) in cases {
+            assert_eq!(path_escape(input), escaped, "{input}");
         }
     }
 }

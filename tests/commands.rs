@@ -1,0 +1,295 @@
+mod support;
+
+use std::collections::BTreeMap;
+use std::thread;
+use std::time::{Duration, Instant};
+
+use serde::Deserialize;
+use serde_json::Value;
+
+use support::fake_sei::{FakeSei, PASSWORD, ROUTE_LOGIN_PAGE, ROUTE_VERSION};
+use support::process::{Exited, run_to_exit, start_command};
+
+const COMMANDS: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/testdata/golden/commands.json"
+));
+const DIAGNOSE: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/testdata/golden/diagnose.txt"
+));
+const DIAGNOSE_CASE: &str = "diagnose with the scenario of diagnose.txt";
+const SEI_URL: &str = "<SEI_URL>";
+const EXIT_LIMIT: Duration = Duration::from_secs(30);
+const PATIENCE: Duration = Duration::from_secs(30);
+const POLL: Duration = Duration::from_millis(10);
+const USAGE_HINT: &str = "Run 'sei-monitor --help' for usage.";
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Case {
+    name: String,
+    setup: Vec<Value>,
+    args: Vec<String>,
+    env: BTreeMap<String, String>,
+    interrupt: Option<Interrupt>,
+    compare: String,
+    exit_code: i32,
+    stdout: String,
+    stderr: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Interrupt {
+    when: String,
+    note: String,
+}
+
+struct Run {
+    exited: Exited,
+    logins: usize,
+    failed_logins: usize,
+    issued_tokens: Vec<String>,
+}
+
+fn cases() -> Vec<Case> {
+    let file: Value = serde_json::from_str(COMMANDS).expect("commands.json is JSON");
+    let cases = Vec::<Case>::deserialize(&file["cases"]).expect("the cases of commands.json");
+    assert!(!cases.is_empty(), "commands.json has no cases");
+    cases
+}
+
+fn case_named(name: &str) -> Case {
+    cases()
+        .into_iter()
+        .find(|case| case.name == name)
+        .unwrap_or_else(|| panic!("commands.json has no case named {name:?}"))
+}
+
+fn with_url(env: &BTreeMap<String, String>, url: &str) -> Vec<(String, String)> {
+    env.iter()
+        .map(|(name, value)| (name.clone(), value.replace(SEI_URL, url)))
+        .collect()
+}
+
+fn pairs(env: &[(String, String)]) -> Vec<(&str, &str)> {
+    env.iter()
+        .map(|(name, value)| (name.as_str(), value.as_str()))
+        .collect()
+}
+
+fn replay(case: &Case) -> Run {
+    let fake = FakeSei::start();
+    fake.apply(&case.setup)
+        .unwrap_or_else(|error| panic!("{}: setup: {error}", case.name));
+    let env = with_url(&case.env, &fake.url());
+    let args: Vec<&str> = case.args.iter().map(String::as_str).collect();
+    let mut exited = match &case.interrupt {
+        None => run_to_exit(&args, &pairs(&env), EXIT_LIMIT),
+        Some(interrupt) => interrupted(&fake, interrupt, &args, &pairs(&env), libc::SIGINT),
+    };
+    exited.stdout = exited.stdout.replace(&fake.url(), SEI_URL);
+    exited.stderr = exited.stderr.replace(&fake.url(), SEI_URL);
+    Run {
+        exited,
+        logins: fake.logins(),
+        failed_logins: fake.failed_logins(),
+        issued_tokens: fake.issued_tokens(),
+    }
+}
+
+fn interrupted(
+    fake: &FakeSei,
+    interrupt: &Interrupt,
+    args: &[&str],
+    env: &[(&str, &str)],
+    signal: libc::c_int,
+) -> Exited {
+    assert_eq!(
+        interrupt.when, "before_first_request",
+        "unknown interruption point; its note: {}",
+        interrupt.note
+    );
+    fake.stall(ROUTE_VERSION);
+    fake.stall(ROUTE_LOGIN_PAGE);
+    let mut started = start_command(args, env);
+    let deadline = Instant::now() + PATIENCE;
+    while fake.calls(ROUTE_VERSION) + fake.calls(ROUTE_LOGIN_PAGE) == 0 {
+        assert!(
+            Instant::now() < deadline,
+            "the command sent no request to the fake SEI within {PATIENCE:?}"
+        );
+        thread::sleep(POLL);
+    }
+    started.signal(signal);
+    started.finish(EXIT_LIMIT)
+}
+
+fn differences(case: &Case, run: &Run) -> Vec<String> {
+    assert!(
+        ["exact", "usage"].contains(&case.compare.as_str()),
+        "{}: unknown compare value {:?}",
+        case.name,
+        case.compare
+    );
+    let exited = &run.exited;
+    let checks = [
+        (
+            "exit code",
+            format!("{:?}", Some(case.exit_code)),
+            format!("{:?}", exited.status.code()),
+        ),
+        ("stdout", case.stdout.clone(), exited.stdout.clone()),
+        ("stderr", case.stderr.clone(), exited.stderr.clone()),
+    ];
+    let mut found: Vec<String> = checks
+        .into_iter()
+        .filter(|(_, expected, got)| expected != got)
+        .map(|(what, expected, got)| {
+            format!(
+                "{}: {what} differs\n--- Go\n{expected}\n--- Rust\n{got}",
+                case.name
+            )
+        })
+        .collect();
+    let attempts = run.logins + run.failed_logins;
+    if attempts > 1 {
+        found.push(format!(
+            "{}: {attempts} login attempts, Go makes at most 1",
+            case.name
+        ));
+    }
+    found
+}
+
+#[test]
+fn commands_match_go() {
+    let cases = cases();
+    let failures: Vec<String> = cases
+        .iter()
+        .flat_map(|case| differences(case, &replay(case)))
+        .collect();
+
+    assert!(
+        failures.is_empty(),
+        "{} of {} cases differ from Go:\n{}",
+        failures.len(),
+        cases.len(),
+        failures.join("\n\n")
+    );
+}
+
+fn assert_hidden(text: &str, values: &[&str]) {
+    for value in values {
+        assert!(!text.contains(value), "the output shows {value:?}:\n{text}");
+    }
+}
+
+#[test]
+fn diagnose_matches_go() {
+    let case = case_named(DIAGNOSE_CASE);
+    assert_eq!(case.stdout, DIAGNOSE, "the vector case and diagnose.txt");
+
+    let run = replay(&case);
+
+    let exited = &run.exited;
+    assert_eq!(exited.status.code(), Some(0), "{}", exited.stderr);
+    assert_eq!(exited.stderr, "");
+    assert_eq!(exited.stdout, DIAGNOSE);
+    assert_eq!((run.logins, run.failed_logins), (1, 0));
+    assert_hidden(
+        &exited.stdout,
+        &[
+            "00000.",
+            "9001",
+            "50001",
+            "80001",
+            "SEDEMO",
+            "fulano",
+            "Fulano",
+            "beltrano",
+            "Beltrano",
+            "Diárias",
+            "Brasília",
+            "Contrato",
+            "Ofício",
+            "Despacho",
+            "recebido",
+            "0012345",
+            "06/11/2026",
+            PASSWORD,
+        ],
+    );
+    let tokens: Vec<&str> = run.issued_tokens.iter().map(String::as_str).collect();
+    assert_hidden(&exited.stdout, &tokens);
+}
+
+#[test]
+fn test_login_never_prints_the_password() {
+    for units in ["sedemo/gab", "SEDEMO/XYZ"] {
+        let mut case = case_named("test-login with the current unit");
+        case.env.insert("SEI_UNITS".to_owned(), units.to_owned());
+
+        let run = replay(&case);
+
+        assert_eq!((run.logins, run.failed_logins), (1, 0), "{units}");
+        let text = format!("{}{}", run.exited.stdout, run.exited.stderr);
+        let mut secrets = vec![PASSWORD];
+        secrets.extend(run.issued_tokens.iter().map(String::as_str));
+        assert_hidden(&text, &secrets);
+    }
+}
+
+#[test]
+fn help_lists_every_command() {
+    let help = run_to_exit(&["--help"], &[], EXIT_LIMIT);
+
+    assert_eq!(help.status.code(), Some(0), "{}", help.stderr);
+    assert_eq!(help.stderr, "");
+    for text in [
+        "plugin",
+        "test-login",
+        "Log in to SEI and show the versions and your units",
+        "orgs",
+        "List the acronym and id of every agency on the SEI login page",
+        "diagnose",
+        "Check how the SEI API behaves, printing only counts and types",
+    ] {
+        assert!(help.stdout.contains(text), "{text:?} in:\n{}", help.stdout);
+    }
+}
+
+#[test]
+fn unknown_flag_is_a_usage_error() {
+    let exited = run_to_exit(&["--nope"], &[], EXIT_LIMIT);
+
+    assert_eq!(exited.status.code(), Some(2), "{}", exited.stderr);
+    assert_eq!(exited.stdout, "");
+    assert_eq!(
+        exited.stderr,
+        format!("unknown flag: --nope\n{USAGE_HINT}\n")
+    );
+}
+
+#[test]
+fn a_terminate_signal_interrupts_the_command() {
+    let fake = FakeSei::start();
+    let url = fake.url();
+    let interrupt = Interrupt {
+        when: "before_first_request".to_owned(),
+        note: "SIGTERM while orgs waits for the login page".to_owned(),
+    };
+
+    let exited = interrupted(
+        &fake,
+        &interrupt,
+        &["orgs"],
+        &[("SEI_URL", url.as_str())],
+        libc::SIGTERM,
+    );
+
+    assert_eq!(exited.status.code(), Some(130), "{}", exited.stderr);
+    assert_eq!(exited.stdout, "");
+    assert_eq!(exited.stderr, "interrupted\n");
+}

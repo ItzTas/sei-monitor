@@ -117,6 +117,7 @@ fn decode_error(route: &str, detail: String) -> SeiError {
     SeiError::Decode {
         route: route.to_owned(),
         detail,
+        timed_out: false,
     }
 }
 

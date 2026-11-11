@@ -54,7 +54,7 @@ pub async fn list_orgs(sei_url: &str, options: &Options) -> Result<Vec<Org>, Sei
     let body = read_page(response).await?;
     tokio::task::spawn_blocking(move || parse_login_page(content_type.as_deref(), &body, deadline))
         .await
-        .unwrap_or_else(|_| Err(read_failure("the page parser panicked")))
+        .unwrap_or_else(|_| Err(read_failure("the page parser panicked", false)))
 }
 
 pub async fn resolve_org(sei_url: &str, value: &str, options: &Options) -> Result<Org, SeiError> {
@@ -81,6 +81,7 @@ pub(crate) fn parse_login_page(
         return Err(SeiError::Transport {
             context: "decode the login page".to_owned(),
             detail: "EOF".to_owned(),
+            timed_out: false,
         });
     }
     let text = decode(determine(content_type, body), body);
@@ -126,6 +127,7 @@ fn ended_early(error: &reqwest::Error) -> bool {
 fn transport(context: &str, error: reqwest::Error) -> SeiError {
     SeiError::Transport {
         context: context.to_owned(),
+        timed_out: error.is_timeout(),
         detail: describe_transport(error),
     }
 }
@@ -165,18 +167,21 @@ fn parse(text: &str, deadline: Option<Instant>) -> Result<Html, SeiError> {
     for chunk in chunks(text) {
         parser.process(StrTendril::from_slice(chunk));
         if stop.get() == Stop::TooDeep {
-            return Err(read_failure(TOO_DEEP));
+            return Err(read_failure(TOO_DEEP, false));
         }
         if stop.get() == Stop::AfterTemplate {
             break;
         }
         if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
-            return Err(read_failure("the time limit of the request was reached"));
+            return Err(read_failure(
+                "the time limit of the request was reached",
+                true,
+            ));
         }
     }
     let document = parser.finish();
     if stop.get() == Stop::TooDeep {
-        return Err(read_failure(TOO_DEEP));
+        return Err(read_failure(TOO_DEEP, false));
     }
     Ok(document)
 }
@@ -197,10 +202,11 @@ fn chunks(text: &str) -> impl Iterator<Item = &str> {
     })
 }
 
-fn read_failure(detail: &str) -> SeiError {
+fn read_failure(detail: &str, timed_out: bool) -> SeiError {
     SeiError::Transport {
         context: "read the login page".to_owned(),
         detail: detail.to_owned(),
+        timed_out,
     }
 }
 

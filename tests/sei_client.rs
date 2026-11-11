@@ -661,6 +661,16 @@ async fn stalled_body_fails_within_the_client_timeout() {
         "{text}"
     );
     assert!(!text.contains('?'), "{text}");
+    assert!(
+        matches!(
+            error,
+            SeiError::Decode {
+                timed_out: true,
+                ..
+            }
+        ),
+        "{error:?}"
+    );
 }
 
 fn first_page() -> ProcessQuery {

@@ -480,6 +480,7 @@ mod tests {
             MonitorError::Sei(SeiError::Transport {
                 context: "look for mod-wssei".to_owned(),
                 detail: "connection refused".to_owned(),
+                timed_out: false,
             }),
             MonitorError::Sei(SeiError::LoginPageStatus(502)),
         ];

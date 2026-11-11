@@ -1,18 +1,26 @@
 use std::error::Error;
-use std::io;
+use std::future::Future;
+use std::io::{self, Write};
+use std::pin::Pin;
 use std::process::ExitCode;
 use std::time::Duration;
 
 use clap::Parser;
 use monitor_hub_plugin::{NOT_LAUNCHED_BY_HUB, launched_by_hub, logging};
 use sei_monitor::app::run_plugin;
-use sei_monitor::cli::{Cli, Command, usage_exit};
+use sei_monitor::cli::{Cli, Command, command_exit, diagnose, orgs, test_login, usage_exit};
 use sei_monitor::config::{ConfigError, PluginConfig, Source};
 use sei_monitor::harden::harden;
 use tokio::runtime::{Builder, Runtime};
+use tokio::signal::unix::{SignalKind, signal};
 use tracing::error;
 
 const RUNTIME_SHUTDOWN_LIMIT: Duration = Duration::from_millis(500);
+
+type Operation = for<'a> fn(
+    &'a Source,
+    &'a mut dyn Write,
+) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>;
 
 fn main() -> ExitCode {
     if let Err(failure) = harden() {
@@ -24,7 +32,42 @@ fn main() -> ExitCode {
     };
     match cli.command {
         Some(Command::Plugin) => plugin(),
+        Some(Command::TestLogin) => operate(|source, out| Box::pin(test_login(source, out))),
+        Some(Command::Orgs) => operate(|source, out| Box::pin(orgs(source, out))),
+        Some(Command::Diagnose) => operate(|source, out| Box::pin(diagnose(source, out))),
         None => not_launched_by_hub(),
+    }
+}
+
+fn operate(operation: Operation) -> ExitCode {
+    let runtime = match runtime() {
+        Ok(runtime) => runtime,
+        Err(failure) => return command_exit(Err(failure.into()), false),
+    };
+    let source = Source::environment();
+    let mut stdout = io::stdout().lock();
+    let (result, interrupted) =
+        runtime.block_on(until_interrupted(operation(&source, &mut stdout)));
+    let flushed = stdout.flush();
+    runtime.shutdown_timeout(RUNTIME_SHUTDOWN_LIMIT);
+    command_exit(result.and(flushed.map_err(Into::into)), interrupted)
+}
+
+async fn until_interrupted(
+    work: impl Future<Output = anyhow::Result<()>>,
+) -> (anyhow::Result<()>, bool) {
+    let (mut interrupt, mut terminate) = match (
+        signal(SignalKind::interrupt()),
+        signal(SignalKind::terminate()),
+    ) {
+        (Ok(interrupt), Ok(terminate)) => (interrupt, terminate),
+        (Err(failure), _) | (_, Err(failure)) => return (Err(failure.into()), false),
+    };
+    tokio::select! {
+        biased;
+        _ = interrupt.recv() => (Ok(()), true),
+        _ = terminate.recv() => (Ok(()), true),
+        result = work => (result, false),
     }
 }
 

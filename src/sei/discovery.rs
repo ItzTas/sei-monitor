@@ -65,6 +65,7 @@ async fn answer(client: &reqwest::Client, base: &str) -> Result<(u16, Vec<u8>), 
         .await
         .map_err(|error| SeiError::Decode {
             route: ROUTE_VERSION.to_owned(),
+            timed_out: error.is_timeout(),
             detail: describe_transport(error),
         })?;
     Ok((status, body))
@@ -87,6 +88,7 @@ fn classify(status: u16, body: &[u8]) -> Probe {
 fn transport(context: String, error: reqwest::Error) -> SeiError {
     SeiError::Transport {
         context,
+        timed_out: error.is_timeout(),
         detail: describe_transport(error),
     }
 }

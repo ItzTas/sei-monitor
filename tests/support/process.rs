@@ -128,6 +128,59 @@ pub fn terminate(child: &mut Child) {
     assert_eq!(sent, 0, "{}", std::io::Error::last_os_error());
 }
 
+pub struct StartedCommand {
+    child: Child,
+    stdout: Receiver<String>,
+    stderr: Receiver<String>,
+    _temp: ShortTempDir,
+}
+
+pub fn start_command(args: &[&str], env: &[(&str, &str)]) -> StartedCommand {
+    let temp = ShortTempDir::new();
+    let mut child = command(args, &[("TMPDIR", temp.text())], env)
+        .spawn()
+        .expect("start the program");
+    let stdout = read_all(child.stdout.take().expect("piped stdout"));
+    let stderr = read_all(child.stderr.take().expect("piped stderr"));
+    StartedCommand {
+        child,
+        stdout,
+        stderr,
+        _temp: temp,
+    }
+}
+
+impl StartedCommand {
+    pub fn signal(&mut self, signal: libc::c_int) {
+        let pid = libc::pid_t::try_from(self.child.id()).expect("a process id");
+        let sent = unsafe { libc::kill(pid, signal) };
+        assert_eq!(sent, 0, "{}", std::io::Error::last_os_error());
+    }
+
+    pub fn finish(&mut self, within: Duration) -> Exited {
+        let Some(status) = wait_exit(&mut self.child, within) else {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+            panic!(
+                "the program did not exit within {within:?}\nstderr:\n{}",
+                collected(&self.stderr)
+            );
+        };
+        Exited {
+            status,
+            stdout: collected(&self.stdout),
+            stderr: collected(&self.stderr),
+        }
+    }
+}
+
+impl Drop for StartedCommand {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
 pub fn wait_exit(child: &mut Child, within: Duration) -> Option<ExitStatus> {
     let deadline = Instant::now() + within;
     loop {

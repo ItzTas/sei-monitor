@@ -1,14 +1,20 @@
 package monitor
 
 import (
+	"cmp"
+	"context"
 	"errors"
-	"fmt"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/ItzTas/sei-monitor/internal/core"
+	"github.com/ItzTas/sei-monitor/internal/core/coretest"
 	"github.com/ItzTas/sei-monitor/internal/event"
 	"github.com/ItzTas/sei-monitor/internal/goldentest"
 	"github.com/ItzTas/sei-monitor/internal/goldentest/seisetup"
@@ -462,14 +468,29 @@ type goldenErrorLink struct {
 	Sentinel *string `json:"sentinel"`
 }
 
+type goldenLoginAnswer struct {
+	Status int    `json:"status"`
+	Body   string `json:"body"`
+}
+
+type goldenLoginSource struct {
+	Call        string             `json:"call"`
+	Server      string             `json:"server"`
+	LoginAnswer *goldenLoginAnswer `json:"login_answer"`
+	Password    string             `json:"password"`
+	CycleEnd    string             `json:"cycle_end"`
+}
+
 type goldenLoginFailure struct {
 	Name     string            `json:"name"`
 	Now      string            `json:"now"`
+	Source   goldenLoginSource `json:"source"`
 	APIError *goldenAPIError   `json:"api_error"`
 	Error    string            `json:"error"`
 	Chain    []goldenErrorLink `json:"chain"`
 	Reason   string            `json:"reason"`
 	Event    goldenStoredEvent `json:"event"`
+	Notes    string            `json:"notes"`
 }
 
 type goldenSuccessWait struct {
@@ -488,6 +509,7 @@ type goldenErrors struct {
 }
 
 type monitorText struct {
+	Notes        string               `json:"notes"`
 	Backoff      []goldenWait         `json:"backoff"`
 	SuccessWait  []goldenSuccessWait  `json:"success_wait"`
 	TooSoon      []goldenTooSoon      `json:"too_soon"`
@@ -499,6 +521,7 @@ type monitorText struct {
 func monitorTextVectors(t *testing.T) monitorText {
 	t.Helper()
 	return monitorText{
+		Notes:        "Each login_failure case produces its error on a fresh server: a client login against a server that answers only the login route with the recorded status and body, or a client login or monitor run against a fresh fake SEI (and, for run_once, an empty database) with the recorded password.",
 		Backoff:      backoffVectors(),
 		SuccessWait:  successWaitVectors(),
 		TooSoon:      tooSoonVectors(),
@@ -600,43 +623,138 @@ func describeVectors() []goldenDescribe {
 	return cases
 }
 
+type loginFailureInput struct {
+	name   string
+	source goldenLoginSource
+	notes  string
+}
+
 func loginFailureVectors(t *testing.T) []goldenLoginFailure {
 	t.Helper()
 	now := time.Date(2026, 11, 4, 14, 7, 9, 500000000, zone(t, "America/Boa_Vista"))
-	rejected := &sei.APIError{Route: "/autenticar", Status: 200, Message: "Usuário ou Senha Inválida."}
-	spaced := &sei.APIError{Route: "/autenticar", Status: 200, Message: " Usuário & Senha <inválidos> "}
-	silent := &sei.APIError{Route: "/autenticar", Status: 401}
-	fromClient := rejectedByTheFake(t)
-	inputs := []struct {
-		name     string
-		apiError *sei.APIError
-		err      error
-	}{
-		{"SEI message", rejected, rejected},
-		{"SEI message with spaces and markup characters", spaced, spaced},
-		{"no SEI message", silent, silent},
-		{"wrapped SEI message", rejected, fmt.Errorf("sei: log in: %w", rejected)},
-		{"joined with another error", rejected, errors.Join(rejected, errors.New("monitor: record the cycle end: connection refused"))},
-		{"not an SEI answer", nil, sei.ErrInvalidCredentials},
-		{"SEI message joined with a nil cycle-end error, as RunOnce returns it", rejected, errors.Join(rejected, nil)},
-		{"rejected by the fake SEI through the client", apiErrorIn(t, fromClient), fromClient},
+	answer := func(status int, body string) goldenLoginSource {
+		return goldenLoginSource{Call: "client_login", Server: "login_answer", LoginAnswer: &goldenLoginAnswer{Status: status, Body: body}}
+	}
+	rejected := `{"sucesso":false,"mensagem":"Usuário ou Senha Inválida."}`
+	inputs := []loginFailureInput{
+		{name: "SEI message", source: answer(http.StatusOK, rejected)},
+		{
+			name:   "SEI message with spaces and markup characters, trimmed by the client",
+			source: answer(http.StatusOK, `{"sucesso":false,"mensagem":" Usuário & Senha <inválidos> "}`),
+			notes:  "The client trims the SEI message (and unescapes HTML entities) when it reads the envelope, in envelope.message() of internal/sei/wire.go, so the reason carries no surrounding spaces.",
+		},
+		{name: "no SEI message", source: answer(http.StatusUnauthorized, `{"sucesso":false}`)},
+		{name: "SEI message with HTTP 401", source: answer(http.StatusUnauthorized, rejected)},
+		{
+			name:   "joined with a failed cycle-run update, as RunOnce returns it",
+			source: goldenLoginSource{Call: "run_once", Server: "fake", Password: "wrong", CycleEnd: "closed_pool"},
+			notes:  "RunOnce joins the login error with the error of recording the cycle end; that update runs on a Postgres pool that is already closed, which production hits when the pool is closed during shutdown.",
+		},
+		{name: "login refused with HTTP 403 and no message", source: answer(http.StatusForbidden, `{"sucesso":false}`)},
+		{
+			name:   "SEI message joined with a nil cycle-end error, as RunOnce returns it",
+			source: goldenLoginSource{Call: "run_once", Server: "fake", Password: "wrong", CycleEnd: "recorded"},
+			notes:  "RunOnce joins the login error with the nil result of recording the cycle end, so the chain starts with a one-child join.",
+		},
+		{name: "rejected by the fake SEI through the client", source: goldenLoginSource{Call: "client_login", Server: "fake", Password: "wrong"}},
 	}
 	cases := make([]goldenLoginFailure, len(inputs))
 	for i, input := range inputs {
-		reason, ev := loginFailure(input.err, now)
-		entry := goldenLoginFailure{
-			Name: input.name, Now: stamp(now), Error: input.err.Error(), Chain: errorChain(input.err, 0), Reason: reason,
+		err := loginError(t, input.source)
+		apiErr := apiErrorIn(t, err)
+		reason, ev := loginFailure(err, now)
+		cases[i] = goldenLoginFailure{
+			Name: input.name, Now: stamp(now), Source: input.source,
+			APIError: &goldenAPIError{Route: apiErr.Route, Status: apiErr.Status, Message: apiErr.Message},
+			Error:    err.Error(), Chain: errorChain(err, 0), Reason: reason,
 			Event: goldenStoredEvent{
 				Kind: ev.Kind, ProcedureID: ev.ProcedureID, Ref: ev.Ref,
 				OccurredAt: stamp(ev.OccurredAt), DetectedAt: stamp(ev.DetectedAt), Payload: ev.Payload,
 			},
+			Notes: input.notes,
 		}
-		if input.apiError != nil {
-			entry.APIError = &goldenAPIError{Route: input.apiError.Route, Status: input.apiError.Status, Message: input.apiError.Message}
-		}
-		cases[i] = entry
 	}
 	return cases
+}
+
+func loginError(t *testing.T, source goldenLoginSource) error {
+	t.Helper()
+	sources := map[string]func(*testing.T, goldenLoginSource) error{
+		"client_login": clientLoginError,
+		"run_once":     runOnceLoginError,
+	}
+	produce, ok := sources[source.Call]
+	if !ok {
+		t.Fatalf("unknown login failure source %q", source.Call)
+	}
+	err := produce(t, source)
+	if err == nil {
+		t.Fatalf("%+v produced no error", source)
+	}
+	if !errors.Is(err, sei.ErrInvalidCredentials) {
+		t.Fatalf("%v would not pause the monitor", err)
+	}
+	return err
+}
+
+func clientLoginError(t *testing.T, source goldenLoginSource) error {
+	t.Helper()
+	base, location := loginAnswerServer(t, source.LoginAnswer), time.UTC
+	if source.Server == "fake" {
+		server := seitest.New(t)
+		base, location = server.APIURL(), server.Location()
+	}
+	creds := sei.Credentials{Username: seitest.Username, Password: core.StaticPassword(core.NewSecret(cmp.Or(source.Password, seitest.Password))), OrgID: seitest.OrgID}
+	client := sei.New(base, creds, sei.Options{UserAgent: "sei-monitor/test", Location: location})
+	_, err := client.Login(t.Context())
+	return err
+}
+
+func loginAnswerServer(t *testing.T, answer *goldenLoginAnswer) string {
+	t.Helper()
+	if answer == nil {
+		return ""
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /autenticar", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(answer.Status)
+		_, _ = w.Write([]byte(answer.Body))
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+type failingCycleEnd struct {
+	*Postgres
+	closed *Postgres
+}
+
+func (f failingCycleEnd) FinishCycleRun(ctx context.Context, run core.CycleRun) error {
+	return f.closed.FinishCycleRun(ctx, run)
+}
+
+func runOnceLoginError(t *testing.T, source goldenLoginSource) error {
+	t.Helper()
+	h := newHarness(t, func(cfg *Config) {
+		cfg.Target.Password = core.StaticPassword(core.NewSecret(source.Password))
+	})
+	m := h.monitor
+	if source.CycleEnd == "closed_pool" {
+		pool, err := pgxpool.New(t.Context(), coretest.DatabaseURL(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		pool.Close()
+		noJitter := func(time.Duration) time.Duration { return 0 }
+		m = New(h.monitor.cfg, failingCycleEnd{Postgres: h.store, closed: NewPostgres(pool)}, slog.New(slog.DiscardHandler), WithClock(h.clock.Now, h.clock.After), WithJitter(noJitter))
+	}
+	if err := m.Prepare(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	_, err := m.RunOnce(t.Context(), TriggerScheduled)
+	return err
 }
 
 type goldenCycleResult struct {
@@ -652,11 +770,18 @@ type goldenCycle struct {
 }
 
 type goldenCycleConfig struct {
-	AllUnits          bool   `json:"all_units"`
-	Concurrency       int    `json:"concurrency"`
-	ReturnWarningDays int    `json:"return_warning_days"`
-	Zone              string `json:"zone"`
-	PrepareAt         string `json:"prepare_at"`
+	AllUnits          bool     `json:"all_units"`
+	Units             []string `json:"units"`
+	Concurrency       int      `json:"concurrency"`
+	ReturnWarningDays int      `json:"return_warning_days"`
+	RetentionDays     int      `json:"retention_days"`
+	PollIntervalNS    int64    `json:"poll_interval_ns"`
+	Channels          []string `json:"channels"`
+	Trigger           string   `json:"trigger"`
+	Org               string   `json:"org"`
+	Username          string   `json:"username"`
+	Zone              string   `json:"zone"`
+	PrepareAt         string   `json:"prepare_at"`
 }
 
 type cycleScenario struct {
@@ -666,21 +791,26 @@ type cycleScenario struct {
 }
 
 type cycleFile struct {
+	Notes     string            `json:"notes"`
 	Defaults  seisetup.Defaults `json:"defaults"`
 	Scenarios []cycleScenario   `json:"scenarios"`
 }
 
 func cycleVectors(t *testing.T) cycleFile {
 	t.Helper()
-	h := newHarness(t, func(cfg *Config) { cfg.AllUnits = true })
-	defaults, err := seisetup.ReadDefaults(t.Context(), h.server)
+	defaults, err := seisetup.ReadDefaults(t.Context(), seitest.New(t))
 	if err != nil {
 		t.Fatal(err)
 	}
+	h := newHarness(t, func(cfg *Config) { cfg.AllUnits = true })
+	cfg := h.monitor.cfg
 	scenario := cycleScenario{
 		Name: "every kind at once",
 		Config: goldenCycleConfig{
-			AllUnits: true, Concurrency: 3, ReturnWarningDays: 2, Zone: seitest.TimeZone,
+			AllUnits: cfg.AllUnits, Units: append([]string{}, cfg.Units...), Concurrency: cfg.Concurrency,
+			ReturnWarningDays: cfg.ReturnWarningDays, RetentionDays: cfg.RetentionDays, PollIntervalNS: int64(cfg.PollInterval),
+			Channels: append([]string{}, cfg.Channels...), Trigger: TriggerScheduled, Org: cfg.Target.Org,
+			Username: cfg.Target.Username, Zone: cfg.Location.String(),
 			PrepareAt: stamp(start.Add(7*time.Second + 250*time.Millisecond)),
 		},
 		Cycles: cycleInputs(),
@@ -707,7 +837,8 @@ func cycleVectors(t *testing.T) cycleFile {
 		}
 		recorded = len(events)
 	}
-	return cycleFile{Defaults: defaults, Scenarios: []cycleScenario{scenario}}
+	notes := "Each scenario starts on a fresh fake SEI server and an empty database; the fake's state carries over between the cycles of one scenario, each cycle applying its setup calls in order before the cycle runs."
+	return cycleFile{Notes: notes, Defaults: defaults, Scenarios: []cycleScenario{scenario}}
 }
 
 func advanceTo(t *testing.T, clock *fakeClock, text string) {
@@ -833,18 +964,6 @@ func cycleInputs() []goldenCycle {
 			},
 		},
 	}
-}
-
-func rejectedByTheFake(t *testing.T) error {
-	t.Helper()
-	server := seitest.New(t)
-	creds := sei.Credentials{Username: seitest.Username, Password: core.StaticPassword(core.NewSecret("wrong")), OrgID: seitest.OrgID}
-	client := sei.New(server.APIURL(), creds, sei.Options{UserAgent: "sei-monitor/test", Location: server.Location()})
-	_, err := client.Login(t.Context())
-	if err == nil {
-		t.Fatal("the fake accepted a wrong password")
-	}
-	return err
 }
 
 func apiErrorIn(t *testing.T, err error) *sei.APIError {

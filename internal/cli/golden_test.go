@@ -22,9 +22,12 @@ func TestGoldenVectors(t *testing.T) {
 	if !goldentest.Pinned(t) {
 		return
 	}
-	goldentest.GoldenBytes(t, "diagnose.txt", []byte(diagnoseOutput(t)))
-	goldentest.Golden(t, "commands.json", commandVectors(t))
+	commands := commandVectors(t)
+	goldentest.GoldenBytes(t, "diagnose.txt", []byte(diagnoseOutput(t, commands)))
+	goldentest.Golden(t, "commands.json", commands)
 }
+
+const diagnoseCaseName = "diagnose with the scenario of diagnose.txt"
 
 func withoutServerURL(server *seitest.Server, text string) string {
 	return strings.ReplaceAll(text, server.URL(), serverURLPlaceholder)
@@ -72,19 +75,19 @@ func seiSettings(overrides map[string]string) map[string]string {
 	return env
 }
 
-func diagnoseOutput(t *testing.T) string {
+func diagnoseOutput(t *testing.T, commands commandFile) string {
 	t.Helper()
-	server := seitest.New(t)
-	if err := seisetup.Apply(server, diagnoseSetup()); err != nil {
-		t.Fatal(err)
+	for _, c := range commands.Cases {
+		if c.Name != diagnoseCaseName {
+			continue
+		}
+		if c.ExitCode != 0 || c.Stderr != "" {
+			t.Fatalf("diagnose exit code = %d, stderr = %q", c.ExitCode, c.Stderr)
+		}
+		return c.Stdout
 	}
-
-	code, stdout, stderr := runCLI(t, withServerURL(server, seiSettings(nil)), "diagnose")
-
-	if code != 0 || stderr != "" {
-		t.Fatalf("diagnose exit code = %d, stderr = %q", code, stderr)
-	}
-	return withoutServerURL(server, stdout)
+	t.Fatalf("no command case named %q", diagnoseCaseName)
+	return ""
 }
 
 type interrupt struct {
@@ -105,6 +108,7 @@ type commandCase struct {
 }
 
 type commandFile struct {
+	Notes    string            `json:"notes"`
 	Defaults seisetup.Defaults `json:"defaults"`
 	Cases    []commandCase     `json:"cases"`
 }
@@ -125,7 +129,8 @@ func commandVectors(t *testing.T) commandFile {
 		code, stdout, stderr := runCommand(t, withServerURL(server, c.Env), c.Interrupt != nil, c.Args...)
 		c.ExitCode, c.Stdout, c.Stderr = code, withoutServerURL(server, stdout), withoutServerURL(server, stderr)
 	}
-	return commandFile{Defaults: defaults, Cases: cases}
+	notes := "Each case starts on a fresh fake SEI server (these commands use no database), applies its setup calls in order, and runs the command with exactly the recorded environment, nothing inherited; <SEI_URL> stands for the fake's base URL."
+	return commandFile{Notes: notes, Defaults: defaults, Cases: cases}
 }
 
 func runCommand(t *testing.T, env map[string]string, interrupted bool, args ...string) (int, string, string) {
@@ -182,5 +187,6 @@ func commandInputs() []commandCase {
 		command("unknown command", none, map[string]string{}, "usage", "test-logn"),
 		command("unknown flag", none, map[string]string{}, "usage", "orgs", "--nope"),
 		command("unexpected argument", none, map[string]string{}, "usage", "orgs", "extra"),
+		command(diagnoseCaseName, diagnoseSetup(), seiSettings(nil), "exact", "diagnose"),
 	}
 }

@@ -1,4 +1,5 @@
 {
+  "notes": "Each case starts on a fresh fake SEI server (these commands use no database), applies its setup calls in order, and runs the command with exactly the recorded environment, nothing inherited; <SEI_URL> stands for the fake's base URL.",
   "defaults": {
     "account": {
       "username": "fulano.tal",
@@ -22,6 +23,7 @@
         }
       ]
     },
+    "current_unit_id": 1001,
     "orgs": [
       {
         "id": 63,
@@ -696,6 +698,126 @@
       "exit_code": 2,
       "stdout": "",
       "stderr": "unknown command \"extra\" for \"sei-monitor orgs\"\nRun 'sei-monitor --help' for usage.\n"
+    },
+    {
+      "name": "diagnose with the scenario of diagnose.txt",
+      "setup": [
+        {
+          "call": "set_processes",
+          "args": {
+            "unit_id": 1001,
+            "processes": [
+              {
+                "id": 9001,
+                "number": "00000.000001/2026-00",
+                "type": "Diárias",
+                "description": "Viagem a Brasília",
+                "assignee": null,
+                "return_date": "06/11/2026",
+                "return_overdue": false,
+                "generated": false
+              },
+              {
+                "id": 9002,
+                "number": "00000.000002/2026-00",
+                "type": "Contrato",
+                "description": "",
+                "assignee": {
+                  "id": 202,
+                  "acronym": "beltrano.silva",
+                  "name": "Beltrano da Silva"
+                },
+                "return_date": "",
+                "return_overdue": false,
+                "generated": false
+              },
+              {
+                "id": 9003,
+                "number": "00000.000003/2026-00",
+                "type": "Ofício",
+                "description": "",
+                "assignee": null,
+                "return_date": "",
+                "return_overdue": false,
+                "generated": true
+              }
+            ]
+          }
+        },
+        {
+          "call": "add_activities",
+          "args": {
+            "procedure_id": 9001,
+            "activities": [
+              {
+                "id": 50001,
+                "user": "beltrano.silva",
+                "unit": "SEDEMO/PROTOCOLO",
+                "text": "Processo remetido pela unidade SEDEMO/PROTOCOLO",
+                "at": "2026-11-04T12:00:00Z"
+              },
+              {
+                "id": 50002,
+                "user": "fulano.tal",
+                "unit": "SEDEMO/NUPROC",
+                "text": "Processo recebido na unidade",
+                "at": "2026-11-04T13:00:00Z"
+              },
+              {
+                "id": 50003,
+                "user": "fulano.tal",
+                "unit": "SEDEMO/NUPROC",
+                "text": "Documento Ofício 12 assinado",
+                "at": "2026-11-04T14:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "call": "add_documents",
+          "args": {
+            "procedure_id": 9001,
+            "documents": [
+              {
+                "id": 80001,
+                "protocol": "0012345",
+                "type": "Ofício",
+                "number": "12",
+                "label": "Ofício 12 (0012345)"
+              },
+              {
+                "id": 80002,
+                "protocol": "0012346",
+                "type": "Despacho",
+                "number": "3",
+                "label": "Despacho 3 (0012346)"
+              },
+              {
+                "id": 80003,
+                "protocol": "0012347",
+                "type": "Anexo",
+                "number": "",
+                "label": "Anexo (0012347)"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        "diagnose"
+      ],
+      "env": {
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "senha-de-teste",
+        "SEI_TIMEZONE": "America/Boa_Vista",
+        "SEI_URL": "<SEI_URL>",
+        "SEI_USERNAME": "fulano.tal"
+      },
+      "interrupt": null,
+      "compare": "exact",
+      "exit_code": 0,
+      "stdout": "sei-monitor diagnose\nSEI 5.0.5, mod-wssei 3.0.4; units: 2 available, 1 watched (checks use the first one)\n\n[1] Pagination with limit=2\n    /processo/listar: page 0 has 2 ids, page 1 has 1, 0 in common -> start is a page number\n    /atividade/listar: page 0 has 2 ids, page 1 has 1, 0 in common -> start is a page number\n    /documento/listar: page 0 has 2 ids, page 1 has 1, 0 in common -> start is a page number\n\n[2] Coverage of /processo/listar by processoGeradoRecebido\n    default call: total 3; G=1 R=2 other=0\n    tipo=R:       total 2; G=0 R=2 other=0\n    tipo=G:       total 1; G=1 R=0 other=0\n\n[3] Scheduled returns (first 100 processes)\n    retornoProgramado=S: 1; retornoData: object{dataProgramada,unidade} x1\n    dataProgramada: 99/99/9999 x1\n    retornoProgramado=N with retornoData filled: 2 (sei-monitor ignores those)\n\n[4] Fields that may hold a link\n    none in the process items\n    a stable link to a process still needs a manual check in the browser\n\n[5] Field types\n    process: id string x3; idProcedimento string x3; usuarioAtribuido null x2, object x1; total string\n    activity: id string x3; data string x3; hora string x3; usuario string x3\n    document: id string x3; nomeComposto string x3; protocoloFormatado string x3\n    empty page: data key absent, total string\n\n[6] Order\n    activities: newest first (ids going down)\n    documents: oldest first (ids going up)\n",
+      "stderr": ""
     }
   ]
 }

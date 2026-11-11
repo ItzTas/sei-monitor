@@ -1,4 +1,5 @@
 {
+  "notes": "Each login_failure case produces its error on a fresh server: a client login against a server that answers only the login route with the recorded status and body, or a client login or monitor run against a fresh fake SEI (and, for run_once, an empty database) with the recorded password.",
   "backoff": [
     {
       "poll_interval_ns": 300000000000,
@@ -309,6 +310,16 @@
     {
       "name": "SEI message",
       "now": "2026-11-04T18:07:09.5Z",
+      "source": {
+        "call": "client_login",
+        "server": "login_answer",
+        "login_answer": {
+          "status": 200,
+          "body": "{\"sucesso\":false,\"mensagem\":\"Usuário ou Senha Inválida.\"}"
+        },
+        "password": "",
+        "cycle_end": ""
+      },
       "api_error": {
         "route": "/autenticar",
         "status": 200,
@@ -320,7 +331,7 @@
           "depth": 0,
           "type": "api_error",
           "message": "sei: /autenticar: Usuário ou Senha Inválida.",
-          "sentinel": null
+          "sentinel": "invalid_credentials"
         }
       ],
       "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
@@ -333,26 +344,37 @@
         "payload": {
           "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
         }
-      }
+      },
+      "notes": ""
     },
     {
-      "name": "SEI message with spaces and markup characters",
+      "name": "SEI message with spaces and markup characters, trimmed by the client",
       "now": "2026-11-04T18:07:09.5Z",
+      "source": {
+        "call": "client_login",
+        "server": "login_answer",
+        "login_answer": {
+          "status": 200,
+          "body": "{\"sucesso\":false,\"mensagem\":\" Usuário & Senha <inválidos> \"}"
+        },
+        "password": "",
+        "cycle_end": ""
+      },
       "api_error": {
         "route": "/autenticar",
         "status": 200,
-        "message": " Usuário & Senha <inválidos> "
+        "message": "Usuário & Senha <inválidos>"
       },
-      "error": "sei: /autenticar:  Usuário & Senha <inválidos> ",
+      "error": "sei: /autenticar: Usuário & Senha <inválidos>",
       "chain": [
         {
           "depth": 0,
           "type": "api_error",
-          "message": "sei: /autenticar:  Usuário & Senha <inválidos> ",
-          "sentinel": null
+          "message": "sei: /autenticar: Usuário & Senha <inválidos>",
+          "sentinel": "invalid_credentials"
         }
       ],
-      "reason": "SEI rejected the login ( Usuário & Senha <inválidos> )",
+      "reason": "SEI rejected the login (Usuário & Senha <inválidos>)",
       "event": {
         "kind": "account_login_failed",
         "procedure_id": 0,
@@ -360,13 +382,24 @@
         "occurred_at": "0001-01-01T00:00:00Z",
         "detected_at": "0001-01-01T00:00:00Z",
         "payload": {
-          "reason": "SEI rejected the login ( Usuário & Senha <inválidos> )"
+          "reason": "SEI rejected the login (Usuário & Senha <inválidos>)"
         }
-      }
+      },
+      "notes": "The client trims the SEI message (and unescapes HTML entities) when it reads the envelope, in envelope.message() of internal/sei/wire.go, so the reason carries no surrounding spaces."
     },
     {
       "name": "no SEI message",
       "now": "2026-11-04T18:07:09.5Z",
+      "source": {
+        "call": "client_login",
+        "server": "login_answer",
+        "login_answer": {
+          "status": 401,
+          "body": "{\"sucesso\":false}"
+        },
+        "password": "",
+        "cycle_end": ""
+      },
       "api_error": {
         "route": "/autenticar",
         "status": 401,
@@ -378,107 +411,6 @@
           "depth": 0,
           "type": "api_error",
           "message": "sei: /autenticar answered HTTP 401",
-          "sentinel": null
-        }
-      ],
-      "reason": "SEI rejected the login",
-      "event": {
-        "kind": "account_login_failed",
-        "procedure_id": 0,
-        "ref": "login:2026-11-04T18:07:09Z",
-        "occurred_at": "0001-01-01T00:00:00Z",
-        "detected_at": "0001-01-01T00:00:00Z",
-        "payload": {
-          "reason": "SEI rejected the login"
-        }
-      }
-    },
-    {
-      "name": "wrapped SEI message",
-      "now": "2026-11-04T18:07:09.5Z",
-      "api_error": {
-        "route": "/autenticar",
-        "status": 200,
-        "message": "Usuário ou Senha Inválida."
-      },
-      "error": "sei: log in: sei: /autenticar: Usuário ou Senha Inválida.",
-      "chain": [
-        {
-          "depth": 0,
-          "type": "wrapped",
-          "message": "sei: log in: sei: /autenticar: Usuário ou Senha Inválida.",
-          "sentinel": null
-        },
-        {
-          "depth": 1,
-          "type": "api_error",
-          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
-          "sentinel": null
-        }
-      ],
-      "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
-      "event": {
-        "kind": "account_login_failed",
-        "procedure_id": 0,
-        "ref": "login:2026-11-04T18:07:09Z",
-        "occurred_at": "0001-01-01T00:00:00Z",
-        "detected_at": "0001-01-01T00:00:00Z",
-        "payload": {
-          "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
-        }
-      }
-    },
-    {
-      "name": "joined with another error",
-      "now": "2026-11-04T18:07:09.5Z",
-      "api_error": {
-        "route": "/autenticar",
-        "status": 200,
-        "message": "Usuário ou Senha Inválida."
-      },
-      "error": "sei: /autenticar: Usuário ou Senha Inválida.\nmonitor: record the cycle end: connection refused",
-      "chain": [
-        {
-          "depth": 0,
-          "type": "joined",
-          "message": "sei: /autenticar: Usuário ou Senha Inválida.\nmonitor: record the cycle end: connection refused",
-          "sentinel": null
-        },
-        {
-          "depth": 1,
-          "type": "api_error",
-          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
-          "sentinel": null
-        },
-        {
-          "depth": 1,
-          "type": "plain",
-          "message": "monitor: record the cycle end: connection refused",
-          "sentinel": null
-        }
-      ],
-      "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
-      "event": {
-        "kind": "account_login_failed",
-        "procedure_id": 0,
-        "ref": "login:2026-11-04T18:07:09Z",
-        "occurred_at": "0001-01-01T00:00:00Z",
-        "detected_at": "0001-01-01T00:00:00Z",
-        "payload": {
-          "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
-        }
-      }
-    },
-    {
-      "name": "not an SEI answer",
-      "now": "2026-11-04T18:07:09.5Z",
-      "api_error": null,
-      "error": "SEI rejected the login",
-      "chain": [
-        {
-          "depth": 0,
-          "type": "plain",
-          "message": "SEI rejected the login",
           "sentinel": "invalid_credentials"
         }
       ],
@@ -492,11 +424,148 @@
         "payload": {
           "reason": "SEI rejected the login"
         }
-      }
+      },
+      "notes": ""
+    },
+    {
+      "name": "SEI message with HTTP 401",
+      "now": "2026-11-04T18:07:09.5Z",
+      "source": {
+        "call": "client_login",
+        "server": "login_answer",
+        "login_answer": {
+          "status": 401,
+          "body": "{\"sucesso\":false,\"mensagem\":\"Usuário ou Senha Inválida.\"}"
+        },
+        "password": "",
+        "cycle_end": ""
+      },
+      "api_error": {
+        "route": "/autenticar",
+        "status": 401,
+        "message": "Usuário ou Senha Inválida."
+      },
+      "error": "sei: /autenticar: Usuário ou Senha Inválida.",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "api_error",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
+          "sentinel": "invalid_credentials"
+        }
+      ],
+      "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
+      "event": {
+        "kind": "account_login_failed",
+        "procedure_id": 0,
+        "ref": "login:2026-11-04T18:07:09Z",
+        "occurred_at": "0001-01-01T00:00:00Z",
+        "detected_at": "0001-01-01T00:00:00Z",
+        "payload": {
+          "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+        }
+      },
+      "notes": ""
+    },
+    {
+      "name": "joined with a failed cycle-run update, as RunOnce returns it",
+      "now": "2026-11-04T18:07:09.5Z",
+      "source": {
+        "call": "run_once",
+        "server": "fake",
+        "login_answer": null,
+        "password": "wrong",
+        "cycle_end": "closed_pool"
+      },
+      "api_error": {
+        "route": "/autenticar",
+        "status": 200,
+        "message": "Usuário ou Senha Inválida."
+      },
+      "error": "sei: /autenticar: Usuário ou Senha Inválida.\nclosed pool",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "joined",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.\nclosed pool",
+          "sentinel": "invalid_credentials"
+        },
+        {
+          "depth": 1,
+          "type": "api_error",
+          "message": "sei: /autenticar: Usuário ou Senha Inválida.",
+          "sentinel": "invalid_credentials"
+        },
+        {
+          "depth": 1,
+          "type": "plain",
+          "message": "closed pool",
+          "sentinel": null
+        }
+      ],
+      "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
+      "event": {
+        "kind": "account_login_failed",
+        "procedure_id": 0,
+        "ref": "login:2026-11-04T18:07:09Z",
+        "occurred_at": "0001-01-01T00:00:00Z",
+        "detected_at": "0001-01-01T00:00:00Z",
+        "payload": {
+          "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
+        }
+      },
+      "notes": "RunOnce joins the login error with the error of recording the cycle end; that update runs on a Postgres pool that is already closed, which production hits when the pool is closed during shutdown."
+    },
+    {
+      "name": "login refused with HTTP 403 and no message",
+      "now": "2026-11-04T18:07:09.5Z",
+      "source": {
+        "call": "client_login",
+        "server": "login_answer",
+        "login_answer": {
+          "status": 403,
+          "body": "{\"sucesso\":false}"
+        },
+        "password": "",
+        "cycle_end": ""
+      },
+      "api_error": {
+        "route": "/autenticar",
+        "status": 403,
+        "message": ""
+      },
+      "error": "sei: /autenticar answered HTTP 403",
+      "chain": [
+        {
+          "depth": 0,
+          "type": "api_error",
+          "message": "sei: /autenticar answered HTTP 403",
+          "sentinel": "invalid_credentials"
+        }
+      ],
+      "reason": "SEI rejected the login",
+      "event": {
+        "kind": "account_login_failed",
+        "procedure_id": 0,
+        "ref": "login:2026-11-04T18:07:09Z",
+        "occurred_at": "0001-01-01T00:00:00Z",
+        "detected_at": "0001-01-01T00:00:00Z",
+        "payload": {
+          "reason": "SEI rejected the login"
+        }
+      },
+      "notes": ""
     },
     {
       "name": "SEI message joined with a nil cycle-end error, as RunOnce returns it",
       "now": "2026-11-04T18:07:09.5Z",
+      "source": {
+        "call": "run_once",
+        "server": "fake",
+        "login_answer": null,
+        "password": "wrong",
+        "cycle_end": "recorded"
+      },
       "api_error": {
         "route": "/autenticar",
         "status": 200,
@@ -508,13 +577,13 @@
           "depth": 0,
           "type": "joined",
           "message": "sei: /autenticar: Usuário ou Senha Inválida.",
-          "sentinel": null
+          "sentinel": "invalid_credentials"
         },
         {
           "depth": 1,
           "type": "api_error",
           "message": "sei: /autenticar: Usuário ou Senha Inválida.",
-          "sentinel": null
+          "sentinel": "invalid_credentials"
         }
       ],
       "reason": "SEI rejected the login (Usuário ou Senha Inválida.)",
@@ -527,11 +596,19 @@
         "payload": {
           "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
         }
-      }
+      },
+      "notes": "RunOnce joins the login error with the nil result of recording the cycle end, so the chain starts with a one-child join."
     },
     {
       "name": "rejected by the fake SEI through the client",
       "now": "2026-11-04T18:07:09.5Z",
+      "source": {
+        "call": "client_login",
+        "server": "fake",
+        "login_answer": null,
+        "password": "wrong",
+        "cycle_end": ""
+      },
       "api_error": {
         "route": "/autenticar",
         "status": 200,
@@ -556,7 +633,8 @@
         "payload": {
           "reason": "SEI rejected the login (Usuário ou Senha Inválida.)"
         }
-      }
+      },
+      "notes": ""
     }
   ],
   "errors": {

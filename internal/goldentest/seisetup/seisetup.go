@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ItzTas/sei-monitor/internal/core"
+	"github.com/ItzTas/sei-monitor/internal/sei"
 	"github.com/ItzTas/sei-monitor/internal/sei/seitest"
 )
 
@@ -231,6 +233,7 @@ type Versions struct {
 
 type Defaults struct {
 	Account         Account  `json:"account"`
+	CurrentUnitID   int64    `json:"current_unit_id"`
 	Orgs            []Org    `json:"orgs"`
 	OrgListTotal    int      `json:"org_list_total"`
 	OrgListPageSize int      `json:"org_list_page_size"`
@@ -260,6 +263,9 @@ func ReadDefaults(ctx context.Context, server *seitest.Server) (Defaults, error)
 	if err != nil {
 		return Defaults{}, err
 	}
+	if defaults.CurrentUnitID, err = currentUnit(ctx, server, account); err != nil {
+		return Defaults{}, err
+	}
 	defaults.OrgListPageSize = len(page.Data)
 	if defaults.OrgListTotal, err = strconv.Atoi(page.Total); err != nil {
 		return Defaults{}, fmt.Errorf("seisetup: org list total %q: %w", page.Total, err)
@@ -287,4 +293,14 @@ func orgPage(ctx context.Context, server *seitest.Server) (orgListing, error) {
 		return orgListing{}, fmt.Errorf("seisetup: read the org list: %w", err)
 	}
 	return page, nil
+}
+
+func currentUnit(ctx context.Context, server *seitest.Server, account seitest.Account) (int64, error) {
+	creds := sei.Credentials{Username: account.Username, Password: core.StaticPassword(core.NewSecret(account.Password)), OrgID: account.OrgID}
+	client := sei.New(server.APIURL(), creds, sei.Options{UserAgent: "sei-monitor/test", Location: server.Location()})
+	session, err := client.Login(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("seisetup: log in to the fake: %w", err)
+	}
+	return session.CurrentUnitID, nil
 }

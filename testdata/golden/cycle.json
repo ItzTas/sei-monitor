@@ -1,4 +1,5 @@
 {
+  "notes": "Each scenario starts on a fresh fake SEI server and an empty database; the fake's state carries over between the cycles of one scenario, each cycle applying its setup calls in order before the cycle runs.",
   "defaults": {
     "account": {
       "username": "fulano.tal",
@@ -22,6 +23,7 @@
         }
       ]
     },
+    "current_unit_id": 1001,
     "orgs": [
       {
         "id": 63,
@@ -98,8 +100,17 @@
       "name": "every kind at once",
       "config": {
         "all_units": true,
+        "units": [],
         "concurrency": 3,
         "return_warning_days": 2,
+        "retention_days": 0,
+        "poll_interval_ns": 900000000000,
+        "channels": [
+          "webhook"
+        ],
+        "trigger": "scheduled",
+        "org": "SEDEMO",
+        "username": "fulano.tal",
         "zone": "America/Boa_Vista",
         "prepare_at": "2026-11-04T18:00:07.25Z"
       },

@@ -261,15 +261,13 @@ async fn a_silent_server_times_out_naming_the_step() {
     let pooled = store(&url);
     let database_url = secret(&url);
 
-    let started = Instant::now();
-    let (lock, run) = tokio::join!(acquire_writer_lock(&database_url), pooled.last_cycle_run(1));
-    let elapsed = started.elapsed();
+    let both = tokio::time::timeout(Duration::from_secs(10) + SLACK, async {
+        tokio::join!(acquire_writer_lock(&database_url), pooled.last_cycle_run(1))
+    })
+    .await;
     silent.abort();
+    let (lock, run) = both.expect("a silent server held a call past its connect limit");
 
-    assert!(
-        elapsed < Duration::from_secs(10) + SLACK,
-        "took {elapsed:?}"
-    );
     let Err(lock) = lock else {
         panic!("a silent server gave a lock")
     };

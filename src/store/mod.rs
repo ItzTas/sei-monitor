@@ -194,15 +194,19 @@ fn chain_text(error: &(dyn Error + 'static)) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use monitor_hub_plugin_testkit::database;
     use tokio_postgres::{Client, Config};
 
-    use super::{Store, acquire_writer_lock, lock_config, pool_config};
+    use super::{
+        CONNECT_TIMEOUT, POOL_SIZE, Store, StoreError, acquire_writer_lock, lock_config,
+        pool_config,
+    };
     use crate::secret::Secret;
 
     const URL: &str = "postgres://sei:hunter2@db.internal:5432/sei";
+    const SLACK: Duration = Duration::from_secs(3);
 
     fn with_query(url: &str, parameter: &str) -> Secret {
         let separator = if url.contains('?') { '&' } else { '?' };
@@ -273,5 +277,33 @@ mod tests {
             .expect("lock");
         assert_eq!(show(&lock.client, "statement_timeout").await, "0");
         assert_eq!(show(&lock.client, "lock_timeout").await, "0");
+    }
+
+    #[tokio::test]
+    async fn a_full_pool_times_out_waiting_for_a_free_connection() {
+        let Some(db) = database().await else { return };
+        let store = Store::new(&Secret::new(db.url.clone())).expect("store");
+        let mut held = Vec::new();
+        for _ in 0..POOL_SIZE {
+            held.push(store.client().await.expect("pooled connection"));
+        }
+
+        let started = Instant::now();
+        let error = tokio::time::timeout(CONNECT_TIMEOUT + SLACK, store.last_cycle_run(1))
+            .await
+            .expect("a full pool held the call past its wait limit")
+            .expect_err("a call answered with every connection held");
+        assert!(
+            started.elapsed() >= CONNECT_TIMEOUT,
+            "{:?}",
+            started.elapsed()
+        );
+        assert!(
+            matches!(error, StoreError::Timeout("waiting for a free connection")),
+            "{error:?}"
+        );
+
+        held.pop();
+        held.push(store.client().await.expect("the released connection"));
     }
 }

@@ -5,13 +5,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use sei_monitor::event::Kind;
-use sei_monitor::monitor::{Clock, Monitor, MonitorError, TriggerError};
+use sei_monitor::monitor::{Clock, Monitor, MonitorError, State, TriggerError};
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{AccountKey, CycleRun, Store, Trigger};
 use tokio::task::JoinHandle;
 
 use support::fake_sei::{FakeSei, ORG_ID, PASSWORD, ROUTE_PROCESSES, USERNAME};
-use support::harness::{FIFTEEN_MINUTES, Harness, bounded, config, database_store, populate};
+use support::harness::{
+    FIFTEEN_MINUTES, Harness, bounded, config, database_store, no_jitter, populate,
+};
 use support::logs::{LoggedEvent, captured, logged};
 
 const SETTLE: Duration = Duration::from_millis(100);
@@ -19,6 +21,7 @@ const POLL: Duration = Duration::from_millis(10);
 const EVENTUALLY: Duration = Duration::from_secs(10);
 const CHANGED_PASSWORD: &str = "changed-by-the-user";
 const REJECTED: &str = "Usuário ou Senha Inválida.";
+const RECORDED_REASON: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
 
 fn minutes(n: u64) -> Duration {
     Duration::from_secs(n * 60)
@@ -99,6 +102,36 @@ async fn fire_pending_sleeps(h: &Harness, limit: usize) -> usize {
         sleep.fire.send(()).expect("the monitor is waiting");
     }
     fired
+}
+
+async fn record_rejection(h: &Harness) -> String {
+    let account = h
+        .store
+        .ensure_account(&account_key(h), h.clock.now())
+        .await
+        .expect("account");
+    h.store
+        .set_paused_reason(account.id, RECORDED_REASON)
+        .await
+        .expect("record the rejection");
+    RECORDED_REASON.to_owned()
+}
+
+fn another_monitor(h: &Harness) -> Arc<Monitor> {
+    Monitor::new(
+        config(&h.fake, PASSWORD),
+        h.store.clone(),
+        h.clock.clone(),
+        no_jitter(),
+    )
+}
+
+async fn held(monitor: &Monitor) -> bool {
+    eventually(|| async {
+        let state = monitor.state();
+        state.paused && state.held
+    })
+    .await
 }
 
 fn store_that_never_connects() -> Store {
@@ -379,4 +412,138 @@ async fn a_second_run_returns_while_the_first_is_alive() {
     assert_eq!(h.fake.logins(), logins);
     let run = last_run(&h).await;
     assert_eq!((run.error.as_str(), run.processes_seen), ("", 2));
+}
+
+#[tokio::test]
+async fn a_recorded_rejection_holds_every_start_until_a_check_is_requested() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    h.fake.set_password(CHANGED_PASSWORD);
+    let reason = record_rejection(&h).await;
+
+    let mut starts = Vec::new();
+    let mut runs = Vec::new();
+    let mut monitor = another_monitor(&h);
+    for start in 0..5 {
+        if start > 0 {
+            h.clock.advance(Duration::from_secs(3600));
+            monitor = another_monitor(&h);
+        }
+        runs.push(spawn_run(&monitor));
+        starts.push((held(&monitor).await, fire_pending_sleeps(&h, 3).await));
+        if start < 4 {
+            runs.pop();
+        }
+    }
+    let held_state = monitor.state();
+    let logins = (h.fake.logins(), h.fake.failed_logins());
+    let events = store
+        .events_after(held_state.account_id, 0, 500)
+        .await
+        .expect("events");
+    let checked = monitor.trigger_cycle();
+    let rejected = eventually(|| async {
+        let state = monitor.state();
+        h.fake.failed_logins() > 0 && state.paused && !state.held
+    })
+    .await;
+    let again = monitor.trigger_cycle();
+
+    assert_eq!(logins, (0, 0));
+    assert_eq!(starts, [(true, 0); 5]);
+    let expected = State {
+        paused: true,
+        held: true,
+        paused_reason: reason.clone(),
+        next_cycle_at: None,
+        ..held_state.clone()
+    };
+    assert_eq!(held_state, expected);
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(events[0].kind, Kind::AccountLoginFailed);
+    assert_eq!(events[0].reference, "login-held:2026-11-04");
+    assert_eq!(
+        events[0].payload.reason,
+        format!(
+            "{reason}; still paused after a restart: request a check once the configuration is fixed"
+        )
+    );
+    assert_eq!(checked, Ok(()));
+    assert!(rejected, "the requested check never ran");
+    assert_eq!(h.fake.failed_logins(), 1);
+    assert_eq!(again, Err(TriggerError::Paused));
+}
+
+#[tokio::test]
+async fn a_check_with_the_password_fixed_resumes_monitoring() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    record_rejection(&h).await;
+    let _run = spawn_run(&h.monitor);
+    let was_held = held(&h.monitor).await;
+
+    let checked = h.monitor.trigger_cycle();
+    let next = h.clock.next_sleep().await;
+
+    assert!(was_held, "the monitor did not start held");
+    assert_eq!(checked, Ok(()));
+    assert_eq!(next.duration, FIFTEEN_MINUTES);
+    let state = h.monitor.state();
+    assert_eq!(
+        (state.paused, state.held, state.paused_reason.as_str()),
+        (false, false, "")
+    );
+    assert_eq!(stored_reason(&h).await.as_deref(), Some(""));
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (1, 0));
+    let run = last_run(&h).await;
+    assert_eq!((run.trigger, run.error.as_str()), (Trigger::Manual, ""));
+}
+
+#[tokio::test]
+async fn a_failed_check_keeps_the_recorded_rejection_on_hold() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    let reason = record_rejection(&h).await;
+    h.fake.fail_next(ROUTE_PROCESSES, 502, 1);
+    let _run = spawn_run(&h.monitor);
+    let was_held = held(&h.monitor).await;
+
+    let checked = h.monitor.trigger_cycle();
+    let finished = eventually(|| async {
+        let run = h.store.last_cycle_run(h.account_id()).await;
+        run.is_ok_and(|run| run.is_some_and(|run| run.finished_at.is_some()))
+    })
+    .await;
+    let fired = fire_pending_sleeps(&h, 3).await;
+    let state = h.monitor.state();
+    let too_soon = h.monitor.trigger_cycle();
+    h.clock.advance(minutes(5));
+    let again = h.monitor.trigger_cycle();
+
+    assert!(was_held, "the monitor did not start held");
+    assert_eq!(checked, Ok(()));
+    assert!(finished, "the requested check never finished");
+    assert_eq!(fired, 0, "the held monitor scheduled a cycle");
+    assert_eq!(
+        (state.paused, state.held, state.paused_reason.as_str()),
+        (true, true, reason.as_str())
+    );
+    assert_eq!(stored_reason(&h).await, Some(reason));
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (1, 0));
+    assert_eq!(
+        too_soon,
+        Err(TriggerError::TooSoon {
+            retry_after: minutes(5)
+        })
+    );
+    assert_eq!(again, Ok(()));
 }

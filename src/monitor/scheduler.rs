@@ -3,17 +3,27 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, TimeDelta, Utc};
+use tokio::sync::mpsc;
 use tracing::{error, warn};
 
 use super::{CycleResult, Monitor, MonitorError, login_failure};
 use crate::config::MIN_POLL_INTERVAL;
 use crate::duration::{format_go_duration, round_go_duration};
+use crate::event::{Event, Kind, Payload};
 use crate::sei::{ErrorKind, SeiError};
-use crate::store::{CycleChanges, Trigger};
+use crate::store::{CycleChanges, StoreError, Trigger};
 
 const FIRST_RETRY_DELAY: Duration = Duration::from_secs(30);
 const MAX_DOUBLINGS: u32 = 16;
 const SECOND_NANOS: i64 = 1_000_000_000;
+const HELD_SUFFIX: &str =
+    "; still paused after a restart: request a check once the configuration is fixed";
+
+enum Standing {
+    Active,
+    Held,
+    Paused,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TriggerError {
@@ -36,7 +46,7 @@ pub enum TriggerError {
 impl Monitor {
     pub fn trigger_cycle(&self) -> Result<(), TriggerError> {
         let inner = self.inner();
-        if inner.state.paused {
+        if inner.state.paused && !inner.state.held {
             return Err(TriggerError::Paused);
         }
         if inner.prepared.is_none() {
@@ -55,19 +65,34 @@ impl Monitor {
         let Ok(mut manual) = self.manual_signals.try_lock() else {
             return;
         };
-        if self.inner().state.paused {
-            return std::future::pending().await;
-        }
-        if !self.prepare_until_ready().await {
+        if !self.inner().state.paused && !self.start().await {
             return;
         }
         let mut trigger = Trigger::Scheduled;
         let mut failures = 0;
         loop {
+            match self.standing() {
+                Standing::Active => {}
+                Standing::Held => {
+                    self.wait_for_check(&mut manual).await;
+                    trigger = Trigger::Manual;
+                }
+                Standing::Paused => return std::future::pending().await,
+            }
             let outcome = self.run_once(trigger).await;
             if let Some(rejection) = rejected_login(&outcome) {
                 self.pause(rejection).await;
-                return std::future::pending().await;
+                continue;
+            }
+            if let Err(failure) = &outcome
+                && let Some(reason) = self.rejection_on_record()
+            {
+                warn!(
+                    error = failure as &dyn Error,
+                    "the requested check failed; monitoring stays paused until another check is requested"
+                );
+                self.mark_held(&reason);
+                continue;
             }
             let wait = next_wait(
                 outcome.as_ref().err(),
@@ -81,6 +106,85 @@ impl Monitor {
                 Some(()) = manual.recv() => Trigger::Manual,
             };
         }
+    }
+
+    async fn start(&self) -> bool {
+        if !self.prepare_until_ready().await {
+            return false;
+        }
+        if let Some(reason) = self.rejection_on_record() {
+            self.hold(&reason).await;
+        }
+        true
+    }
+
+    fn standing(&self) -> Standing {
+        let inner = self.inner();
+        if !inner.state.paused {
+            return Standing::Active;
+        }
+        if inner.state.held {
+            return Standing::Held;
+        }
+        Standing::Paused
+    }
+
+    async fn wait_for_check(&self, manual: &mut mpsc::Receiver<()>) {
+        manual.recv().await;
+        let mut inner = self.inner();
+        inner.state.paused = false;
+        inner.state.held = false;
+    }
+
+    fn rejection_on_record(&self) -> Option<String> {
+        let inner = self.inner();
+        let reason = &inner.prepared.as_ref()?.account.paused_reason;
+        (!reason.is_empty()).then(|| reason.clone())
+    }
+
+    async fn hold(&self, reason: &str) {
+        let now = self.clock.now();
+        let account_id = self.mark_held(reason);
+        error!(
+            reason = %reason,
+            "SEI rejected the login in an earlier run; monitoring stays paused until a check is requested with the configuration fixed"
+        );
+        let event = held_event(reason, now);
+        if let Err(failure) = self.record_event(account_id, now, event).await {
+            error!(
+                error = &failure as &dyn Error,
+                "could not record the login failure event"
+            );
+        }
+    }
+
+    fn mark_held(&self, reason: &str) -> i64 {
+        let mut inner = self.inner();
+        inner.state.paused = true;
+        inner.state.held = true;
+        inner.state.paused_reason = reason.to_owned();
+        inner.state.next_cycle_at = None;
+        inner.state.account_id
+    }
+
+    async fn record_event(
+        &self,
+        account_id: i64,
+        now: DateTime<Utc>,
+        event: Event,
+    ) -> Result<(), StoreError> {
+        let changes = CycleChanges {
+            account_id,
+            run_id: None,
+            now,
+            finished_at: now,
+            baseline: false,
+            processes: Vec::new(),
+            left: Vec::new(),
+            documents: Vec::new(),
+            events: vec![event],
+        };
+        self.store.apply_cycle(&changes).await.map(drop)
     }
 
     async fn prepare_until_ready(&self) -> bool {
@@ -134,20 +238,9 @@ impl Monitor {
             reason = %reason,
             "SEI rejected the login; monitoring is paused until sei-monitor restarts with the configuration fixed"
         );
-        let changes = CycleChanges {
-            account_id,
-            run_id: None,
-            now,
-            finished_at: now,
-            baseline: false,
-            processes: Vec::new(),
-            left: Vec::new(),
-            documents: Vec::new(),
-            events: vec![event],
-        };
         let (paused, recorded) = tokio::join!(
             self.store.set_paused_reason(account_id, &reason),
-            self.store.apply_cycle(&changes)
+            self.record_event(account_id, now, event)
         );
         if let Err(failure) = paused {
             error!(error = &failure as &dyn Error, "could not record the pause");
@@ -163,12 +256,29 @@ impl Monitor {
     fn mark_paused(&self, reason: &str) -> i64 {
         let mut inner = self.inner();
         inner.state.paused = true;
+        inner.state.held = false;
         inner.state.paused_reason = reason.to_owned();
         inner.state.next_cycle_at = None;
         if let Some(prepared) = inner.prepared.as_mut() {
             prepared.account.paused_reason = reason.to_owned();
         }
         inner.state.account_id
+    }
+}
+
+fn held_event(reason: &str, now: DateTime<Utc>) -> Event {
+    Event {
+        id: 0,
+        account_id: 0,
+        kind: Kind::AccountLoginFailed,
+        procedure_id: 0,
+        reference: format!("login-held:{}", now.date_naive()),
+        occurred_at: None,
+        detected_at: None,
+        payload: Payload {
+            reason: format!("{reason}{HELD_SUFFIX}"),
+            ..Payload::default()
+        },
     }
 }
 

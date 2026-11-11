@@ -79,6 +79,7 @@ pub struct State {
     pub user: CurrentUser,
     pub running: bool,
     pub paused: bool,
+    pub held: bool,
     pub paused_reason: String,
     pub next_cycle_at: Option<DateTime<Utc>>,
     pub last_started_at: Option<DateTime<Utc>>,

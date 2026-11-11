@@ -1679,3 +1679,41 @@ async fn past_the_reported_limit_one_line_says_so_and_reads_stay_quiet() {
     assert_eq!(again.expect("no readable events again"), Vec::new());
     assert_eq!(logs, Vec::<LoggedEvent>::new());
 }
+
+#[tokio::test]
+async fn the_last_issued_seq_never_goes_back() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let store = store(&db.url);
+    assert_eq!(store.last_issued_seq().await.expect("on a new database"), 0);
+    let account = store
+        .ensure_account(&key(), repo_now())
+        .await
+        .expect("account");
+    let client = connect(&db.url).await;
+    let issued: Vec<i64> = client
+        .query(
+            "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
+             SELECT $1, 'process_left', 1, 'r' || n, $2, $2, '{}'
+             FROM generate_series(1, 3) AS n
+             RETURNING id",
+            &[&account.id, &repo_now()],
+        )
+        .await
+        .expect("insert events")
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+    let newest = *issued.iter().max().expect("three events");
+
+    assert_eq!(store.last_issued_seq().await.expect("issued"), newest);
+    client
+        .execute("DELETE FROM events", &[])
+        .await
+        .expect("remove every event");
+    assert_eq!(
+        store.last_issued_seq().await.expect("after pruning"),
+        newest
+    );
+}

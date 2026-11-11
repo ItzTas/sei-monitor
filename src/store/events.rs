@@ -15,6 +15,11 @@ const EVENTS_AFTER: &str =
     "SELECT id, account_id, kind, procedure_id, ref, occurred_at, detected_at, payload
 FROM events WHERE account_id = $1 AND id > $2 ORDER BY id LIMIT $3";
 
+const LAST_ISSUED_SEQ: &str = "SELECT GREATEST(
+    (SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM events_id_seq),
+    (SELECT COALESCE(max(id), 0) FROM events)
+)";
+
 const PRUNE_EVENTS_BEFORE: &str =
     "DELETE FROM events WHERE account_id = $1 AND detected_at < $2 AND id <= $3";
 
@@ -101,6 +106,11 @@ impl Store {
                 return Err(StoreError::TooManyUnreadableEvents(walked));
             }
         }
+    }
+
+    pub async fn last_issued_seq(&self) -> Result<i64, StoreError> {
+        let row = self.client().await?.query_one(LAST_ISSUED_SEQ, &[]).await?;
+        Ok(row.try_get(0)?)
     }
 
     pub async fn prune_before(

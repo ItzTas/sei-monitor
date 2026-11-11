@@ -117,7 +117,10 @@ impl PasswordCommand {
             Some(Err(err)) => return fail(CommandFailure::Start(err.to_string()), -1),
             Some(Ok(())) => {}
         }
-        let password = password_from(stdout);
+        let Ok(text) = std::str::from_utf8(stdout) else {
+            return fail(CommandFailure::NotUtf8, 0);
+        };
+        let password = Secret::new(trim_final_newline(text).to_owned());
         if password.is_empty() {
             return fail(CommandFailure::Empty, 0);
         }
@@ -165,6 +168,9 @@ impl PasswordCommandError {
             }
             CommandFailure::Start(err) => format!("could not run {program}: {err}"),
             CommandFailure::Empty => format!("{program} printed nothing"),
+            CommandFailure::NotUtf8 => {
+                format!("{program} printed bytes that are not valid UTF-8")
+            }
             CommandFailure::Exit => format!("{program} exited with code {}", self.exit_code),
         }
     }
@@ -182,6 +188,7 @@ pub enum CommandFailure {
     TimedOut(Duration),
     Start(String),
     Empty,
+    NotUtf8,
     Exit,
 }
 
@@ -254,22 +261,6 @@ fn append(buffer: &mut Zeroizing<Vec<u8>>, bytes: &[u8]) {
         *buffer = grown;
     }
     buffer.extend_from_slice(bytes);
-}
-
-fn password_from(stdout: &[u8]) -> Secret {
-    let text = lossy_utf8(stdout);
-    Secret::new(trim_final_newline(&text).to_owned())
-}
-
-fn lossy_utf8(bytes: &[u8]) -> Zeroizing<String> {
-    let mut text = Zeroizing::new(String::with_capacity(bytes.len() * 3));
-    for chunk in bytes.utf8_chunks() {
-        text.push_str(chunk.valid());
-        if !chunk.invalid().is_empty() {
-            text.push(char::REPLACEMENT_CHARACTER);
-        }
-    }
-    text
 }
 
 fn process_environ() -> Vec<(OsString, OsString)> {
@@ -501,7 +492,7 @@ mod tests {
             (r"printf 'a b\n\n'", "a b\n"),
             (r"printf 'x\r\n'", "x"),
             ("printf p4ss", "p4ss"),
-            (r"printf 'a\377b\n'", "a\u{fffd}b"),
+            ("printf 'pass\u{e9}'", "pass\u{e9}"),
         ];
         for (line, want) in cases {
             let secret = command(line).password().await.unwrap();
@@ -529,18 +520,26 @@ mod tests {
                 "SEI_PASSWORD_CMD: sh exited with code -1",
             ),
             ("true", "SEI_PASSWORD_CMD: true printed nothing"),
+            (
+                r"printf 'out-secret\377\n'",
+                "SEI_PASSWORD_CMD: printf printed bytes that are not valid UTF-8",
+            ),
         ];
         for (line, want) in cases {
             let err = failure(command(line)).await;
             let debug = format!("{err:?}");
             assert_eq!(err.to_string(), want, "{line}");
-            for leaked in ["oops", "stdout-secret", "stderr-hint"] {
+            for leaked in ["oops", "stdout-secret", "stderr-hint", "out-secret"] {
                 assert!(!debug.contains(leaked), "{debug}");
             }
         }
 
         let err = failure(command("true")).await;
         assert!(matches!(err.failure, CommandFailure::Empty));
+        assert_eq!((err.exit_code, err.stderr_bytes), (0, 0));
+
+        let err = failure(command(r"printf '\377'")).await;
+        assert!(matches!(err.failure, CommandFailure::NotUtf8));
         assert_eq!((err.exit_code, err.stderr_bytes), (0, 0));
 
         let err = failure(command("sh -c 'echo oops >&2; exit 1'")).await;

@@ -5,10 +5,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use monitor_hub_plugin_testkit::Database;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use tokio_postgres::NoTls;
 
 use sei_monitor::event::{Event, Kind, Payload};
 use sei_monitor::monitor::diff::CurrentUser;
@@ -19,7 +17,6 @@ use sei_monitor::sei::{ApiError, Client, Credentials, ErrorKind, SeiError};
 use sei_monitor::store::{AccountInfo, AccountKey, Store, Trigger};
 use sei_monitor::timezone::load_zone;
 use support::clock::FakeClock;
-use support::database_url_as;
 use support::fake_sei::{
     FakeActivity, FakeDocument, FakeProcess, FakeSei, MODULE_VERSION, ORG_ACRONYM, ORG_ID,
     PASSWORD, ROUTE_ACTIVITIES, ROUTE_DOCUMENTS, ROUTE_LOGIN, ROUTE_PROCESSES, SEI_VERSION,
@@ -27,7 +24,7 @@ use support::fake_sei::{
 };
 use support::harness::{
     FIFTEEN_MINUTES, Harness, activity, bounded, config, database_store, document, hours, options,
-    populate, process, start, user,
+    populate, process, start, store_as, user,
 };
 
 const CYCLE: &str = include_str!(concat!(
@@ -975,30 +972,6 @@ async fn client_login_error(source: &LoginSource) -> Box<dyn Error + 'static> {
     Box::new(error)
 }
 
-async fn store_that_cannot_finish_runs(database: &Database) -> Store {
-    let (client, connection) = tokio_postgres::connect(&database.url, NoTls)
-        .await
-        .expect("connect as the test superuser");
-    let driver = tokio::spawn(connection);
-    client
-        .batch_execute(
-            "DO $$ BEGIN CREATE ROLE sei_cycle_end_denied LOGIN;
-             EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-             GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sei_cycle_end_denied;
-             GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO sei_cycle_end_denied;
-             REVOKE UPDATE ON cycle_runs FROM sei_cycle_end_denied;",
-        )
-        .await
-        .expect("a role that cannot update cycle runs");
-    drop(client);
-    driver
-        .await
-        .expect("join the setup connection")
-        .expect("close the setup connection");
-    let url = database_url_as(&database.url, "sei_cycle_end_denied", "unused");
-    Store::new(&Secret::new(url)).expect("store")
-}
-
 async fn run_once_login_error(source: &LoginSource) -> Option<Box<dyn Error + 'static>> {
     let (database, store) = database_store().await?;
     let fake = FakeSei::start();
@@ -1010,7 +983,7 @@ async fn run_once_login_error(source: &LoginSource) -> Option<Box<dyn Error + 's
         source.cycle_end
     );
     let monitor_store = if source.cycle_end == "closed_pool" {
-        store_that_cannot_finish_runs(&database).await
+        store_as(&database, "sei_cycle_end_denied", "UPDATE ON cycle_runs").await
     } else {
         store.clone()
     };

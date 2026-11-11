@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use monitor_hub_plugin_testkit::Database;
+use tokio_postgres::NoTls;
 
 use sei_monitor::event::{Event, Kind};
 use sei_monitor::monitor::{CycleResult, Jitter, Monitor, MonitorConfig};
@@ -17,7 +18,7 @@ use super::fake_sei::{
     FakeActivity, FakeDocument, FakeProcess, FakeSei, FakeUser, ORG_ACRONYM, PASSWORD, UNIT_NUPROC,
     USER_ID, USER_NAME, USERNAME, process_number,
 };
-use super::migrated_database;
+use super::{database_url_as, migrated_database};
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(20);
 pub const FIFTEEN_MINUTES: Duration = Duration::from_secs(15 * 60);
@@ -130,6 +131,31 @@ pub async fn database_store() -> Option<(Database, Store)> {
     let database = migrated_database().await?;
     let store = Store::new(&Secret::new(database.url.clone())).expect("store");
     Some((database, store))
+}
+
+pub async fn store_as(database: &Database, role: &str, revoke: &str) -> Store {
+    let (client, connection) = tokio_postgres::connect(&database.url, NoTls)
+        .await
+        .expect("connect as the test superuser");
+    let driver = tokio::spawn(connection);
+    let setup = format!(
+        "DO $$ BEGIN CREATE ROLE {role} LOGIN;
+         EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {role};
+         GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO {role};
+         REVOKE {revoke} FROM {role};"
+    );
+    client
+        .batch_execute(&setup)
+        .await
+        .unwrap_or_else(|error| panic!("a role without {revoke}: {error}"));
+    drop(client);
+    driver
+        .await
+        .expect("join the setup connection")
+        .expect("close the setup connection");
+    let url = database_url_as(&database.url, role, "unused");
+    Store::new(&Secret::new(url)).expect("store")
 }
 
 pub fn user(id: i64, acronym: &str, name: &str) -> FakeUser {

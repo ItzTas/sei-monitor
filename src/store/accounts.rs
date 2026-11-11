@@ -11,7 +11,7 @@ RETURNING *";
 
 const SET_PAUSED_REASON: &str = "UPDATE accounts SET paused_reason = $1 WHERE id = $2";
 
-const LOCK_ACCOUNT: &str = "SELECT id FROM accounts WHERE id = $1 FOR UPDATE";
+const LOCK_ACCOUNT: &str = "SELECT id FROM accounts WHERE id = $1 FOR NO KEY UPDATE";
 
 const UPDATE_ACCOUNT_INFO: &str = "UPDATE accounts
 SET org_acronym = $1, sei_version = $2, wssei_version = $3

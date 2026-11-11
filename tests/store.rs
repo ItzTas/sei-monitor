@@ -1403,6 +1403,63 @@ async fn concurrent_cycles_commit_in_position_order() {
 }
 
 #[tokio::test]
+async fn a_run_starts_while_a_cycle_of_its_account_is_open() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let run = pooled
+        .start_cycle_run(account.id, Trigger::Scheduled, repo_now())
+        .await
+        .expect("start");
+    let mut outside = connect(&db.url).await;
+    let held = outside.transaction().await.expect("begin");
+    held.query_one(
+        "SELECT id FROM cycle_runs WHERE id = $1 FOR UPDATE",
+        &[&run],
+    )
+    .await
+    .expect("hold the run row");
+    let watcher = connect(&db.url).await;
+    let open = spawn_cycle(
+        &pooled,
+        CycleChanges {
+            run_id: Some(run),
+            finished_at: repo_now() + TimeDelta::minutes(1),
+            events: vec![event(Kind::ActivityAdded, 9001, "open")],
+            ..cycle(account.id, repo_now())
+        },
+    );
+    settle(&watcher, 1, &open).await;
+    assert!(!open.is_finished(), "the cycle did not wait on its run");
+
+    let next = tokio::time::timeout(
+        Duration::from_secs(1),
+        pooled.start_cycle_run(
+            account.id,
+            Trigger::Manual,
+            repo_now() + TimeDelta::minutes(1),
+        ),
+    )
+    .await
+    .expect("start_cycle_run waited behind the open cycle")
+    .expect("start the next run");
+
+    held.rollback().await.expect("release the run row");
+    let inserted = open.await.expect("join").expect("the open cycle");
+    assert_eq!(references(&inserted), vec!["open"]);
+    assert_eq!(
+        pooled
+            .last_cycle_run(account.id)
+            .await
+            .expect("last run")
+            .map(|last| last.id),
+        Some(next)
+    );
+}
+
+#[tokio::test]
 async fn an_unreadable_stored_event_names_itself() {
     let Some(db) = migrated_database().await else {
         return;

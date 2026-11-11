@@ -364,12 +364,16 @@ async fn a_paused_monitor_refuses_cycles_and_new_runs() {
     drop(first);
     let _respawned = spawn_run(&h.monitor);
     let retries = fire_pending_sleeps(&h, 3).await;
+    h.clock.advance(Duration::from_secs(3600));
+    let triggered = h.monitor.trigger_cycle();
     tokio::time::sleep(SETTLE).await;
 
     assert_eq!(h.fake.failed_logins(), 1, "after {retries} retries");
     assert!(matches!(direct, Err(MonitorError::Paused)), "{direct:?}");
     assert_eq!(retries, 0, "the respawned run scheduled a cycle");
-    assert!(h.monitor.state().paused);
+    assert_eq!(triggered, Err(TriggerError::Paused));
+    let state = h.monitor.state();
+    assert!(state.paused && !state.held, "{state:?}");
 }
 
 #[tokio::test]

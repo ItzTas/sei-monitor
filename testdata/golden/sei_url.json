@@ -431,5 +431,73 @@
     "input": "https://h/a~b",
     "normalized": "https://h/a~b",
     "problems": null
+  },
+  {
+    "input": "https://:443",
+    "normalized": "https://:443",
+    "problems": null
+  },
+  {
+    "input": "https://:",
+    "normalized": "https://:",
+    "problems": null
+  },
+  {
+    "input": "http://:8080",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use https (plain http is only accepted for localhost)"
+    ]
+  },
+  {
+    "input": "https://@h",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: remove the username and password from the address"
+    ]
+  },
+  {
+    "input": "https://:@h",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: remove the username and password from the address"
+    ]
+  },
+  {
+    "input": "https://h/a/../sei",
+    "normalized": "https://h/a/..",
+    "problems": null
+  },
+  {
+    "input": "https://h/sei/./",
+    "normalized": "https://h/sei/.",
+    "problems": null
+  },
+  {
+    "input": "https://h/xsei",
+    "normalized": "https://h/xsei",
+    "problems": null
+  },
+  {
+    "input": "https://h/sei?",
+    "normalized": "https://h?",
+    "problems": null
+  },
+  {
+    "input": "https://h/?",
+    "normalized": "https://h?",
+    "problems": null
+  },
+  {
+    "input": "http://localhost.",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use https (plain http is only accepted for localhost)"
+    ]
+  },
+  {
+    "input": "https://h.",
+    "normalized": "https://h.",
+    "problems": null
   }
 ]

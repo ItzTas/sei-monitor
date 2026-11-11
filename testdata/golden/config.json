@@ -4827,6 +4827,338 @@
       "problems": [
         "DATABASE_URL: use postgres://user:password@host/database"
       ]
+    },
+    {
+      "name": "SEI_URL=https://:443",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://:443",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "sei": {
+          "url": "https://:443",
+          "api_url": "",
+          "username": "user.name",
+          "org": "SEDEMO",
+          "units": [],
+          "all_units": false,
+          "zone": "America/Sao_Paulo",
+          "concurrency": 3,
+          "password": {
+            "source": "static",
+            "value": "s3cr3t-password"
+          }
+        },
+        "database_url": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "poll_interval_ns": 900000000000,
+        "return_warning_days": 2,
+        "retention_days": 90,
+        "full_detail": false,
+        "log_level": 0
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://:",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://:",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "sei": {
+          "url": "https://:",
+          "api_url": "",
+          "username": "user.name",
+          "org": "SEDEMO",
+          "units": [],
+          "all_units": false,
+          "zone": "America/Sao_Paulo",
+          "concurrency": 3,
+          "password": {
+            "source": "static",
+            "value": "s3cr3t-password"
+          }
+        },
+        "database_url": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "poll_interval_ns": 900000000000,
+        "return_warning_days": 2,
+        "retention_days": 90,
+        "full_detail": false,
+        "log_level": 0
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=http://:8080",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "http://:8080",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: use https (plain http is only accepted for localhost)"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://@h",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://@h",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: remove the username and password from the address"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://:@h",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://:@h",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: remove the username and password from the address"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://h/a/../sei",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/a/../sei",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "sei": {
+          "url": "https://h/a/..",
+          "api_url": "",
+          "username": "user.name",
+          "org": "SEDEMO",
+          "units": [],
+          "all_units": false,
+          "zone": "America/Sao_Paulo",
+          "concurrency": 3,
+          "password": {
+            "source": "static",
+            "value": "s3cr3t-password"
+          }
+        },
+        "database_url": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "poll_interval_ns": 900000000000,
+        "return_warning_days": 2,
+        "retention_days": 90,
+        "full_detail": false,
+        "log_level": 0
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/sei/./",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/sei/./",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "sei": {
+          "url": "https://h/sei/.",
+          "api_url": "",
+          "username": "user.name",
+          "org": "SEDEMO",
+          "units": [],
+          "all_units": false,
+          "zone": "America/Sao_Paulo",
+          "concurrency": 3,
+          "password": {
+            "source": "static",
+            "value": "s3cr3t-password"
+          }
+        },
+        "database_url": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "poll_interval_ns": 900000000000,
+        "return_warning_days": 2,
+        "retention_days": 90,
+        "full_detail": false,
+        "log_level": 0
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/xsei",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/xsei",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "sei": {
+          "url": "https://h/xsei",
+          "api_url": "",
+          "username": "user.name",
+          "org": "SEDEMO",
+          "units": [],
+          "all_units": false,
+          "zone": "America/Sao_Paulo",
+          "concurrency": 3,
+          "password": {
+            "source": "static",
+            "value": "s3cr3t-password"
+          }
+        },
+        "database_url": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "poll_interval_ns": 900000000000,
+        "return_warning_days": 2,
+        "retention_days": 90,
+        "full_detail": false,
+        "log_level": 0
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/sei?",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/sei?",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "sei": {
+          "url": "https://h?",
+          "api_url": "",
+          "username": "user.name",
+          "org": "SEDEMO",
+          "units": [],
+          "all_units": false,
+          "zone": "America/Sao_Paulo",
+          "concurrency": 3,
+          "password": {
+            "source": "static",
+            "value": "s3cr3t-password"
+          }
+        },
+        "database_url": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "poll_interval_ns": 900000000000,
+        "return_warning_days": 2,
+        "retention_days": 90,
+        "full_detail": false,
+        "log_level": 0
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/?",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/?",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "sei": {
+          "url": "https://h?",
+          "api_url": "",
+          "username": "user.name",
+          "org": "SEDEMO",
+          "units": [],
+          "all_units": false,
+          "zone": "America/Sao_Paulo",
+          "concurrency": 3,
+          "password": {
+            "source": "static",
+            "value": "s3cr3t-password"
+          }
+        },
+        "database_url": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "poll_interval_ns": 900000000000,
+        "return_warning_days": 2,
+        "retention_days": 90,
+        "full_detail": false,
+        "log_level": 0
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=http://localhost.",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "http://localhost.",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: use https (plain http is only accepted for localhost)"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://h.",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h.",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "sei": {
+          "url": "https://h.",
+          "api_url": "",
+          "username": "user.name",
+          "org": "SEDEMO",
+          "units": [],
+          "all_units": false,
+          "zone": "America/Sao_Paulo",
+          "concurrency": 3,
+          "password": {
+            "source": "static",
+            "value": "s3cr3t-password"
+          }
+        },
+        "database_url": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "poll_interval_ns": 900000000000,
+        "return_warning_days": 2,
+        "retention_days": 90,
+        "full_detail": false,
+        "log_level": 0
+      },
+      "problems": null
     }
   ],
   "sei": [
@@ -9292,6 +9624,274 @@
         }
       },
       "problems": null
+    },
+    {
+      "name": "SEI_URL=https://:443",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://:443",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "url": "https://:443",
+        "api_url": "",
+        "username": "user.name",
+        "org": "SEDEMO",
+        "units": [],
+        "all_units": false,
+        "zone": "America/Sao_Paulo",
+        "concurrency": 3,
+        "password": {
+          "source": "static",
+          "value": "s3cr3t-password"
+        }
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://:",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://:",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "url": "https://:",
+        "api_url": "",
+        "username": "user.name",
+        "org": "SEDEMO",
+        "units": [],
+        "all_units": false,
+        "zone": "America/Sao_Paulo",
+        "concurrency": 3,
+        "password": {
+          "source": "static",
+          "value": "s3cr3t-password"
+        }
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=http://:8080",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "http://:8080",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: use https (plain http is only accepted for localhost)"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://@h",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://@h",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: remove the username and password from the address"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://:@h",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://:@h",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: remove the username and password from the address"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://h/a/../sei",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/a/../sei",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "url": "https://h/a/..",
+        "api_url": "",
+        "username": "user.name",
+        "org": "SEDEMO",
+        "units": [],
+        "all_units": false,
+        "zone": "America/Sao_Paulo",
+        "concurrency": 3,
+        "password": {
+          "source": "static",
+          "value": "s3cr3t-password"
+        }
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/sei/./",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/sei/./",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "url": "https://h/sei/.",
+        "api_url": "",
+        "username": "user.name",
+        "org": "SEDEMO",
+        "units": [],
+        "all_units": false,
+        "zone": "America/Sao_Paulo",
+        "concurrency": 3,
+        "password": {
+          "source": "static",
+          "value": "s3cr3t-password"
+        }
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/xsei",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/xsei",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "url": "https://h/xsei",
+        "api_url": "",
+        "username": "user.name",
+        "org": "SEDEMO",
+        "units": [],
+        "all_units": false,
+        "zone": "America/Sao_Paulo",
+        "concurrency": 3,
+        "password": {
+          "source": "static",
+          "value": "s3cr3t-password"
+        }
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/sei?",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/sei?",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "url": "https://h?",
+        "api_url": "",
+        "username": "user.name",
+        "org": "SEDEMO",
+        "units": [],
+        "all_units": false,
+        "zone": "America/Sao_Paulo",
+        "concurrency": 3,
+        "password": {
+          "source": "static",
+          "value": "s3cr3t-password"
+        }
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/?",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/?",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "url": "https://h?",
+        "api_url": "",
+        "username": "user.name",
+        "org": "SEDEMO",
+        "units": [],
+        "all_units": false,
+        "zone": "America/Sao_Paulo",
+        "concurrency": 3,
+        "password": {
+          "source": "static",
+          "value": "s3cr3t-password"
+        }
+      },
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=http://localhost.",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "http://localhost.",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: use https (plain http is only accepted for localhost)"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://h.",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h.",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": {
+        "url": "https://h.",
+        "api_url": "",
+        "username": "user.name",
+        "org": "SEDEMO",
+        "units": [],
+        "all_units": false,
+        "zone": "America/Sao_Paulo",
+        "concurrency": 3,
+        "password": {
+          "source": "static",
+          "value": "s3cr3t-password"
+        }
+      },
+      "problems": null
     }
   ],
   "sei_url": [
@@ -11959,6 +12559,170 @@
         "/run/secrets/spaces-newline": "  \n"
       },
       "result": "https://sei.example.org",
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://:443",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://:443",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": "https://:443",
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://:",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://:",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": "https://:",
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=http://:8080",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "http://:8080",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: use https (plain http is only accepted for localhost)"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://@h",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://@h",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: remove the username and password from the address"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://:@h",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://:@h",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: remove the username and password from the address"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://h/a/../sei",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/a/../sei",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": "https://h/a/..",
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/sei/./",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/sei/./",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": "https://h/sei/.",
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/xsei",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/xsei",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": "https://h/xsei",
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/sei?",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/sei?",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": "https://h?",
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=https://h/?",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h/?",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": "https://h?",
+      "problems": null
+    },
+    {
+      "name": "SEI_URL=http://localhost.",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "http://localhost.",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": null,
+      "problems": [
+        "SEI_URL: use https (plain http is only accepted for localhost)"
+      ]
+    },
+    {
+      "name": "SEI_URL=https://h.",
+      "env": {
+        "DATABASE_URL": "postgres://monitor:s3cr3t-db@db.example.org/monitor",
+        "SEI_ORG": "SEDEMO",
+        "SEI_PASSWORD": "s3cr3t-password",
+        "SEI_URL": "https://h.",
+        "SEI_USERNAME": "user.name"
+      },
+      "files": {},
+      "result": "https://h.",
       "problems": null
     }
   ]

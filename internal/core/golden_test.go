@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,8 +17,12 @@ import (
 )
 
 func TestGoldenVectors(t *testing.T) {
+	if !goldentest.Pinned(t) {
+		return
+	}
 	goldentest.Golden(t, "config.json", configVectors(t))
 	goldentest.Golden(t, "sei_url.json", seiURLVectors(t))
+	goldentest.Golden(t, "api_url.json", apiURLVectors(t))
 	goldentest.Golden(t, "duration.json", durationVectors())
 	goldentest.Golden(t, "split_command.json", splitCommandVectors())
 	goldentest.Golden(t, "without_secrets.json", withoutSecretsVectors())
@@ -293,6 +298,9 @@ func configInputs() []configInput {
 	inputs = append(inputs, secretProblemInputs(secretFiles)...)
 	inputs = append(inputs, urlEdgeInputs()...)
 	inputs = append(inputs, secretFileEdgeInputs()...)
+	for _, edge := range moreURLEdges() {
+		inputs = append(inputs, configInput{name: "SEI_URL=" + edge, env: minimalEnv(map[string]string{"SEI_URL": edge})})
+	}
 	return inputs
 }
 
@@ -381,6 +389,13 @@ func urlEdges() []string {
 	return edges
 }
 
+func moreURLEdges() []string {
+	return []string{
+		"https://:443", "https://:", "http://:8080", "https://@h", "https://:@h", "https://h/a/../sei",
+		"https://h/sei/./", "https://h/xsei", "https://h/sei?", "https://h/?", "http://localhost.", "https://h.",
+	}
+}
+
 func urlEdgeInputs() []configInput {
 	var inputs []configInput
 	for _, edge := range urlEdges() {
@@ -416,13 +431,7 @@ func secretFileEdgeInputs() []configInput {
 	return inputs
 }
 
-type seiURLCase struct {
-	Input      string   `json:"input"`
-	Normalized *string  `json:"normalized"`
-	Problems   []string `json:"problems"`
-}
-
-func seiURLVectors(t *testing.T) []seiURLCase {
+func seiURLInputs() []string {
 	inputs := []string{
 		"https://sei.rr.gov.br", "https://sei.rr.gov.br/", "https://sei.rr.gov.br/sei", "https://sei.rr.gov.br/sei/",
 		"https://sei.rr.gov.br/SEI", "https://sei.rr.gov.br/sei/sei/", "https://sei.rr.gov.br/x/sei//",
@@ -432,13 +441,36 @@ func seiURLVectors(t *testing.T) []seiURLCase {
 		"http://example.com", "ftp://h", "https:h", "https:///p", "https://h/%zz", "https://h{}", "  https://h/  ",
 		"", "   ", "sei.rr.gov.br", "https://h/%2Fsei", "https://h/a%2fb/", "https://h/sei%2F",
 	}
-	inputs = append(inputs, urlEdges()...)
+	return slices.Concat(inputs, urlEdges(), moreURLEdges())
+}
+
+type seiURLCase struct {
+	Input      string   `json:"input"`
+	Normalized *string  `json:"normalized"`
+	Problems   []string `json:"problems"`
+}
+
+func seiURLVectors(t *testing.T) []seiURLCase {
+	inputs := seiURLInputs()
 	cases := make([]seiURLCase, len(inputs))
 	for i, input := range inputs {
 		normalized, err := LoadSEIURL(goldenSource(map[string]string{"SEI_URL": input}, nil))
 		cases[i] = seiURLCase{Input: input, Problems: problemsOf(t, err)}
 		if err == nil {
 			cases[i].Normalized = &normalized
+		}
+	}
+	return cases
+}
+
+func apiURLVectors(t *testing.T) []seiURLCase {
+	inputs := seiURLInputs()
+	cases := make([]seiURLCase, len(inputs))
+	for i, input := range inputs {
+		sei, err := LoadSEI(goldenSource(minimalEnv(map[string]string{"SEI_API_URL": input}), nil))
+		cases[i] = seiURLCase{Input: input, Problems: problemsOf(t, err)}
+		if err == nil {
+			cases[i].Normalized = &sei.APIURL
 		}
 	}
 	return cases

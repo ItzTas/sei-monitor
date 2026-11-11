@@ -1,12 +1,15 @@
 package sei
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"html"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -23,6 +26,9 @@ import (
 )
 
 func TestGoldenVectors(t *testing.T) {
+	if !goldentest.Pinned(t) {
+		return
+	}
 	goldentest.Golden(t, "fold.json", foldVectors())
 	goldentest.Golden(t, "classify.json", classifyVectors(t))
 	goldentest.Golden(t, "html_unescape.json", unescapeVectors())
@@ -230,6 +236,35 @@ func describeError(t *testing.T, err error) *goldenError {
 	return nil
 }
 
+func outOfRangeWholeNumber(body []byte) (string, bool) {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			return "", false
+		}
+		text := ""
+		switch value := token.(type) {
+		case json.Number:
+			text = value.String()
+		case string:
+			text = strings.TrimSpace(value)
+		}
+		if reachesOutOfRangeConversion(text) {
+			return text, true
+		}
+	}
+}
+
+func reachesOutOfRangeConversion(text string) bool {
+	if _, err := strconv.ParseInt(text, 10, 64); err == nil {
+		return false
+	}
+	n, err := strconv.ParseFloat(text, 64)
+	return err == nil && n == math.Exp2(63)
+}
+
 type goldenPage[T any] struct {
 	Items []T `json:"items"`
 	Total int `json:"total"`
@@ -363,6 +398,11 @@ type wireCase struct {
 
 func wireVectors(t *testing.T) []wireCase {
 	inputs := wireInputs(t)
+	for _, input := range inputs {
+		if value, found := outOfRangeWholeNumber(input.body); found {
+			t.Fatalf("wire case %q holds %s, which flexInt would convert from float 2^63 to int64: the result depends on the CPU (accepted divergence (g)), so it must not be a vector", input.name, value)
+		}
+	}
 	cases := make([]wireCase, len(inputs))
 	for i, input := range inputs {
 		cases[i] = runWireCase(t, input)

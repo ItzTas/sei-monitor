@@ -222,50 +222,31 @@ async fn rejected_login_pauses_without_trying_again() {
     };
     let h = Harness::new(&store, |_| {});
     populate(&h.fake);
-    h.fake.set_password(CHANGED_PASSWORD);
     let _run = spawn_run(&h.monitor);
+    let scheduled = h.clock.next_sleep().await;
+    h.fake.set_password(CHANGED_PASSWORD);
+    h.clock.advance(scheduled.duration);
+    scheduled.fire.send(()).expect("the monitor is waiting");
 
-    let paused = eventually(|| async { h.monitor.state().paused }).await;
-    let mut retries = 0;
-    while retries < 3
-        && let Ok(sleep) = tokio::time::timeout(SETTLE, h.clock.next_sleep()).await
-    {
-        retries += 1;
-        h.clock.advance(sleep.duration);
-        sleep.fire.send(()).expect("the monitor is waiting");
-    }
+    let recorded = pause_recorded(&h).await;
+    let retries = fire_pending_sleeps(&h, 3).await;
     h.clock.advance(Duration::from_secs(3600));
     let triggered = h.monitor.trigger_cycle();
     tokio::time::sleep(SETTLE).await;
 
     assert_eq!(h.fake.failed_logins(), 1, "after {retries} retries");
     assert_eq!(retries, 0, "the paused monitor scheduled another cycle");
-    assert!(paused, "the monitor never paused");
+    assert!(recorded, "the pause was never recorded");
     assert_eq!(triggered, Err(TriggerError::Paused));
     let state = h.monitor.state();
     assert!(state.paused_reason.contains(REJECTED), "{state:?}");
+    assert!(!state.held);
     assert_eq!(state.next_cycle_at, None);
-
-    let key = AccountKey {
-        sei_base_url: h.fake.url(),
-        username: USERNAME.to_owned(),
-        org_id: ORG_ID,
-    };
-    let recorded = eventually(|| async {
-        let account = store.ensure_account(&key, h.clock.now()).await;
-        let reason_stored = account.is_ok_and(|account| !account.paused_reason.is_empty());
-        reason_stored && !h.events().await.is_empty()
-    })
-    .await;
-    assert!(recorded, "the pause was never recorded");
-    let account = store
-        .ensure_account(&key, h.clock.now())
-        .await
-        .expect("account");
-    assert_eq!(account.paused_reason, state.paused_reason);
+    assert_eq!(stored_reason(&h).await, Some(state.paused_reason.clone()));
     let events = h.events().await;
     assert_eq!(events.len(), 1, "{events:?}");
     assert_eq!(events[0].kind, Kind::AccountLoginFailed);
+    assert!(events[0].reference.starts_with("login:"), "{events:?}");
     assert_eq!(events[0].payload.reason, state.paused_reason);
     assert!(last_run(&h).await.error.contains(REJECTED));
 }

@@ -6,5 +6,6 @@ mod golden;
 pub mod gotext;
 pub mod password;
 pub mod secret;
+pub mod sei;
 pub mod timezone;
 pub mod version;

@@ -47,9 +47,34 @@ fn build(options: &Options, redirects: Policy) -> Result<reqwest::Client, reqwes
         .build()
 }
 
-pub(crate) async fn read_capped(mut response: Response) -> Result<Vec<u8>, reqwest::Error> {
+pub(crate) async fn read_capped(response: Response) -> Result<Vec<u8>, reqwest::Error> {
+    read_body(response).await.map_err(|partial| partial.error)
+}
+
+pub(crate) struct PartialBody {
+    received: CappedBody,
+    pub(crate) error: reqwest::Error,
+}
+
+impl PartialBody {
+    pub(crate) fn received(&self) -> usize {
+        self.received.bytes.len()
+    }
+}
+
+pub(crate) async fn read_body(mut response: Response) -> Result<Vec<u8>, PartialBody> {
     let mut body = CappedBody::new(response.content_length());
-    while let Some(chunk) = response.chunk().await? {
+    loop {
+        let chunk = match response.chunk().await {
+            Ok(Some(chunk)) => chunk,
+            Ok(None) => break,
+            Err(error) => {
+                return Err(PartialBody {
+                    received: body,
+                    error,
+                });
+            }
+        };
         if body.push(&chunk) {
             break;
         }

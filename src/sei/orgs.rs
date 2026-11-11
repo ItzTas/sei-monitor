@@ -6,6 +6,8 @@ mod tests;
 mod tokenizer;
 mod tree;
 
+use std::borrow::Cow;
+
 use encoding_rs::Encoding;
 use html5ever::driver::{ParseOpts, parse_document};
 use html5ever::tendril::TendrilSink;
@@ -17,7 +19,7 @@ use scraper::{ElementRef, Html};
 use self::charset::{Detected, PREVIEW_SIZE, determine};
 use self::tree::GoTreeSink;
 use super::errors::SeiError;
-use super::http::{MAX_BODY_SIZE, Options, describe_transport, page_client};
+use super::http::{Options, PartialBody, describe_transport, page_client, read_body};
 use super::json::go_lossy_utf8;
 use super::types::Org;
 use crate::gotext::{atoi, equal_fold, fields, trim};
@@ -90,27 +92,15 @@ pub(crate) fn detect_encoding(content_type: Option<&str>, body: &[u8]) -> &'stat
     determine(content_type, body).encoding
 }
 
-async fn read_page(mut response: Response) -> Result<Vec<u8>, SeiError> {
-    let mut body = Vec::new();
-    while body.len() < MAX_BODY_SIZE {
-        let chunk = response
-            .chunk()
-            .await
-            .map_err(|error| page_read_failure(body.len(), error))?;
-        let Some(chunk) = chunk else {
-            break;
-        };
-        let room = MAX_BODY_SIZE - body.len();
-        body.extend_from_slice(&chunk[..chunk.len().min(room)]);
-    }
-    Ok(body)
+async fn read_page(response: Response) -> Result<Vec<u8>, SeiError> {
+    read_body(response).await.map_err(page_read_failure)
 }
 
-fn page_read_failure(read: usize, error: reqwest::Error) -> SeiError {
-    if read < PREVIEW_SIZE {
-        return transport("decode the login page", error);
+fn page_read_failure(partial: PartialBody) -> SeiError {
+    if partial.received() < PREVIEW_SIZE {
+        return transport("decode the login page", partial.error);
     }
-    transport("read the login page", error)
+    transport("read the login page", partial.error)
 }
 
 fn transport(context: &str, error: reqwest::Error) -> SeiError {
@@ -120,22 +110,26 @@ fn transport(context: &str, error: reqwest::Error) -> SeiError {
     }
 }
 
-fn decode(detected: Detected, body: &[u8]) -> String {
+fn decode(detected: Detected, body: &[u8]) -> Cow<'_, str> {
     if !detected.transcode {
-        return go_lossy_utf8(body);
+        return Cow::Owned(go_lossy_utf8(body));
     }
     let text = detected.encoding.decode_without_bom_handling(body).0;
-    if !detected.encoding.is_single_byte() {
-        return text.into_owned();
+    if !detected.encoding.is_single_byte() || !text.contains(is_c1_control) {
+        return text;
     }
-    text.chars().map(without_c1_control).collect()
+    Cow::Owned(text.chars().map(without_c1_control).collect())
+}
+
+fn is_c1_control(c: char) -> bool {
+    matches!(c, '\u{80}'..='\u{9F}')
 }
 
 fn without_c1_control(c: char) -> char {
-    match c {
-        '\u{80}'..='\u{9F}' => '\u{FFFD}',
-        _ => c,
+    if is_c1_control(c) {
+        return '\u{FFFD}';
     }
+    c
 }
 
 fn parse(text: &str) -> Html {

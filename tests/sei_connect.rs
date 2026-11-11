@@ -3,7 +3,7 @@ mod support;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::Router;
 use axum::http::header::{CONTENT_TYPE, LOCATION};
@@ -461,5 +461,52 @@ async fn login_page_cut_short_before_any_byte_has_no_agency_list() {
     assert_eq!(
         error.to_string(),
         "sei: the login page has no agency list (selOrgao field)"
+    );
+}
+
+#[tokio::test]
+async fn login_page_deeper_than_go_allows_is_refused_with_go_text() {
+    let fake = FakeSei::start();
+    let page = format!(
+        r#"{}<select id="selOrgao"><option value="1">A</option></select>"#,
+        "<div>".repeat(600)
+    );
+    fake.respond_next(ROUTE_LOGIN_PAGE, 200, &[], page.into_bytes());
+
+    let error = bounded(list_orgs(&fake.url(), &options(fake.zone())))
+        .await
+        .expect_err("a page too deep");
+
+    assert_eq!(
+        error.to_string(),
+        "sei: read the login page: html: open stack of elements exceeds 512 nodes"
+    );
+}
+
+#[tokio::test]
+async fn login_page_parse_stops_at_the_request_deadline() {
+    let fake = FakeSei::start();
+    let attributes: String = (0..90_000).map(|n| format!(" a{n}")).collect();
+    let page =
+        format!(r#"<select id="selOrgao"{attributes}><option value="1">A</option></select>"#);
+    fake.respond_next(ROUTE_LOGIN_PAGE, 200, &[], page.into_bytes());
+    let options = Options {
+        timeout: Duration::from_millis(300),
+        ..options(fake.zone())
+    };
+    let started = Instant::now();
+
+    let error = bounded(list_orgs(&fake.url(), &options))
+        .await
+        .expect_err("a page slower than the request deadline");
+
+    assert!(
+        started.elapsed() < Duration::from_millis(1300),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(
+        error.to_string(),
+        "sei: read the login page: the time limit of the request was reached"
     );
 }

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
+use std::rc::Rc;
 
 use html5ever::tendril::StrTendril;
 use html5ever::tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
@@ -13,35 +14,71 @@ const FOREIGN_NAMESPACES: [&str; 2] = [
     "http://www.w3.org/1998/Math/MathML",
 ];
 
+const MAX_OPEN_ELEMENTS: usize = 512;
+
 type Handle = <HtmlTreeSink as TreeSink>::Handle;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Stop {
+    Reading,
+    AfterTemplate,
+    TooDeep,
+}
 
 pub(super) struct GoTreeSink {
     inner: HtmlTreeSink,
-    ignoring: Cell<bool>,
+    stop: Rc<Cell<Stop>>,
     annotation_points: RefCell<HashSet<Handle>>,
 }
 
 impl GoTreeSink {
-    pub(super) fn new() -> GoTreeSink {
+    pub(super) fn new(stop: Rc<Cell<Stop>>) -> GoTreeSink {
         GoTreeSink {
             inner: HtmlTreeSink::new(Html::new_document()),
-            ignoring: Cell::new(false),
+            stop,
             annotation_points: RefCell::new(HashSet::new()),
         }
     }
 
+    fn stopped(&self) -> bool {
+        self.stop.get() != Stop::Reading
+    }
+
     fn stops_at(&self, place: &Handle, child: &NodeOrText<Handle>) -> bool {
-        if self.ignoring.get() {
+        if self.stopped() {
             return true;
         }
         let NodeOrText::AppendNode(node) = child else {
             return false;
         };
-        if !(self.is_html_template(node) && self.within_foreign_content(place)) {
-            return false;
+        if self.is_html_template(node) && self.within_foreign_content(place) {
+            self.stop.set(Stop::AfterTemplate);
+            return true;
         }
-        self.ignoring.set(true);
-        true
+        if self.is_element(node) && self.element_depth(place) >= MAX_OPEN_ELEMENTS {
+            self.stop.set(Stop::TooDeep);
+            return true;
+        }
+        false
+    }
+
+    fn is_element(&self, handle: &Handle) -> bool {
+        let html = self.inner.0.borrow();
+        html.tree
+            .get(*handle)
+            .is_some_and(|node| node.value().is_element())
+    }
+
+    fn element_depth(&self, handle: &Handle) -> usize {
+        let html = self.inner.0.borrow();
+        let Some(node) = html.tree.get(*handle) else {
+            return 0;
+        };
+        std::iter::once(node)
+            .chain(node.ancestors())
+            .filter(|node| node.value().is_element())
+            .take(MAX_OPEN_ELEMENTS)
+            .count()
     }
 
     fn is_html_template(&self, handle: &Handle) -> bool {
@@ -137,7 +174,7 @@ impl TreeSink for GoTreeSink {
         public_id: StrTendril,
         system_id: StrTendril,
     ) {
-        if self.ignoring.get() {
+        if self.stopped() {
             return;
         }
         self.inner
@@ -164,21 +201,21 @@ impl TreeSink for GoTreeSink {
     }
 
     fn add_attrs_if_missing(&self, target: &Handle, attrs: Vec<Attribute>) {
-        if self.ignoring.get() {
+        if self.stopped() {
             return;
         }
         self.inner.add_attrs_if_missing(target, attrs);
     }
 
     fn remove_from_parent(&self, target: &Handle) {
-        if self.ignoring.get() {
+        if self.stopped() {
             return;
         }
         self.inner.remove_from_parent(target);
     }
 
     fn reparent_children(&self, node: &Handle, new_parent: &Handle) {
-        if self.ignoring.get() {
+        if self.stopped() {
             return;
         }
         self.inner.reparent_children(node, new_parent);

@@ -48,7 +48,7 @@ fn login_page_matches_go() {
         let body = BASE64_STANDARD
             .decode(&case.body_base64)
             .unwrap_or_else(|err| panic!("{}: body_base64: {err}", case.name));
-        let (orgs, error) = outcome(parse_login_page(content_type(&case), &body));
+        let (orgs, error) = outcome(parse_login_page(content_type(&case), &body, None));
         assert_eq!(orgs, case.orgs, "{}", case.name);
         assert_eq!(error, case.error, "{}", case.name);
     }
@@ -77,7 +77,7 @@ fn single_byte_pages_turn_c1_controls_into_replacement_characters_like_go() {
         ("text/html; charset=utf-8", b"\xc2\x81", "\u{81}"),
     ];
     for (content_type, text, acronym) in cases {
-        let orgs = parse_login_page(Some(content_type), &page(text)).expect(content_type);
+        let orgs = parse_login_page(Some(content_type), &page(text), None).expect(content_type);
         assert_eq!(orgs[0].acronym, acronym, "{content_type}");
     }
 }
@@ -120,7 +120,7 @@ fn pages_are_built_like_the_go_parser() {
         ),
     ];
     for (name, page, want) in cases {
-        let found = parse_login_page(None, page.as_bytes())
+        let found = parse_login_page(None, page.as_bytes(), None)
             .map(|orgs| {
                 orgs.into_iter()
                     .map(|org| (org.id, org.acronym))
@@ -204,5 +204,52 @@ fn encoding_follows_go_order() {
             encoding.name(),
             "{name}"
         );
+    }
+}
+
+#[test]
+fn the_open_element_stack_stops_at_go_limit() {
+    let select = r#"<select id="selOrgao"><option value="1">A</option></select>"#;
+    let too_deep = "sei: read the login page: html: open stack of elements exceeds 512 nodes";
+    let divs = |count: usize| "<div>".repeat(count);
+    let cases = [
+        (
+            "html, body and 510 elements",
+            format!("{select}{}", divs(510)),
+            None,
+        ),
+        (
+            "511 elements",
+            format!("{select}{}", divs(511)),
+            Some(too_deep),
+        ),
+        (
+            "an empty element at 513",
+            format!("{select}{}<br>", divs(510)),
+            Some(too_deep),
+        ),
+        (
+            "an agency list below the limit",
+            format!("{}{select}", divs(600)),
+            Some(too_deep),
+        ),
+        (
+            "foster parenting at 512",
+            format!("{select}{}<table><p>", divs(508)),
+            None,
+        ),
+        (
+            "foster parenting at 513",
+            format!("{select}{}<table><p>", divs(509)),
+            Some(too_deep),
+        ),
+    ];
+    for (name, page, error) in cases {
+        let found =
+            parse_login_page(None, page.as_bytes(), None).map_err(|error| error.to_string());
+        match error {
+            Some(text) => assert_eq!(found, Err(text.to_owned()), "{name}"),
+            None => assert_eq!(found.map(|orgs| orgs.len()), Ok(1), "{name}"),
+        }
     }
 }

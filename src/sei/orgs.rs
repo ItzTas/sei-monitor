@@ -7,19 +7,22 @@ mod tokenizer;
 mod tree;
 
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::error::Error;
-use std::io;
+use std::rc::Rc;
+use std::time::Instant;
+use std::{io, iter};
 
 use encoding_rs::Encoding;
 use html5ever::driver::{ParseOpts, parse_document};
-use html5ever::tendril::TendrilSink;
+use html5ever::tendril::{StrTendril, TendrilSink};
 use html5ever::tokenizer::TokenizerOpts;
 use reqwest::Response;
 use reqwest::header::CONTENT_TYPE;
 use scraper::{ElementRef, Html};
 
 use self::charset::{Detected, PREVIEW_SIZE, determine};
-use self::tree::GoTreeSink;
+use self::tree::{GoTreeSink, Stop};
 use super::errors::SeiError;
 use super::http::{Options, PartialBody, describe_transport, page_client, read_body};
 use super::json::go_lossy_utf8;
@@ -27,8 +30,11 @@ use super::types::Org;
 use crate::gotext::{atoi, equal_fold, fields, trim};
 
 const ORG_SELECT: &str = "selOrgao";
+const PARSE_CHUNK: usize = 16 << 10;
+const TOO_DEEP: &str = "html: open stack of elements exceeds 512 nodes";
 
 pub async fn list_orgs(sei_url: &str, options: &Options) -> Result<Vec<Org>, SeiError> {
+    let deadline = Instant::now().checked_add(options.timeout);
     let client = page_client(options);
     let request = client
         .get(format!("{sei_url}/sei/"))
@@ -47,7 +53,9 @@ pub async fn list_orgs(sei_url: &str, options: &Options) -> Result<Vec<Org>, Sei
         .get(CONTENT_TYPE)
         .map(|value| go_lossy_utf8(value.as_bytes()));
     let body = read_page(response).await?;
-    parse_login_page(content_type.as_deref(), &body)
+    tokio::task::spawn_blocking(move || parse_login_page(content_type.as_deref(), &body, deadline))
+        .await
+        .unwrap_or_else(|_| Err(read_failure("the page parser panicked")))
 }
 
 pub async fn resolve_org(sei_url: &str, value: &str, options: &Options) -> Result<Org, SeiError> {
@@ -68,6 +76,7 @@ pub async fn resolve_org(sei_url: &str, value: &str, options: &Options) -> Resul
 pub(crate) fn parse_login_page(
     content_type: Option<&str>,
     body: &[u8],
+    deadline: Option<Instant>,
 ) -> Result<Vec<Org>, SeiError> {
     if body.is_empty() {
         return Err(SeiError::Transport {
@@ -76,7 +85,7 @@ pub(crate) fn parse_login_page(
         });
     }
     let text = decode(determine(content_type, body), body);
-    let orgs = agency_options(&parse(&text));
+    let orgs = agency_options(&parse(&text, deadline)?);
     if orgs.is_empty() {
         return Err(SeiError::NoAgencyList);
     }
@@ -155,7 +164,7 @@ fn without_c1_control(c: char) -> char {
     c
 }
 
-fn parse(text: &str) -> Html {
+fn parse(text: &str, deadline: Option<Instant>) -> Result<Html, SeiError> {
     let options = ParseOpts {
         tokenizer: TokenizerOpts {
             discard_bom: false,
@@ -163,7 +172,48 @@ fn parse(text: &str) -> Html {
         },
         ..ParseOpts::default()
     };
-    parse_document(GoTreeSink::new(), options).one(text)
+    let stop = Rc::new(Cell::new(Stop::Reading));
+    let mut parser = parse_document(GoTreeSink::new(Rc::clone(&stop)), options);
+    for chunk in chunks(text) {
+        parser.process(StrTendril::from_slice(chunk));
+        if stop.get() == Stop::TooDeep {
+            return Err(read_failure(TOO_DEEP));
+        }
+        if stop.get() == Stop::AfterTemplate {
+            break;
+        }
+        if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
+            return Err(read_failure("the time limit of the request was reached"));
+        }
+    }
+    let document = parser.finish();
+    if stop.get() == Stop::TooDeep {
+        return Err(read_failure(TOO_DEEP));
+    }
+    Ok(document)
+}
+
+fn chunks(text: &str) -> impl Iterator<Item = &str> {
+    let mut rest = text;
+    iter::from_fn(move || {
+        if rest.is_empty() {
+            return None;
+        }
+        let mut end = rest.len().min(PARSE_CHUNK);
+        while !rest.is_char_boundary(end) {
+            end -= 1;
+        }
+        let (chunk, tail) = rest.split_at(end);
+        rest = tail;
+        Some(chunk)
+    })
+}
+
+fn read_failure(detail: &str) -> SeiError {
+    SeiError::Transport {
+        context: "read the login page".to_owned(),
+        detail: detail.to_owned(),
+    }
 }
 
 fn agency_options(document: &Html) -> Vec<Org> {

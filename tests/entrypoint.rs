@@ -293,12 +293,12 @@ async fn a_recorded_rejection_holds_across_restarts_until_a_check() {
             status.state == i32::from(State::Paused)
         })
         .await;
-        assert_eq!(held.message, format!("{REJECTED}; {HELD}"), "life {life}");
         tokio::time::sleep(STAY_UP.saturating_sub(started.elapsed())).await;
         assert!(plugin.still_running(), "{}", plugin.stderr_text());
         drop(client);
         stop_cleanly(&mut plugin).await;
         assert_eq!((fake.logins(), fake.failed_logins()), (0, 0), "life {life}");
+        assert_eq!(held.message, format!("{REJECTED}; {HELD}"), "life {life}");
     }
 
     let mut plugin = start_plugin(&env);

@@ -16,6 +16,7 @@ use crate::store::{CycleChanges, StoreError, Trigger};
 const FIRST_RETRY_DELAY: Duration = Duration::from_secs(30);
 const MAX_DOUBLINGS: u32 = 16;
 const SECOND_NANOS: i64 = 1_000_000_000;
+const MINIMUM_GAP: TimeDelta = TimeDelta::seconds(MIN_POLL_INTERVAL.as_secs() as i64);
 const HELD_SUFFIX: &str =
     "; still paused after a restart: request a check once the configuration is fixed";
 
@@ -244,11 +245,10 @@ impl Monitor {
 
     fn retry_after(&self, last_started_at: Option<DateTime<Utc>>) -> Option<Duration> {
         let since = self.clock.now() - last_started_at?;
-        let minimum = TimeDelta::from_std(MIN_POLL_INTERVAL).expect("five minutes fit a TimeDelta");
-        if since >= minimum {
+        if since >= MINIMUM_GAP {
             return None;
         }
-        (minimum - since).to_std().ok()
+        (MINIMUM_GAP - since).to_std().ok()
     }
 
     fn schedule(&self, wait: Duration) {

@@ -228,20 +228,33 @@ fn diagnose_matches_go() {
     assert_hidden(&exited.stdout, &tokens);
 }
 
+const WRONG_PASSWORD: &str = "not-the-password-7c1e";
+
+fn assert_no_secret_printed(case: &str, setting: (&str, &str), logins: (usize, usize)) {
+    let mut case = case_named(case);
+    case.env.insert(setting.0.to_owned(), setting.1.to_owned());
+
+    let run = replay(&case);
+
+    assert_eq!((run.logins, run.failed_logins), logins, "{setting:?}");
+    let text = format!("{}{}", run.exited.stdout, run.exited.stderr);
+    let mut secrets = vec![PASSWORD, case.env["SEI_PASSWORD"].as_str()];
+    secrets.extend(run.issued_tokens.iter().map(String::as_str));
+    assert_hidden(&text, &secrets);
+}
+
 #[test]
 fn test_login_never_prints_the_password() {
-    for units in ["sedemo/gab", "SEDEMO/XYZ"] {
-        let mut case = case_named("test-login with the current unit");
-        case.env.insert("SEI_UNITS".to_owned(), units.to_owned());
+    let case = "test-login with the current unit";
+    assert_no_secret_printed(case, ("SEI_UNITS", "sedemo/gab"), (1, 0));
+    assert_no_secret_printed(case, ("SEI_UNITS", "SEDEMO/XYZ"), (1, 0));
+    assert_no_secret_printed(case, ("SEI_PASSWORD", WRONG_PASSWORD), (0, 1));
+}
 
-        let run = replay(&case);
-
-        assert_eq!((run.logins, run.failed_logins), (1, 0), "{units}");
-        let text = format!("{}{}", run.exited.stdout, run.exited.stderr);
-        let mut secrets = vec![PASSWORD];
-        secrets.extend(run.issued_tokens.iter().map(String::as_str));
-        assert_hidden(&text, &secrets);
-    }
+#[test]
+fn diagnose_never_prints_the_password() {
+    assert_no_secret_printed(DIAGNOSE_CASE, ("SEI_UNITS", "all"), (1, 0));
+    assert_no_secret_printed(DIAGNOSE_CASE, ("SEI_PASSWORD", WRONG_PASSWORD), (0, 1));
 }
 
 fn canned_json(fake: &FakeSei, route: &str, body: &Value) {

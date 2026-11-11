@@ -13,7 +13,6 @@ use std::rc::Rc;
 use std::time::Instant;
 use std::{io, iter};
 
-use encoding_rs::Encoding;
 use html5ever::driver::{ParseOpts, parse_document};
 use html5ever::tendril::{StrTendril, TendrilSink};
 use html5ever::tokenizer::TokenizerOpts;
@@ -90,17 +89,6 @@ pub(crate) fn parse_login_page(
         return Err(SeiError::NoAgencyList);
     }
     Ok(orgs)
-}
-
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "parse_login_page also needs to know when Go leaves the bytes undecoded"
-    )
-)]
-pub(crate) fn detect_encoding(content_type: Option<&str>, body: &[u8]) -> &'static Encoding {
-    determine(content_type, body).encoding
 }
 
 async fn read_page(response: Response) -> Result<Vec<u8>, SeiError> {

@@ -1,5 +1,5 @@
 use base64::prelude::{BASE64_STANDARD, Engine as _};
-use encoding_rs::{KOI8_R, UTF_8, UTF_16LE, WINDOWS_1252};
+use encoding_rs::{Encoding, KOI8_R, UTF_8, UTF_16LE, WINDOWS_1252};
 use serde::Deserialize;
 
 use super::*;
@@ -138,70 +138,95 @@ fn pages_are_built_like_the_go_parser() {
     }
 }
 
+type EncodingCase = (
+    &'static str,
+    Option<&'static str>,
+    Vec<u8>,
+    &'static Encoding,
+    bool,
+);
+
 #[test]
 fn encoding_follows_go_order() {
     let ascii_padding = "a".repeat(1100);
     let late_meta = format!("<!--{ascii_padding}--><meta charset=\"koi8-r\">");
-    let cases: [(&str, Option<&str>, Vec<u8>, &Encoding); 9] = [
+    let cases: [EncodingCase; 10] = [
         (
             "byte order mark before the header",
             Some("text/html; charset=utf-8"),
             b"\xff\xfe<\x00p\x00>\x00".to_vec(),
             UTF_16LE,
+            true,
         ),
         (
             "header before the meta tag",
             Some("text/html; charset=ISO-8859-1"),
             b"<meta charset=\"koi8-r\">".to_vec(),
             WINDOWS_1252,
+            true,
         ),
         (
             "unknown header label leaves it to the meta tag",
             Some("text/html; charset=x-unknown"),
             b"<meta charset=\"koi8-r\">".to_vec(),
             KOI8_R,
+            true,
         ),
         (
             "content attribute without the pragma",
             None,
             b"<meta content=\"text/html; charset=koi8-r\">".to_vec(),
             WINDOWS_1252,
+            true,
         ),
         (
             "content attribute with the pragma",
             None,
             b"<META CONTENT='text/html;charset = KOI8-R' HTTP-EQUIV=Content-Type>".to_vec(),
             KOI8_R,
+            true,
         ),
         (
             "meta tag naming UTF-16",
             None,
             b"<meta charset=\"utf-16le\"><p>\xe9".to_vec(),
             UTF_8,
+            false,
         ),
         (
             "meta tag hidden in a script",
             None,
             b"<script><meta charset=\"koi8-r\"></script>".to_vec(),
             WINDOWS_1252,
+            true,
         ),
         (
             "meta tag after the first 1024 bytes",
             None,
             late_meta.into_bytes(),
             WINDOWS_1252,
+            true,
+        ),
+        (
+            "UTF-8 declared by the header",
+            Some("text/html; charset=utf-8"),
+            "<p>ÓRGÃO</p>".as_bytes().to_vec(),
+            UTF_8,
+            true,
         ),
         (
             "undeclared UTF-8",
             None,
             "<p>ÓRGÃO</p>".as_bytes().to_vec(),
             UTF_8,
+            false,
         ),
     ];
-    for (name, content_type, body, encoding) in cases {
+    for (name, content_type, body, encoding, transcode) in cases {
+        let detected = charset::determine(content_type, &body);
         assert_eq!(
-            detect_encoding(content_type, &body).name(),
-            encoding.name(),
+            (detected.encoding.name(), detected.transcode),
+            (encoding.name(), transcode),
             "{name}"
         );
     }

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
-use std::sync::OnceLock;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use serde::Deserialize;
@@ -319,23 +319,59 @@ struct ConfigCase {
     problems: Option<Vec<String>>,
 }
 
-fn fake_program_dir() -> &'static str {
-    static DIR: OnceLock<String> = OnceLock::new();
-    DIR.get_or_init(|| {
-        let dir =
-            std::env::temp_dir().join(format!("sei-monitor-config-test-{}", std::process::id()));
-        fs::create_dir_all(&dir).unwrap();
-        let sh = dir.join("sh");
+struct FakeProgramDir(PathBuf);
+
+impl FakeProgramDir {
+    fn create(name: &str) -> Option<FakeProgramDir> {
+        let dir = FakeProgramDir(
+            std::env::temp_dir().join(format!("sei-monitor-{name}-{}", std::process::id())),
+        );
+        fs::create_dir_all(&dir.0).unwrap();
+        let sh = dir.0.join("sh");
         fs::write(&sh, "#!/bin/sh\n").unwrap();
         fs::set_permissions(&sh, fs::Permissions::from_mode(0o755)).unwrap();
-        dir.into_os_string().into_string().unwrap()
-    })
+        if lookpath::is_executable(&sh) {
+            return Some(dir);
+        }
+        let notice = format!(
+            "the fake sh in {} cannot be executed (is the temporary directory mounted noexec?)",
+            dir.0.display()
+        );
+        if std::env::var_os("CI").is_some_and(|ci| !ci.is_empty()) {
+            panic!("{notice}, and CI is set");
+        }
+        eprintln!("skipping: {notice}");
+        None
+    }
+
+    fn path(&self) -> &str {
+        self.0.to_str().unwrap()
+    }
 }
 
-fn case_source(case: &ConfigCase) -> Source {
+impl Drop for FakeProgramDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn fake_program_dir_is_removed_after_use() {
+    let Some(dir) = FakeProgramDir::create("cleanup-test") else {
+        return;
+    };
+    let path = dir.0.clone();
+    assert!(path.join("sh").is_file());
+
+    drop(dir);
+
+    assert!(!path.exists(), "{} is still there", path.display());
+}
+
+fn case_source(case: &ConfigCase, program_dir: &FakeProgramDir) -> Source {
     let mut env = case.env.clone();
     env.entry("PATH".to_owned())
-        .or_insert_with(|| fake_program_dir().to_owned());
+        .or_insert_with(|| program_dir.path().to_owned());
     let files = case.files.clone();
     Source {
         lookup: Box::new(move |name| env.get(name).cloned()),
@@ -397,16 +433,27 @@ fn outcome<T>(
 
 #[test]
 fn config_matches_go() {
+    let Some(program_dir) = FakeProgramDir::create("config-test") else {
+        return;
+    };
     for case in golden::cases::<ConfigCase>("config", "/plugin") {
-        let got = outcome(PluginConfig::load(&case_source(&case)), plugin_record);
+        let got = outcome(
+            PluginConfig::load(&case_source(&case, &program_dir)),
+            plugin_record,
+        );
         assert_eq!(got, (case.result, case.problems), "plugin: {}", case.name);
     }
     for case in golden::cases::<ConfigCase>("config", "/sei") {
-        let got = outcome(SeiConfig::load(&case_source(&case)), sei_record);
+        let got = outcome(
+            SeiConfig::load(&case_source(&case, &program_dir)),
+            sei_record,
+        );
         assert_eq!(got, (case.result, case.problems), "sei: {}", case.name);
     }
     for case in golden::cases::<ConfigCase>("config", "/sei_url") {
-        let got = outcome(load_sei_url(&case_source(&case)), |url| json!(url));
+        let got = outcome(load_sei_url(&case_source(&case, &program_dir)), |url| {
+            json!(url)
+        });
         assert_eq!(got, (case.result, case.problems), "sei_url: {}", case.name);
     }
 }

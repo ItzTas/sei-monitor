@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use anyhow::{Context, anyhow};
 use monitor_hub_plugin::serve;
+use tokio::signal::unix::{Signal, SignalKind, signal};
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, timeout, timeout_at};
 use tracing::info;
@@ -19,6 +20,7 @@ use crate::version::user_agent;
 const START_UP_LIMIT: Duration = Duration::from_secs(45);
 const CYCLE_CLOSE_LIMIT: Duration = Duration::from_millis(500);
 const LOCK_LOST: &str = "the database lock was lost";
+const LISTENING: &str = "listening for SIGTERM and SIGINT";
 const SCHEDULER_STOPPED: &str = "the monitor stopped after an internal error; see the plugin log";
 
 struct Started {
@@ -117,6 +119,13 @@ async fn serve_until_stopped(
     monitor: Arc<Monitor>,
     plugin: SeiPlugin,
 ) -> anyhow::Result<()> {
+    let terminate = signal(SignalKind::terminate()).context(LISTENING)?;
+    let interrupt = signal(SignalKind::interrupt()).context(LISTENING)?;
+    let stopper = tokio::spawn(shut_down_on_signal(
+        Arc::clone(&monitor),
+        terminate,
+        interrupt,
+    ));
     let run = tokio::spawn(Arc::clone(&monitor).run());
     let scheduler = run.abort_handle();
     let supervisor = tokio::spawn(supervise(Arc::clone(&monitor), run));
@@ -125,10 +134,19 @@ async fn serve_until_stopped(
         () = lock.closed() => Err(lock_lost(&lock)),
     };
     monitor.shut_down();
+    stopper.abort();
     if timeout(CYCLE_CLOSE_LIMIT, supervisor).await.is_err() {
         scheduler.abort();
     }
     ended
+}
+
+async fn shut_down_on_signal(monitor: Arc<Monitor>, mut terminate: Signal, mut interrupt: Signal) {
+    tokio::select! {
+        _ = terminate.recv() => {}
+        _ = interrupt.recv() => {}
+    }
+    monitor.shut_down();
 }
 
 async fn supervise(monitor: Arc<Monitor>, run: JoinHandle<()>) {

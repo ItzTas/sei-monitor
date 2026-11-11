@@ -29,6 +29,7 @@ const STOP_LIMIT: Duration = Duration::from_secs(2);
 const PATIENCE: Duration = Duration::from_secs(20);
 const POLL: Duration = Duration::from_millis(20);
 const STAY_UP: Duration = Duration::from_secs(3);
+const CLOSE_LIMIT: Duration = Duration::from_millis(700);
 const REJECTED: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
 const GO_PAUSE: &str = "monitoring is paused because SEI rejected the login; restart sei-monitor after fixing the configuration";
 const HELD: &str = "nothing is logging in: request a check once the configuration is fixed";
@@ -341,6 +342,104 @@ async fn a_fatal_configuration_keeps_the_plugin_up() {
     assert_eq!(fake.calls(ROUTE_LOGIN), 0);
     drop(client);
     stop_cleanly(&mut plugin).await;
+}
+
+async fn last_run(client: &Client) -> Option<(bool, String)> {
+    client
+        .query_opt(
+            "SELECT finished_at IS NOT NULL, error FROM cycle_runs ORDER BY id DESC LIMIT 1",
+            &[],
+        )
+        .await
+        .expect("the last cycle run")
+        .map(|row| (row.get(0), row.get(1)))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sigterm_closes_the_cycle_while_a_call_is_still_held() {
+    let Some(database) = migrated_database().await else {
+        return;
+    };
+    let fake = FakeSei::start();
+    populate(&fake);
+    fake.stall(ROUTE_PROCESSES);
+    let mut plugin = start_plugin(&sei_env(&fake, &database.url, PASSWORD));
+    until(&mut plugin, "the cycle asks for the processes", || async {
+        (fake.calls(ROUTE_PROCESSES) > 0).then_some(())
+    })
+    .await;
+    let holder = admin(&database.url).await;
+    holder
+        .batch_execute("BEGIN; LOCK TABLE events IN ACCESS EXCLUSIVE MODE")
+        .await
+        .expect("hold the events table");
+    let observer = admin(&database.url).await;
+    let socket = plugin.socket.clone();
+    let held_call = tokio::spawn(async move {
+        let mut client = plugin_client(&socket).await;
+        client.events(0, 0).await
+    });
+    until(
+        &mut plugin,
+        "the Events call waits on the events table",
+        || async {
+            let waiting: i64 = observer
+                .query_one(
+                    "SELECT count(*) FROM pg_stat_activity
+                 WHERE wait_event_type = 'Lock' AND query LIKE '%events%'",
+                    &[],
+                )
+                .await
+                .expect("pg_stat_activity")
+                .get(0);
+            (waiting > 0).then_some(())
+        },
+    )
+    .await;
+
+    let signalled = Instant::now();
+    terminate(&mut plugin.child);
+    let closed = loop {
+        let run = last_run(&observer).await;
+        if run.as_ref().is_some_and(|(finished, _)| *finished) {
+            break run;
+        }
+        if signalled.elapsed() >= CLOSE_LIMIT {
+            break run;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    };
+    let closed_after = signalled.elapsed();
+    let call_still_held = !held_call.is_finished();
+    let running_while_closed = plugin.still_running();
+    let status = plugin.exit_within(STOP_LIMIT);
+    let exited_after = signalled.elapsed();
+    holder
+        .batch_execute("ROLLBACK")
+        .await
+        .expect("release the events table");
+    let answered = tokio::time::timeout(PATIENCE, held_call)
+        .await
+        .expect("the held call ended")
+        .expect("join the held call");
+
+    assert_eq!(
+        closed,
+        Some((true, "context canceled".to_owned())),
+        "after {closed_after:?}\n{}",
+        plugin.stderr_text()
+    );
+    assert!(
+        call_still_held,
+        "the call ended before the cycle was closed"
+    );
+    assert!(
+        running_while_closed,
+        "the process ended before the cycle was closed"
+    );
+    assert!(exited_after < STOP_LIMIT, "{exited_after:?}");
+    assert_eq!(status.code(), Some(0), "{}", plugin.stderr_text());
+    assert!(answered.is_err(), "{answered:?}");
 }
 
 #[tokio::test(flavor = "multi_thread")]

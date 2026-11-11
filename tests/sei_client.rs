@@ -22,9 +22,8 @@ use sei_monitor::sei::{
     Client, Credentials, ErrorKind, Options, PROCESS_PAGE_SIZE, Process, ProcessQuery, SeiError,
 };
 use support::fake_sei::{
-    FakeProcess, FakeSei, MODULE_VERSION, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_PROCESSES,
-    ROUTE_VERSION, SEI_VERSION, UNIT_GAB, UNIT_NUPROC, USER_ID, USER_NAME, USERNAME,
-    process_number,
+    FakeProcess, FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_PROCESSES, ROUTE_VERSION, UNIT_GAB,
+    UNIT_NUPROC, USER_ID, USER_NAME, USERNAME, process_number,
 };
 
 const USER_AGENT: &str = "sei-monitor/test";
@@ -195,10 +194,8 @@ async fn version() {
 
     let version = bounded(client(&fake).version()).await.expect("version");
 
-    assert_eq!(version.sei, SEI_VERSION);
-    assert_eq!(version.module, MODULE_VERSION);
-    assert_eq!(SEI_VERSION, "5.0.5");
-    assert_eq!(MODULE_VERSION, "3.0.4");
+    assert_eq!(version.sei, "5.0.5");
+    assert_eq!(version.module, "3.0.4");
 }
 
 #[tokio::test]
@@ -324,6 +321,20 @@ async fn processes_stop_once_the_total_is_collected() {
 
     assert_eq!(listed.len(), 100);
     assert_eq!(fake.calls(ROUTE_PROCESSES), 2);
+}
+
+#[tokio::test]
+async fn processes_stop_at_a_short_page_without_a_total() {
+    let fake = FakeSei::start();
+    let headers = [("content-type", "application/json")];
+    fake.respond_next(ROUTE_PROCESSES, 200, &headers, canned_page([7, 8, 9]));
+
+    let listed = bounded(client(&fake).processes(UNIT_NUPROC))
+        .await
+        .expect("listing");
+
+    assert_eq!(ids(&listed), [7, 8, 9]);
+    assert_eq!(fake.calls(ROUTE_PROCESSES), 1);
 }
 
 #[tokio::test]

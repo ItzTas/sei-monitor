@@ -1,0 +1,242 @@
+[
+  {
+    "input": "&amp;amp;",
+    "output": "&amp;"
+  },
+  {
+    "input": "&#8211",
+    "output": "–"
+  },
+  {
+    "input": "&#0;",
+    "output": "�"
+  },
+  {
+    "input": "&#128;",
+    "output": "€"
+  },
+  {
+    "input": "&#xD800;",
+    "output": "�"
+  },
+  {
+    "input": "&#1114112;",
+    "output": "�"
+  },
+  {
+    "input": "&notit;",
+    "output": "¬it;"
+  },
+  {
+    "input": "&amp",
+    "output": "&"
+  },
+  {
+    "input": "&ampx",
+    "output": "&x"
+  },
+  {
+    "input": "&nbsp;",
+    "output": " "
+  },
+  {
+    "input": "&unknown;",
+    "output": "&unknown;"
+  },
+  {
+    "input": "&",
+    "output": "&"
+  },
+  {
+    "input": "&;",
+    "output": "&;"
+  },
+  {
+    "input": "&#;",
+    "output": "&#;"
+  },
+  {
+    "input": "&#x;",
+    "output": "�"
+  },
+  {
+    "input": "Administra&ccedil;&atilde;o",
+    "output": "Administração"
+  },
+  {
+    "input": "&#039;",
+    "output": "'"
+  },
+  {
+    "input": "&quot;",
+    "output": "\""
+  },
+  {
+    "input": "&ccedil",
+    "output": "ç"
+  },
+  {
+    "input": "&AMP;",
+    "output": "&"
+  },
+  {
+    "input": "&notin;",
+    "output": "∉"
+  },
+  {
+    "input": "&NotNestedGreaterGreater;",
+    "output": "⪢̸"
+  },
+  {
+    "input": "&#x1F600;",
+    "output": "😀"
+  },
+  {
+    "input": "&#9999999999;",
+    "output": "�"
+  },
+  {
+    "input": "&#xFFFFFFFF;",
+    "output": "�"
+  },
+  {
+    "input": "&#x110000;",
+    "output": "�"
+  },
+  {
+    "input": "&#x9F;",
+    "output": "Ÿ"
+  },
+  {
+    "input": "&#x80;",
+    "output": "€"
+  },
+  {
+    "input": "&#x81;",
+    "output": ""
+  },
+  {
+    "input": "&#13;",
+    "output": "\r"
+  },
+  {
+    "input": "&#65",
+    "output": "A"
+  },
+  {
+    "input": "&#65x",
+    "output": "Ax"
+  },
+  {
+    "input": "&#X41;",
+    "output": "A"
+  },
+  {
+    "input": "&#x41",
+    "output": "A"
+  },
+  {
+    "input": "&#x",
+    "output": "&#x"
+  },
+  {
+    "input": "&#",
+    "output": "&#"
+  },
+  {
+    "input": "&#1",
+    "output": "&#1"
+  },
+  {
+    "input": "&ampamp;",
+    "output": "&amp;"
+  },
+  {
+    "input": "&notin",
+    "output": "¬in"
+  },
+  {
+    "input": "&lt",
+    "output": "<"
+  },
+  {
+    "input": "&LT",
+    "output": "<"
+  },
+  {
+    "input": "&Lt;",
+    "output": "≪"
+  },
+  {
+    "input": "&&amp;",
+    "output": "&&"
+  },
+  {
+    "input": "a&b",
+    "output": "a&b"
+  },
+  {
+    "input": "ção &amp; ção",
+    "output": "ção & ção"
+  },
+  {
+    "input": "ãã&ccedil",
+    "output": "ããç"
+  },
+  {
+    "input": "€&eacute;€",
+    "output": "€é€"
+  },
+  {
+    "input": "&aaaaaaaaaaaaaaaaaaaa",
+    "output": "&aaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+    "input": "&aacute&eacute;",
+    "output": "áé"
+  },
+  {
+    "input": "&#x2013;&ndash;&#8211;",
+    "output": "–––"
+  },
+  {
+    "input": "x&",
+    "output": "x&"
+  },
+  {
+    "input": "&#00065;",
+    "output": "A"
+  },
+  {
+    "input": "&#x0000041;",
+    "output": "A"
+  },
+  {
+    "input": "&nbsp",
+    "output": " "
+  },
+  {
+    "input": "&nbspx",
+    "output": " x"
+  },
+  {
+    "input": "&copy2026",
+    "output": "©2026"
+  },
+  {
+    "input": "&ThickSpace;",
+    "output": "  "
+  },
+  {
+    "input": "&nGt;",
+    "output": "&nGt;"
+  },
+  {
+    "input": "&ngE;",
+    "output": "≧̸"
+  },
+  {
+    "input": "",
+    "output": ""
+  }
+]

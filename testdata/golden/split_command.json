@@ -1,0 +1,294 @@
+[
+  {
+    "input": "pass show sei/monitor",
+    "args": [
+      "pass",
+      "show",
+      "sei/monitor"
+    ],
+    "error": null
+  },
+  {
+    "input": "  secret-tool   lookup service sei  ",
+    "args": [
+      "secret-tool",
+      "lookup",
+      "service",
+      "sei"
+    ],
+    "error": null
+  },
+  {
+    "input": "bw get password \"sei monitor\"",
+    "args": [
+      "bw",
+      "get",
+      "password",
+      "sei monitor"
+    ],
+    "error": null
+  },
+  {
+    "input": "cmd ''",
+    "args": [
+      "cmd",
+      ""
+    ],
+    "error": null
+  },
+  {
+    "input": "cmd \"a\\\"b\"",
+    "args": [
+      "cmd",
+      "a\"b"
+    ],
+    "error": null
+  },
+  {
+    "input": "cmd 'it''s'",
+    "args": [
+      "cmd",
+      "its"
+    ],
+    "error": null
+  },
+  {
+    "input": "",
+    "args": null,
+    "error": "SEI_PASSWORD_CMD is empty"
+  },
+  {
+    "input": "   ",
+    "args": null,
+    "error": "SEI_PASSWORD_CMD is empty"
+  },
+  {
+    "input": "cmd \"open",
+    "args": null,
+    "error": "SEI_PASSWORD_CMD: unterminated quote or trailing backslash"
+  },
+  {
+    "input": "cmd 'open",
+    "args": null,
+    "error": "SEI_PASSWORD_CMD: unterminated quote or trailing backslash"
+  },
+  {
+    "input": "cmd trailing\\",
+    "args": null,
+    "error": "SEI_PASSWORD_CMD: unterminated quote or trailing backslash"
+  },
+  {
+    "input": "a\\ b",
+    "args": [
+      "a b"
+    ],
+    "error": null
+  },
+  {
+    "input": "\"a \\\" b\"",
+    "args": [
+      "a \" b"
+    ],
+    "error": null
+  },
+  {
+    "input": "'a \\' b",
+    "args": [
+      "a \\",
+      "b"
+    ],
+    "error": null
+  },
+  {
+    "input": "\"\"",
+    "args": [
+      ""
+    ],
+    "error": null
+  },
+  {
+    "input": "''",
+    "args": [
+      ""
+    ],
+    "error": null
+  },
+  {
+    "input": "a\"\"b",
+    "args": [
+      "ab"
+    ],
+    "error": null
+  },
+  {
+    "input": "x \\",
+    "args": null,
+    "error": "SEI_PASSWORD_CMD: unterminated quote or trailing backslash"
+  },
+  {
+    "input": "\"open",
+    "args": null,
+    "error": "SEI_PASSWORD_CMD: unterminated quote or trailing backslash"
+  },
+  {
+    "input": "a b",
+    "args": [
+      "a",
+      "b"
+    ],
+    "error": null
+  },
+  {
+    "input": "a\tb\nc\r\nd\u000be\ff",
+    "args": [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f"
+    ],
+    "error": null
+  },
+  {
+    "input": "pass show \"sei/my pass\"",
+    "args": [
+      "pass",
+      "show",
+      "sei/my pass"
+    ],
+    "error": null
+  },
+  {
+    "input": "ab",
+    "args": [
+      "a",
+      "b"
+    ],
+    "error": null
+  },
+  {
+    "input": "a　b",
+    "args": [
+      "a",
+      "b"
+    ],
+    "error": null
+  },
+  {
+    "input": "a\u2028b",
+    "args": [
+      "a",
+      "b"
+    ],
+    "error": null
+  },
+  {
+    "input": "a​b",
+    "args": [
+      "a​b"
+    ],
+    "error": null
+  },
+  {
+    "input": "a b",
+    "args": [
+      "a",
+      "b"
+    ],
+    "error": null
+  },
+  {
+    "input": "a b",
+    "args": [
+      "a",
+      "b"
+    ],
+    "error": null
+  },
+  {
+    "input": "a b",
+    "args": [
+      "a",
+      "b"
+    ],
+    "error": null
+  },
+  {
+    "input": "çãõ \"ã b\" 'é c' d\\ é",
+    "args": [
+      "çãõ",
+      "ã b",
+      "é c",
+      "d é"
+    ],
+    "error": null
+  },
+  {
+    "input": "\"a\\\\b\"",
+    "args": [
+      "a\\b"
+    ],
+    "error": null
+  },
+  {
+    "input": "'a\\\\b'",
+    "args": [
+      "a\\\\b"
+    ],
+    "error": null
+  },
+  {
+    "input": "\\'",
+    "args": [
+      "'"
+    ],
+    "error": null
+  },
+  {
+    "input": "\\\"",
+    "args": [
+      "\""
+    ],
+    "error": null
+  },
+  {
+    "input": "\\\\",
+    "args": [
+      "\\"
+    ],
+    "error": null
+  },
+  {
+    "input": "a\\é",
+    "args": [
+      "aé"
+    ],
+    "error": null
+  },
+  {
+    "input": "\"a'b\" 'a\"b'",
+    "args": [
+      "a'b",
+      "a\"b"
+    ],
+    "error": null
+  },
+  {
+    "input": "\"\" ''",
+    "args": [
+      "",
+      ""
+    ],
+    "error": null
+  },
+  {
+    "input": "x \"\" y",
+    "args": [
+      "x",
+      "",
+      "y"
+    ],
+    "error": null
+  }
+]

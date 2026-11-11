@@ -1,0 +1,142 @@
+[
+  {
+    "input": "Módulo inativo.",
+    "output": "modulo inativo."
+  },
+  {
+    "input": "MÓDULO INCOMPATÍVEL com a versão",
+    "output": "modulo incompativel com a versao"
+  },
+  {
+    "input": "  Token inválido! ",
+    "output": "token invalido!"
+  },
+  {
+    "input": "TOKEN",
+    "output": "token"
+  },
+  {
+    "input": "Usuário ou Senha Inválida.",
+    "output": "usuario ou senha invalida."
+  },
+  {
+    "input": "é",
+    "output": "e"
+  },
+  {
+    "input": "ﬁ",
+    "output": "ﬁ"
+  },
+  {
+    "input": "İstanbul",
+    "output": "istanbul"
+  },
+  {
+    "input": "ΑΣ",
+    "output": "ασ"
+  },
+  {
+    "input": "ß",
+    "output": "ß"
+  },
+  {
+    "input": "ǅ",
+    "output": "ǆ"
+  },
+  {
+    "input": "",
+    "output": ""
+  },
+  {
+    "input": "   ",
+    "output": ""
+  },
+  {
+    "input": " Módulo inativo.　",
+    "output": "modulo inativo."
+  },
+  {
+    "input": "́",
+    "output": ""
+  },
+  {
+    "input": "Ω",
+    "output": "ω"
+  },
+  {
+    "input": "Ω",
+    "output": "ω"
+  },
+  {
+    "input": "Å",
+    "output": "a"
+  },
+  {
+    "input": "Å",
+    "output": "a"
+  },
+  {
+    "input": "한",
+    "output": "한"
+  },
+  {
+    "input": "Ệ",
+    "output": "e"
+  },
+  {
+    "input": "ä́",
+    "output": "a"
+  },
+  {
+    "input": "का",
+    "output": "का"
+  },
+  {
+    "input": "ᾳ",
+    "output": "α"
+  },
+  {
+    "input": "ÇÃO çã ÕÑ",
+    "output": "cao ca on"
+  },
+  {
+    "input": "Ǆ",
+    "output": "ǆ"
+  },
+  {
+    "input": "ẞ",
+    "output": "ß"
+  },
+  {
+    "input": "Tôken",
+    "output": "token"
+  },
+  {
+    "input": "ção ​ token",
+    "output": "cao ​ token"
+  },
+  {
+    "input": "\tMÓDULO\n",
+    "output": "modulo"
+  },
+  {
+    "input": "x",
+    "output": "x"
+  },
+  {
+    "input": "x​",
+    "output": "x​"
+  },
+  {
+    "input": "Ａ",
+    "output": "ａ"
+  },
+  {
+    "input": "Ⅻ",
+    "output": "ⅻ"
+  },
+  {
+    "input": "𝐀",
+    "output": "𝐀"
+  }
+]

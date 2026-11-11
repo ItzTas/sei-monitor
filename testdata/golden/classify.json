@@ -1,0 +1,182 @@
+[
+  {
+    "route": "/processo/listar",
+    "status": 500,
+    "message": "Módulo inativo.",
+    "kind": "module_unavailable"
+  },
+  {
+    "route": "/autenticar",
+    "status": 401,
+    "message": "Módulo inativo.",
+    "kind": "module_unavailable"
+  },
+  {
+    "route": "/versao",
+    "status": 200,
+    "message": "MÓDULO INCOMPATÍVEL com a versão",
+    "kind": "module_unavailable"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 200,
+    "message": "  módulo inativo",
+    "kind": "module_unavailable"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 200,
+    "message": "O módulo inativo",
+    "kind": "refused"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 200,
+    "message": "Modulo inativo.",
+    "kind": "module_unavailable"
+  },
+  {
+    "route": "/autenticar",
+    "status": 500,
+    "message": "Usuário ou Senha Inválida.",
+    "kind": "server"
+  },
+  {
+    "route": "/autenticar",
+    "status": 502,
+    "message": "",
+    "kind": "server"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 503,
+    "message": "Token inválido!",
+    "kind": "server"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 599,
+    "message": "",
+    "kind": "server"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 600,
+    "message": "",
+    "kind": "server"
+  },
+  {
+    "route": "/autenticar",
+    "status": 401,
+    "message": "",
+    "kind": "invalid_credentials"
+  },
+  {
+    "route": "/autenticar",
+    "status": 403,
+    "message": "Acesso negado!",
+    "kind": "invalid_credentials"
+  },
+  {
+    "route": "/autenticar",
+    "status": 200,
+    "message": "Token inválido!",
+    "kind": "invalid_credentials"
+  },
+  {
+    "route": "/autenticar",
+    "status": 200,
+    "message": "Usuário ou Senha Inválida.",
+    "kind": "invalid_credentials"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 200,
+    "message": "O token informado expirou",
+    "kind": "unauthorized"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 200,
+    "message": "TOKEN",
+    "kind": "unauthorized"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 200,
+    "message": "Tôken expirado",
+    "kind": "unauthorized"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 200,
+    "message": "ação tokenização",
+    "kind": "unauthorized"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 401,
+    "message": "",
+    "kind": "unauthorized"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 403,
+    "message": "Acesso negado!",
+    "kind": "unauthorized"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 200,
+    "message": "Unidade não permitida para o usuário.",
+    "kind": "refused"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 400,
+    "message": "",
+    "kind": "refused"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 404,
+    "message": "Não encontrado.",
+    "kind": "refused"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 499,
+    "message": "",
+    "kind": "refused"
+  },
+  {
+    "route": "/atividade/listar",
+    "status": 200,
+    "message": "Processo não encontrado.",
+    "kind": "refused"
+  },
+  {
+    "route": "/documento/listar",
+    "status": 302,
+    "message": "",
+    "kind": "refused"
+  },
+  {
+    "route": "/versao",
+    "status": 401,
+    "message": "Acesso negado!",
+    "kind": "unauthorized"
+  },
+  {
+    "route": "/AUTENTICAR",
+    "status": 200,
+    "message": "Usuário ou Senha Inválida.",
+    "kind": "refused"
+  },
+  {
+    "route": "/processo/listar",
+    "status": 200,
+    "message": "to ken",
+    "kind": "refused"
+  }
+]

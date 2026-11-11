@@ -1,0 +1,507 @@
+{
+  "quote": [
+    {
+      "input": "a\"b",
+      "output": "\"a\\\"b\""
+    },
+    {
+      "input": "a\\b",
+      "output": "\"a\\\\b\""
+    },
+    {
+      "input": "\t",
+      "output": "\"\\t\""
+    },
+    {
+      "input": "\n",
+      "output": "\"\\n\""
+    },
+    {
+      "input": "\u0000",
+      "output": "\"\\x00\""
+    },
+    {
+      "input": "",
+      "output": "\"\\x7f\""
+    },
+    {
+      "input": " ",
+      "output": "\"\\u00a0\""
+    },
+    {
+      "input": "é",
+      "output": "\"é\""
+    },
+    {
+      "input": "😀",
+      "output": "\"😀\""
+    },
+    {
+      "input": "\u2028",
+      "output": "\"\\u2028\""
+    },
+    {
+      "input": "​",
+      "output": "\"\\u200b\""
+    },
+    {
+      "input": "",
+      "output": "\"\""
+    },
+    {
+      "input": "\r",
+      "output": "\"\\r\""
+    },
+    {
+      "input": "\u0007",
+      "output": "\"\\a\""
+    },
+    {
+      "input": "\b",
+      "output": "\"\\b\""
+    },
+    {
+      "input": "\f",
+      "output": "\"\\f\""
+    },
+    {
+      "input": "\u000b",
+      "output": "\"\\v\""
+    },
+    {
+      "input": "\u001b",
+      "output": "\"\\x1b\""
+    },
+    {
+      "input": "'",
+      "output": "\"'\""
+    },
+    {
+      "input": "­",
+      "output": "\"\\u00ad\""
+    },
+    {
+      "input": "�",
+      "output": "\"�\""
+    },
+    {
+      "input": "﻿",
+      "output": "\"\\ufeff\""
+    },
+    {
+      "input": "",
+      "output": "\"\\u0080\""
+    },
+    {
+      "input": "",
+      "output": "\"\\u009f\""
+    },
+    {
+      "input": "é",
+      "output": "\"é\""
+    },
+    {
+      "input": "Mars/Base",
+      "output": "\"Mars/Base\""
+    },
+    {
+      "input": "ção\tfim",
+      "output": "\"ção\\tfim\""
+    },
+    {
+      "input": "󠀁",
+      "output": "\"\\U000e0001\""
+    },
+    {
+      "input": "􏿿",
+      "output": "\"\\U0010ffff\""
+    },
+    {
+      "input": "͸",
+      "output": "\"\\u0378\""
+    },
+    {
+      "input": "　",
+      "output": "\"\\u3000\""
+    },
+    {
+      "input": "ção   x",
+      "output": "\"ção \\u00a0 x\""
+    }
+  ],
+  "equal_fold": [
+    {
+      "a": "Fulano.Tal",
+      "b": "fulano.tal",
+      "equal": true
+    },
+    {
+      "a": "K",
+      "b": "k",
+      "equal": true
+    },
+    {
+      "a": "ſ",
+      "b": "S",
+      "equal": true
+    },
+    {
+      "a": "ß",
+      "b": "SS",
+      "equal": false
+    },
+    {
+      "a": "İ",
+      "b": "i",
+      "equal": false
+    },
+    {
+      "a": "",
+      "b": "",
+      "equal": true
+    },
+    {
+      "a": "a",
+      "b": "",
+      "equal": false
+    },
+    {
+      "a": "Ǆ",
+      "b": "ǆ",
+      "equal": true
+    },
+    {
+      "a": "ǅ",
+      "b": "Ǆ",
+      "equal": true
+    },
+    {
+      "a": "σ",
+      "b": "ς",
+      "equal": true
+    },
+    {
+      "a": "Σ",
+      "b": "ς",
+      "equal": true
+    },
+    {
+      "a": "ﬁ",
+      "b": "fi",
+      "equal": false
+    },
+    {
+      "a": "Á",
+      "b": "á",
+      "equal": true
+    },
+    {
+      "a": "ÿ",
+      "b": "Ÿ",
+      "equal": true
+    },
+    {
+      "a": "ı",
+      "b": "I",
+      "equal": false
+    },
+    {
+      "a": "ı",
+      "b": "i",
+      "equal": false
+    },
+    {
+      "a": "Ω",
+      "b": "Ω",
+      "equal": true
+    },
+    {
+      "a": "Å",
+      "b": "Å",
+      "equal": true
+    },
+    {
+      "a": "SEDEMO/Ação",
+      "b": "sedemo/AÇÃO",
+      "equal": true
+    },
+    {
+      "a": "localhost",
+      "b": "LOCALHOST",
+      "equal": true
+    },
+    {
+      "a": "é",
+      "b": "é",
+      "equal": false
+    },
+    {
+      "a": "ẞ",
+      "b": "ß",
+      "equal": true
+    },
+    {
+      "a": "ẞ",
+      "b": "ss",
+      "equal": false
+    },
+    {
+      "a": "ǈ",
+      "b": "Ǉ",
+      "equal": true
+    },
+    {
+      "a": "açãK",
+      "b": "AÇÃk",
+      "equal": true
+    },
+    {
+      "a": "çãı",
+      "b": "ÇÃI",
+      "equal": false
+    }
+  ],
+  "fields": [
+    {
+      "input": "ab",
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "input": "a b",
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "input": "a　b",
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "input": "a​b",
+      "output": [
+        "a​b"
+      ]
+    },
+    {
+      "input": "",
+      "output": []
+    },
+    {
+      "input": "   ",
+      "output": []
+    },
+    {
+      "input": " a  b ",
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "input": "\ta\nb\r\u000bc\fd",
+      "output": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ]
+    },
+    {
+      "input": "ção  é\u2028ü",
+      "output": [
+        "ção",
+        "é",
+        "ü"
+      ]
+    },
+    {
+      "input": "a b c d\u2029e f g",
+      "output": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g"
+      ]
+    },
+    {
+      "input": "a᠎b",
+      "output": [
+        "a᠎b"
+      ]
+    },
+    {
+      "input": "a﻿b",
+      "output": [
+        "a﻿b"
+      ]
+    },
+    {
+      "input": "a\u001cb",
+      "output": [
+        "a\u001cb"
+      ]
+    }
+  ],
+  "lower": [
+    {
+      "input": "İ",
+      "output": "i"
+    },
+    {
+      "input": "ΑΣ",
+      "output": "ασ"
+    },
+    {
+      "input": "ǅ",
+      "output": "ǆ"
+    },
+    {
+      "input": "Ǆ",
+      "output": "ǆ"
+    },
+    {
+      "input": "ẞ",
+      "output": "ß"
+    },
+    {
+      "input": "K",
+      "output": "k"
+    },
+    {
+      "input": "Ω",
+      "output": "ω"
+    },
+    {
+      "input": "ÁÉÍÓÚÇ",
+      "output": "áéíóúç"
+    },
+    {
+      "input": "İSTANBUL",
+      "output": "istanbul"
+    },
+    {
+      "input": "ΟΔΟΣ ΣΑ",
+      "output": "οδοσ σα"
+    },
+    {
+      "input": "Ⅻ",
+      "output": "ⅻ"
+    },
+    {
+      "input": "Ａ",
+      "output": "ａ"
+    },
+    {
+      "input": "",
+      "output": ""
+    },
+    {
+      "input": "SEDEMO/NUPROC",
+      "output": "sedemo/nuproc"
+    },
+    {
+      "input": "𐐀",
+      "output": "𐐨"
+    }
+  ],
+  "atoi": [
+    {
+      "input": "+3",
+      "value": 3
+    },
+    {
+      "input": "-0",
+      "value": 0
+    },
+    {
+      "input": "03",
+      "value": 3
+    },
+    {
+      "input": " 3",
+      "value": null
+    },
+    {
+      "input": "3.0",
+      "value": null
+    },
+    {
+      "input": "1_0",
+      "value": null
+    },
+    {
+      "input": "9223372036854775808",
+      "value": null
+    },
+    {
+      "input": "9223372036854775807",
+      "value": 9223372036854775807
+    },
+    {
+      "input": "-9223372036854775808",
+      "value": -9223372036854775808
+    },
+    {
+      "input": "-9223372036854775809",
+      "value": null
+    },
+    {
+      "input": "",
+      "value": null
+    },
+    {
+      "input": "+",
+      "value": null
+    },
+    {
+      "input": "-",
+      "value": null
+    },
+    {
+      "input": "0x10",
+      "value": null
+    },
+    {
+      "input": "٣",
+      "value": null
+    },
+    {
+      "input": "３",
+      "value": null
+    },
+    {
+      "input": "3 ",
+      "value": null
+    },
+    {
+      "input": "++3",
+      "value": null
+    },
+    {
+      "input": "+-3",
+      "value": null
+    },
+    {
+      "input": "0",
+      "value": 0
+    },
+    {
+      "input": "60",
+      "value": 60
+    },
+    {
+      "input": "3650",
+      "value": 3650
+    }
+  ]
+}

@@ -1,7 +1,6 @@
 mod support;
 
 use std::error::Error;
-use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,21 +12,23 @@ use tokio_postgres::NoTls;
 
 use sei_monitor::event::{Event, Kind, Payload};
 use sei_monitor::monitor::diff::CurrentUser;
-use sei_monitor::monitor::{
-    Clock, CycleResult, Jitter, Monitor, MonitorConfig, MonitorError, login_failure,
-};
+use sei_monitor::monitor::{Clock, CycleResult, MonitorError, login_failure};
 use sei_monitor::password::StaticPassword;
 use sei_monitor::secret::Secret;
-use sei_monitor::sei::{ApiError, Client, Credentials, ErrorKind, Options, SeiError, Target};
+use sei_monitor::sei::{ApiError, Client, Credentials, ErrorKind, SeiError};
 use sei_monitor::store::{AccountInfo, AccountKey, Store, Trigger};
 use sei_monitor::timezone::load_zone;
 use support::clock::FakeClock;
+use support::database_url_as;
 use support::fake_sei::{
-    FakeActivity, FakeDocument, FakeProcess, FakeSei, FakeUser, MODULE_VERSION, ORG_ACRONYM,
-    ORG_ID, PASSWORD, ROUTE_ACTIVITIES, ROUTE_DOCUMENTS, ROUTE_LOGIN, ROUTE_PROCESSES, SEI_VERSION,
-    UNIT_GAB, UNIT_NUPROC, USER_ID, USER_NAME, USERNAME, process_number,
+    FakeActivity, FakeDocument, FakeProcess, FakeSei, MODULE_VERSION, ORG_ACRONYM, ORG_ID,
+    PASSWORD, ROUTE_ACTIVITIES, ROUTE_DOCUMENTS, ROUTE_LOGIN, ROUTE_PROCESSES, SEI_VERSION,
+    UNIT_GAB, UNIT_NUPROC, USER_ID, USERNAME, process_number,
 };
-use support::{database_url_as, migrated_database};
+use support::harness::{
+    FIFTEEN_MINUTES, Harness, activity, bounded, config, database_store, document, hours, options,
+    populate, process, start, user,
+};
 
 const CYCLE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -37,15 +38,9 @@ const MONITOR_TEXT: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/testdata/golden/monitor_text.json"
 ));
-const TEST_TIMEOUT: Duration = Duration::from_secs(20);
 const SETTLE: Duration = Duration::from_millis(100);
-const FIFTEEN_MINUTES: Duration = Duration::from_secs(15 * 60);
 const CHANGED_PASSWORD: &str = "changed-by-the-user";
 const GO_ZERO_TIME: &str = "0001-01-01T00:00:00Z";
-
-fn start() -> DateTime<Utc> {
-    instant("2026-11-04T18:00:00Z").expect("the start time")
-}
 
 fn instant(text: &str) -> Option<DateTime<Utc>> {
     if text == GO_ZERO_TIME {
@@ -56,111 +51,6 @@ fn instant(text: &str) -> Option<DateTime<Utc>> {
     Some(at.to_utc())
 }
 
-fn hours(n: i64) -> chrono::Duration {
-    chrono::Duration::hours(n)
-}
-
-async fn bounded<T>(work: impl Future<Output = T>) -> T {
-    tokio::time::timeout(TEST_TIMEOUT, work)
-        .await
-        .expect("the monitor did not finish in time")
-}
-
-fn options(fake: &FakeSei) -> Options {
-    Options {
-        user_agent: "sei-monitor/test".to_owned(),
-        zone: fake.zone(),
-        timeout: Duration::from_secs(10),
-    }
-}
-
-fn config(fake: &FakeSei, password: &str) -> MonitorConfig {
-    MonitorConfig {
-        target: Target {
-            sei_url: fake.url(),
-            api_url: String::new(),
-            org: ORG_ACRONYM.to_owned(),
-            username: USERNAME.to_owned(),
-            password: Arc::new(StaticPassword(Secret::new(password.to_owned()))),
-        },
-        options: options(fake),
-        units: Vec::new(),
-        all_units: false,
-        poll_interval: FIFTEEN_MINUTES,
-        concurrency: 3,
-        return_warning_days: 2,
-        retention_days: 0,
-        zone: fake.zone(),
-    }
-}
-
-fn no_jitter() -> Jitter {
-    Arc::new(|_| Duration::ZERO)
-}
-
-struct Harness {
-    fake: FakeSei,
-    store: Store,
-    clock: Arc<FakeClock>,
-    monitor: Arc<Monitor>,
-}
-
-impl Harness {
-    fn new(store: &Store, configure: impl FnOnce(&mut MonitorConfig)) -> Harness {
-        let fake = FakeSei::start();
-        let mut monitor_config = config(&fake, PASSWORD);
-        configure(&mut monitor_config);
-        Harness::with(fake, store.clone(), monitor_config)
-    }
-
-    fn with(fake: FakeSei, store: Store, monitor_config: MonitorConfig) -> Harness {
-        let clock = FakeClock::new(start());
-        let monitor = Monitor::new(monitor_config, store.clone(), clock.clone(), no_jitter());
-        Harness {
-            fake,
-            store,
-            clock,
-            monitor,
-        }
-    }
-
-    async fn prepare(&self) {
-        bounded(self.monitor.prepare()).await.expect("prepare");
-    }
-
-    async fn run_once(&self) -> CycleResult {
-        bounded(self.monitor.run_once(Trigger::Scheduled))
-            .await
-            .expect("cycle")
-    }
-
-    fn account_id(&self) -> i64 {
-        self.monitor.state().account_id
-    }
-
-    async fn events(&self) -> Vec<Event> {
-        self.store
-            .events_after(self.account_id(), 0, 500)
-            .await
-            .expect("events")
-    }
-
-    async fn activity_refs(&self) -> Vec<String> {
-        self.events()
-            .await
-            .into_iter()
-            .filter(|event| event.kind == Kind::ActivityAdded)
-            .map(|event| event.reference)
-            .collect()
-    }
-}
-
-async fn database_store() -> Option<(Database, Store)> {
-    let database = migrated_database().await?;
-    let store = Store::new(&Secret::new(database.url.clone())).expect("store");
-    Some((database, store))
-}
-
 fn kinds_and_refs(events: &[Event]) -> Vec<(Kind, String)> {
     events
         .iter()
@@ -168,80 +58,9 @@ fn kinds_and_refs(events: &[Event]) -> Vec<(Kind, String)> {
         .collect()
 }
 
-fn user(id: i64, acronym: &str, name: &str) -> FakeUser {
-    FakeUser {
-        id,
-        acronym: acronym.to_owned(),
-        name: name.to_owned(),
-    }
-}
-
-fn process(id: i64, n: u32, process_type: &str) -> FakeProcess {
-    FakeProcess {
-        id,
-        number: process_number(n),
-        process_type: process_type.to_owned(),
-        ..FakeProcess::default()
-    }
-}
-
-fn activity(id: i64, at: DateTime<Utc>, text: &str) -> FakeActivity {
-    FakeActivity {
-        id,
-        user: USERNAME.to_owned(),
-        unit: "SEDEMO/NUPROC".to_owned(),
-        text: text.to_owned(),
-        at,
-    }
-}
-
-fn document(id: i64, label: &str) -> FakeDocument {
-    FakeDocument {
-        id,
-        protocol: format!("00{label}"),
-        document_type: "Ofício".to_owned(),
-        number: String::new(),
-        label: label.to_owned(),
-    }
-}
-
 fn numbered_documents(ids: std::ops::RangeInclusive<i64>) -> Vec<FakeDocument> {
     ids.map(|id| document(id, &format!("Documento {id}")))
         .collect()
-}
-
-fn populate(fake: &FakeSei) {
-    let first = FakeProcess {
-        description: "Compra de cadeiras".to_owned(),
-        assignee: Some(user(USER_ID, USERNAME, USER_NAME)),
-        return_date: "05/11/2026".to_owned(),
-        ..process(9001, 1, "Contrato")
-    };
-    fake.set_processes(UNIT_NUPROC, vec![first, process(9002, 2, "Diárias")]);
-    fake.add_activities(
-        9001,
-        vec![
-            activity(50001, start() - hours(72), "Processo gerado"),
-            activity(
-                50002,
-                start() - hours(48),
-                "Processo remetido pela unidade SEDEMO/PROTOCOLO",
-            ),
-            activity(50003, start() - hours(24), "Processo recebido na unidade"),
-        ],
-    );
-    fake.add_activities(
-        9002,
-        vec![activity(60001, start() - hours(24), "Processo gerado")],
-    );
-    fake.add_documents(
-        9001,
-        vec![
-            document(80001, "Ofício 1"),
-            document(80002, "Despacho 2"),
-            document(80003, "Anexo 3"),
-        ],
-    );
 }
 
 fn single_process(fake: &FakeSei) {

@@ -1,9 +1,11 @@
 mod details;
 pub mod diff;
+mod prune;
 
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::AtomicI64;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
@@ -104,6 +106,7 @@ pub struct Monitor {
     clock: Arc<dyn Clock>,
     #[expect(dead_code, reason = "the scheduler of Task 15 is the first reader")]
     jitter: Jitter,
+    acked: AtomicI64,
     inner: Mutex<Inner>,
 }
 
@@ -150,6 +153,7 @@ impl Monitor {
             store,
             clock,
             jitter,
+            acked: AtomicI64::new(0),
             inner: Mutex::new(Inner {
                 prepared: None,
                 logins: 0,
@@ -301,6 +305,7 @@ impl Monitor {
         changes.finished_at = self.clock.now();
         let inserted = self.store.apply_cycle(&changes).await?;
         self.after_success(account.id, baseline, started).await;
+        self.prune(account.id, started).await;
         let result = CycleResult {
             processes_seen,
             events_created: inserted.len(),

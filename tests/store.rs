@@ -1571,3 +1571,61 @@ async fn a_page_of_unreadable_events_is_not_the_end() {
         Vec::new()
     );
 }
+
+async fn store_unreadable_run(client: &Client, account_id: i64, rows: i32) {
+    client
+        .execute(
+            "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
+             SELECT $1, 'activity_added', 9001, 'unreadable-' || n, $2, $2, '{'
+             FROM generate_series(1, $3::int) AS n",
+            &[&account_id, &repo_now(), &rows],
+        )
+        .await
+        .expect("store a run of unreadable events");
+}
+
+#[tokio::test]
+async fn a_long_run_of_unreadable_events_is_read_past_whatever_the_limit() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let client = connect(&db.url).await;
+    store_unreadable_run(&client, account.id, 50_000).await;
+    let last = apply(&pooled, readable(account.id, "last")).await;
+
+    for limit in [1, 10] {
+        assert_eq!(
+            read_within(&pooled, account.id, 0, limit)
+                .await
+                .expect("the event after the unreadable run"),
+            last
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_read_gives_up_after_walking_too_many_unreadable_events() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let client = connect(&db.url).await;
+    store_unreadable_run(&client, account.id, 100_001).await;
+    apply(&pooled, readable(account.id, "unreached")).await;
+
+    let error = read_within(&pooled, account.id, 0, 100)
+        .await
+        .expect_err("a read walked past its row limit");
+
+    assert!(
+        matches!(error, StoreError::TooManyUnreadableEvents(100_000)),
+        "{error:?}"
+    );
+    assert_eq!(
+        error.to_string(),
+        "too many stored events cannot be read: 100000 rows read"
+    );
+}

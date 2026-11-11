@@ -22,6 +22,8 @@ const PRUNE_PROCESSES_LEFT_BEFORE: &str =
     "DELETE FROM processes WHERE account_id = $1 AND left_at < $2";
 
 const REPORTED_LIMIT: usize = 1024;
+const BATCH: i64 = 1000;
+const WALK_LIMIT: u64 = 100_000;
 
 #[derive(Clone, Default)]
 pub(super) struct Skipped(Arc<Mutex<BTreeSet<i64>>>);
@@ -61,12 +63,17 @@ impl Store {
         let client = self.client().await?;
         let mut events = Vec::new();
         let mut cursor = after;
+        let mut walked: u64 = 0;
         loop {
-            let wanted = limit - count(events.len());
+            let wanted = (limit - count(events.len())).max(BATCH);
             let rows = client
                 .query(EVENTS_AFTER, &[&account_id, &cursor, &wanted])
                 .await?;
             for row in &rows {
+                if count(events.len()) >= limit {
+                    return Ok(events);
+                }
+                walked += 1;
                 cursor = row.try_get("id")?;
                 let Some(event) = self.readable(row, cursor)? else {
                     continue;
@@ -75,6 +82,9 @@ impl Store {
             }
             if count(rows.len()) < wanted || count(events.len()) >= limit {
                 return Ok(events);
+            }
+            if walked >= WALK_LIMIT {
+                return Err(StoreError::TooManyUnreadableEvents(walked));
             }
         }
     }

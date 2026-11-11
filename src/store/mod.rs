@@ -61,6 +61,8 @@ pub enum StoreError {
     Database(#[from] tokio_postgres::Error),
     #[error(transparent)]
     Migrate(#[from] MigrateError),
+    #[error("too many stored events cannot be read: {0} rows read")]
+    TooManyUnreadableEvents(u64),
 }
 
 pub struct WriterLock {

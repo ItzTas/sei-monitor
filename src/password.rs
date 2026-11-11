@@ -12,6 +12,7 @@ use tokio::time::{Instant, sleep_until, timeout};
 use zeroize::Zeroizing;
 
 use crate::duration::format_go_duration;
+use crate::gotext::to_upper;
 use crate::secret::Secret;
 
 pub const PASSWORD_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
@@ -164,7 +165,11 @@ impl PasswordCommandError {
         let program = &self.program;
         match &self.failure {
             CommandFailure::TimedOut(timeout) => {
-                format!("{program} did not finish within {}", go_duration(*timeout))
+                let nanos = i64::try_from(timeout.as_nanos()).unwrap_or(i64::MAX);
+                format!(
+                    "{program} did not finish within {}",
+                    format_go_duration(nanos)
+                )
             }
             CommandFailure::Start(err) => format!("could not run {program}: {err}"),
             CommandFailure::Empty => format!("{program} printed nothing"),
@@ -286,22 +291,10 @@ pub(crate) fn is_secret_name(name: &str) -> bool {
         "POSTGRES_PASSWORD",
         "DATABASE_URL",
     ];
-    let upper: String = name.chars().map(simple_uppercase).collect();
+    let upper = to_upper(name);
     let base = upper.strip_suffix("_FILE").unwrap_or(&upper);
     let base = base.strip_suffix("_CMD").unwrap_or(base);
     SECRETS.contains(&base)
-}
-
-fn simple_uppercase(c: char) -> char {
-    let mut upper = c.to_uppercase();
-    match (upper.next(), upper.next()) {
-        (Some(single), None) => single,
-        _ => c,
-    }
-}
-
-fn go_duration(duration: Duration) -> String {
-    format_go_duration(i64::try_from(duration.as_nanos()).unwrap_or(i64::MAX))
 }
 
 pub(crate) fn trim_final_newline(text: &str) -> &str {
@@ -583,17 +576,12 @@ mod tests {
 
     #[test]
     fn timeouts_are_written_like_go() {
-        let err = PasswordCommandError {
+        let timed_out = |timeout| PasswordCommandError {
             program: "pass".to_owned(),
             exit_code: -1,
             stderr_bytes: 0,
-            failure: CommandFailure::TimedOut(PASSWORD_COMMAND_TIMEOUT),
+            failure: CommandFailure::TimedOut(timeout),
         };
-        assert_eq!(
-            err.to_string(),
-            "SEI_PASSWORD_CMD: pass did not finish within 30s"
-        );
-
         let cases = [
             (Duration::from_secs(30), "30s"),
             (Duration::from_millis(200), "200ms"),
@@ -607,8 +595,16 @@ mod tests {
             (Duration::ZERO, "0s"),
         ];
         for (duration, want) in cases {
-            assert_eq!(go_duration(duration), want, "{duration:?}");
+            assert_eq!(
+                timed_out(duration).to_string(),
+                format!("SEI_PASSWORD_CMD: pass did not finish within {want}"),
+                "{duration:?}"
+            );
         }
+        assert_eq!(
+            timed_out(PASSWORD_COMMAND_TIMEOUT).to_string(),
+            "SEI_PASSWORD_CMD: pass did not finish within 30s"
+        );
     }
 
     #[tokio::test]

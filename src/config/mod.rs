@@ -1,15 +1,12 @@
+mod lookpath;
 mod reader;
 #[cfg(test)]
 pub(crate) mod tests;
 mod url;
 
-use std::ffi::{CString, OsString};
+use std::ffi::OsString;
 use std::fs;
 use std::future::{Future, ready};
-use std::io;
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,6 +18,7 @@ use crate::gotext::{atoi, equal_fold, go_quote, to_lower, to_upper, trim};
 use crate::password::{PasswordCommand, PasswordCommandError, PasswordSource};
 use crate::secret::Secret;
 use crate::timezone::load_zone;
+use lookpath::look_path;
 use reader::Reader;
 use url::{normalize_api_url, normalize_sei_url};
 
@@ -225,51 +223,6 @@ fn chosen_password(reader: &mut Reader, command_set: bool) -> PasswordSetting {
         ));
     }
     PasswordSetting::Command(command)
-}
-
-fn look_path(program: &str, path: Option<&str>) -> bool {
-    if matches!(program, "" | "." | "..") {
-        return false;
-    }
-    if program.contains('/') {
-        return is_executable(Path::new(program));
-    }
-    let path = path.unwrap_or_default();
-    if path.is_empty() {
-        return false;
-    }
-    path.split(':')
-        .map(|dir| Path::new(if dir.is_empty() { "." } else { dir }).join(program))
-        .find(|candidate| is_executable(candidate))
-        .is_some_and(|found| found.is_absolute())
-}
-
-fn is_executable(path: &Path) -> bool {
-    let Ok(metadata) = fs::metadata(path) else {
-        return false;
-    };
-    if metadata.is_dir() {
-        return false;
-    }
-    match effective_access(path) {
-        Ok(()) => true,
-        Err(code) if code == libc::ENOSYS || code == libc::EPERM => {
-            metadata.permissions().mode() & 0o111 != 0
-        }
-        Err(_) => false,
-    }
-}
-
-fn effective_access(path: &Path) -> Result<(), i32> {
-    let path = CString::new(path.as_os_str().as_bytes()).map_err(|_| libc::EINVAL)?;
-    let status =
-        unsafe { libc::faccessat(libc::AT_FDCWD, path.as_ptr(), libc::X_OK, libc::AT_EACCESS) };
-    if status == 0 {
-        return Ok(());
-    }
-    Err(io::Error::last_os_error()
-        .raw_os_error()
-        .unwrap_or(libc::EINVAL))
 }
 
 fn zone(reader: &mut Reader) -> Tz {

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use chrono::{DateTime, NaiveDate, SecondsFormat, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, SecondsFormat, Utc};
 use chrono_tz::Tz;
 
 use crate::event::{Event, Kind, Payload};
@@ -131,7 +131,7 @@ pub(crate) fn activity_event(presence: &Presence, activity: &Activity) -> Event 
         activity.id.to_string(),
         payload,
     );
-    event.occurred_at = activity.at;
+    event.occurred_at = activity.at.filter(|at| (1..=9999).contains(&at.year()));
     event
 }
 
@@ -592,6 +592,27 @@ mod tests {
             },
             previous: None,
             entered: false,
+        }
+    }
+
+    #[test]
+    fn activity_event_leaves_a_time_outside_the_years_1_to_9999_to_detection() {
+        let past_9999 = instant("9999-12-31T23:30:00Z") + chrono::Duration::hours(4);
+        let before_1 = instant("0001-01-01T00:00:00Z") - chrono::Duration::hours(4);
+        for at in [past_9999, before_1] {
+            let event = activity_event(
+                &presence(),
+                &Activity {
+                    id: 613,
+                    procedure_id: 7,
+                    user: "beltrano.silva".to_owned(),
+                    unit: "SEDEMO/GAB".to_owned(),
+                    text: "Processo remetido".to_owned(),
+                    at: Some(at),
+                },
+            );
+
+            assert_eq!(event.occurred_at, None, "{at}");
         }
     }
 

@@ -19,8 +19,8 @@ use sei_monitor::timezone::load_zone;
 use support::clock::FakeClock;
 use support::fake_sei::{
     FakeActivity, FakeDocument, FakeProcess, FakeSei, MODULE_VERSION, ORG_ACRONYM, ORG_ID,
-    PASSWORD, ROUTE_ACTIVITIES, ROUTE_DOCUMENTS, ROUTE_LOGIN, ROUTE_PROCESSES, SEI_VERSION,
-    UNIT_GAB, UNIT_NUPROC, USER_ID, USERNAME, process_number,
+    PASSWORD, ROUTE_ACTIVITIES, ROUTE_DOCUMENTS, ROUTE_LOGIN, ROUTE_LOGIN_PAGE, ROUTE_PROCESSES,
+    ROUTE_VERSION, SEI_VERSION, UNIT_GAB, UNIT_NUPROC, USER_ID, USERNAME, process_number,
 };
 use support::harness::{
     FIFTEEN_MINUTES, Harness, activity, bounded, config, database_store, document, hours, options,
@@ -589,6 +589,54 @@ async fn prepare_reads_the_agency_acronym_when_the_org_is_given_by_id() {
     let account = store.ensure_account(&key, start()).await.expect("account");
     assert_eq!(account.id, h.account_id());
     assert_eq!(account.info.org_acronym, ORG_ACRONYM);
+}
+
+#[tokio::test]
+async fn long_versions_and_agency_acronym_are_cut_where_they_enter() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |config| config.target.org = ORG_ID.to_string());
+    populate(&h.fake);
+    let long = |label: &str| format!("{label}-{}", "ç".repeat(2000));
+    let versions =
+        json!({ "sucesso": true, "data": { "sei": long("sei"), "wssei": long("wssei") } });
+    let page = format!(
+        r#"<html><body><select id="selOrgao" name="selOrgao"><option value="{ORG_ID}">{}</option></select></body></html>"#,
+        long("ORG")
+    );
+    for _ in 0..2 {
+        h.fake.respond_next(
+            ROUTE_VERSION,
+            200,
+            &[("Content-Type", "application/json")],
+            versions.to_string().into_bytes(),
+        );
+        h.fake.respond_next(
+            ROUTE_LOGIN_PAGE,
+            200,
+            &[("Content-Type", "text/html; charset=utf-8")],
+            page.clone().into_bytes(),
+        );
+    }
+
+    h.prepare().await;
+    h.run_once().await;
+
+    let key = AccountKey {
+        sei_base_url: h.fake.url(),
+        username: USERNAME.to_owned(),
+        org_id: ORG_ID,
+    };
+    let info = store
+        .ensure_account(&key, start())
+        .await
+        .expect("account")
+        .info;
+    let cut = |text: String| text.chars().take(500).collect::<String>();
+    assert_eq!(info.org_acronym, cut(long("ORG")));
+    assert_eq!(info.sei_version, cut(long("sei")));
+    assert_eq!(info.wssei_version, cut(long("wssei")));
 }
 
 #[tokio::test]

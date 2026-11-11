@@ -249,7 +249,7 @@ impl Monitor {
 
     async fn org_acronym(&self, connection: &Connection) -> String {
         if !connection.org.acronym.is_empty() {
-            return connection.org.acronym.clone();
+            return capped(&connection.org.acronym).to_owned();
         }
         let orgs = match list_orgs(&self.config.target.sei_url, &self.config.options).await {
             Ok(orgs) => orgs,
@@ -263,7 +263,7 @@ impl Monitor {
         };
         orgs.into_iter()
             .find(|org| org.id == connection.org.id)
-            .map(|org| org.acronym)
+            .map(|org| capped(&org.acronym).to_owned())
             .unwrap_or_default()
     }
 

@@ -222,8 +222,8 @@ pub(crate) fn version(envelope: &Envelope) -> Result<Version, SeiError> {
 fn read_version(data: Option<&Value>) -> Result<Version, String> {
     let data = present(data)?;
     Ok(Version {
-        sei: string_field(data, "sei")?,
-        module: string_field(data, "wssei")?,
+        sei: capped(&string_field(data, "sei")?).to_owned(),
+        module: capped(&string_field(data, "wssei")?).to_owned(),
     })
 }
 

@@ -19,7 +19,7 @@ use self::details::{build_changes, fetch_details, observe_units};
 use self::diff::{CurrentUser, Observation, Rules, diff_processes};
 use crate::duration::{format_go_duration, round_go_duration};
 use crate::event::{Event, Kind, Payload};
-use crate::gotext::trim;
+use crate::gotext::{capped, trim};
 use crate::sei::{
     Client, Connection, Options, SeiError, Session, Target, Unit, connect, list_orgs,
 };
@@ -205,6 +205,7 @@ impl Monitor {
                 .update_account_info(account.id, &account.info)
                 .await?;
         }
+        account.paused_reason = capped(&account.paused_reason).to_owned();
         let mut inner = self.inner();
         inner.state.account_id = account.id;
         inner.state.paused_reason.clone_from(&account.paused_reason);

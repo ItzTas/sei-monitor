@@ -138,6 +138,14 @@ pub fn is_go_space(c: char) -> bool {
     )
 }
 
+pub(crate) const TEXT_LIMIT: usize = 500;
+
+pub(crate) fn capped(text: &str) -> &str {
+    text.char_indices()
+        .nth(TEXT_LIMIT)
+        .map_or(text, |(end, _)| &text[..end])
+}
+
 pub(crate) fn trim(text: &str) -> &str {
     text.trim_matches(is_go_space)
 }
@@ -166,6 +174,15 @@ mod tests {
 
     use super::*;
     use crate::golden;
+
+    #[test]
+    fn capped_keeps_the_first_characters_up_to_the_limit() {
+        let short = "ç".repeat(TEXT_LIMIT);
+        assert_eq!(capped(&short), short);
+        let long = format!("{short}ãé");
+        assert_eq!(capped(&long), short);
+        assert_eq!(capped(""), "");
+    }
 
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]

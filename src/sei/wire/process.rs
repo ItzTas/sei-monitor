@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use serde_json::Value;
 
 use super::{layout, nested, object, or_fallback, whole};
-use crate::gotext::trim;
+use crate::gotext::{capped, trim};
 use crate::sei::html::unescape;
 use crate::sei::json::{field, flex_int, string_field};
 use crate::sei::types::{Process, User};
@@ -21,9 +21,9 @@ pub(super) fn process(item: &Value) -> Result<Process, String> {
     let origin = string_field(status, "processoGeradoRecebido")?;
     Ok(Process {
         procedure_id: or_fallback(procedure_id, id),
-        number: trim(&number).to_owned(),
-        process_type: unescape(trim(&process_type)),
-        description: unescape(trim(&description)),
+        number: capped(trim(&number)).to_owned(),
+        process_type: capped(&unescape(trim(&process_type))).to_owned(),
+        description: capped(&unescape(trim(&description))).to_owned(),
         assignee: assignee(field(attributes, "usuarioAtribuido")),
         return_date: (scheduled == "S")
             .then(|| return_date(field(status, "retornoData")))
@@ -44,8 +44,8 @@ fn assignee(raw: Option<&Value>) -> Option<User> {
     }
     Some(User {
         id,
-        acronym: acronym.to_owned(),
-        name: unescape(trim(&name)),
+        acronym: capped(acronym).to_owned(),
+        name: capped(&unescape(trim(&name))).to_owned(),
     })
 }
 

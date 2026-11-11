@@ -2,7 +2,7 @@ use chrono_tz::Tz;
 use serde_json::Value;
 
 use super::{layout, nested, object, or_fallback, whole};
-use crate::gotext::trim;
+use crate::gotext::{capped, trim};
 use crate::sei::html::unescape;
 use crate::sei::json::string_field;
 use crate::sei::types::Activity;
@@ -22,9 +22,9 @@ pub(super) fn activity(item: &Value, procedure_id: i64, zone: Tz) -> Result<Acti
     Ok(Activity {
         id,
         procedure_id: or_fallback(own_procedure_id, procedure_id),
-        user: trim(&user).to_owned(),
-        unit: trim(&unit).to_owned(),
-        text: unescape(trim(&text)),
+        user: capped(trim(&user)).to_owned(),
+        unit: capped(trim(&unit)).to_owned(),
+        text: capped(&unescape(trim(&text))).to_owned(),
         at: local.map(|local| local_to_utc(local, zone)),
     })
 }

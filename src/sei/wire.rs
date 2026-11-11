@@ -14,7 +14,7 @@ use super::errors::{ApiError, ErrorKind, SeiError, classify};
 use super::html::unescape;
 use super::json::{field, flex_int, go_lossy_utf8, is_empty_json, kind_of, parse, string_field};
 use super::types::{Activity, Document, Page, Process, Session, Unit, Version};
-use crate::gotext::{equal_fold, trim};
+use crate::gotext::{capped, equal_fold, trim};
 use crate::secret::Secret;
 
 pub(crate) const ROUTE_LOGIN: &str = "/autenticar";
@@ -72,7 +72,7 @@ pub(crate) fn read_envelope(route: &str, status: u16, body: &[u8]) -> Result<Env
     }
     let message = envelope.message();
     let kind = classify(route, status, &message);
-    Err(api_error(route, status, message, kind))
+    Err(api_error(route, status, capped(&message).to_owned(), kind))
 }
 
 fn decode(body: &[u8]) -> Option<(bool, Envelope)> {
@@ -189,8 +189,8 @@ fn login(data: Option<&Value>) -> Result<(String, Session), String> {
     let login = nested(data, "loginData")?;
     let session = Session {
         user_id: whole(login, "IdUsuario")?,
-        user_acronym: string_field(login, "sigla")?,
-        user_name: unescape(&string_field(login, "nome")?),
+        user_acronym: capped(&string_field(login, "sigla")?).to_owned(),
+        user_name: capped(&unescape(&string_field(login, "nome")?)).to_owned(),
         current_unit_id: whole(login, "IdUnidadeAtual")?,
         units: units(field(data, "unidades"))?,
     };
@@ -209,8 +209,8 @@ fn unit(item: &Value) -> Result<Unit, String> {
     let item = object(Some(item))?;
     Ok(Unit {
         id: whole(item, "id")?,
-        acronym: string_field(item, "sigla")?,
-        description: unescape(&string_field(item, "descricao")?),
+        acronym: capped(&string_field(item, "sigla")?).to_owned(),
+        description: capped(&unescape(&string_field(item, "descricao")?)).to_owned(),
     })
 }
 

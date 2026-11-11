@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use super::{nested, object, or_fallback, whole};
-use crate::gotext::trim;
+use crate::gotext::{capped, trim};
 use crate::sei::html::unescape;
 use crate::sei::json::string_field;
 use crate::sei::types::Document;
@@ -19,9 +19,9 @@ pub(super) fn document(item: &Value, procedure_id: i64) -> Result<Document, Stri
     Ok(Document {
         id,
         procedure_id: or_fallback(own_procedure_id, procedure_id),
-        protocol: trim(&protocol).to_owned(),
-        name: name(&label, &document_type, &number, &file_name),
-        document_type: unescape(trim(&document_type)),
+        protocol: capped(trim(&protocol)).to_owned(),
+        name: capped(&name(&label, &document_type, &number, &file_name)).to_owned(),
+        document_type: capped(&unescape(trim(&document_type))).to_owned(),
     })
 }
 

@@ -86,7 +86,13 @@ type PageOutcome = Result<Vec<(i64, &'static str)>, &'static str>;
 
 #[test]
 fn pages_are_built_like_the_go_parser() {
-    let cases: [(&str, &str, PageOutcome); 5] = [
+    let cases: [(&str, &str, PageOutcome); 6] = [
+        (
+            "a byte order mark is kept as text",
+            "\u{FEFF}<frameset></frameset><select id=\"selOrgao\">\
+             <option value=\"1\">A</option></select>",
+            Ok(vec![(1, "A")]),
+        ),
         (
             "a template in foreign content ends the page",
             "<select id=\"selOrgao\"><option value=\"1\">A</option></select>\

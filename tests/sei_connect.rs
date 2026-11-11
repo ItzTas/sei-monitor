@@ -1,17 +1,22 @@
 mod support;
 
+use std::convert::Infallible;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use axum::Router;
+use axum::body::{Body, Bytes};
 use axum::http::header::{CONTENT_TYPE, LOCATION};
 use axum::http::{StatusCode, Uri};
 use axum::response::IntoResponse;
+use axum::routing::get;
 use chrono_tz::Tz;
+use futures_util::{StreamExt, stream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
+use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
 use sei_monitor::password::{PasswordSource, StaticPassword};
@@ -392,13 +397,15 @@ async fn login_page_follows_at_most_nine_redirects() {
     assert_eq!(ten.requests(), 10);
 }
 
+type RawAnswer = Arc<dyn Fn(&str) -> Option<Vec<u8>> + Send + Sync>;
+
 struct RawServer {
     url: String,
     server: JoinHandle<()>,
 }
 
 impl RawServer {
-    async fn start(answer: Vec<u8>) -> RawServer {
+    async fn start(answer: RawAnswer) -> RawServer {
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind the raw listener");
@@ -408,11 +415,14 @@ impl RawServer {
                 let Ok((mut stream, _)) = listener.accept().await else {
                     return;
                 };
-                let answer = answer.clone();
+                let answer = Arc::clone(&answer);
                 tokio::spawn(async move {
                     let mut request = [0; 4096];
-                    let _ = stream.read(&mut request).await;
-                    let _ = stream.write_all(&answer).await;
+                    let read = stream.read(&mut request).await.unwrap_or(0);
+                    let request = String::from_utf8_lossy(&request[..read]).into_owned();
+                    if let Some(bytes) = answer(&request) {
+                        let _ = stream.write_all(&bytes).await;
+                    }
                     let _ = stream.shutdown().await;
                 });
             }
@@ -421,6 +431,10 @@ impl RawServer {
             url: format!("http://{address}"),
             server,
         }
+    }
+
+    async fn always(answer: Vec<u8>) -> RawServer {
+        RawServer::start(Arc::new(move |_| Some(answer.clone()))).await
     }
 }
 
@@ -441,7 +455,7 @@ fn announced_longer(page: &str) -> Vec<u8> {
 #[tokio::test]
 async fn login_page_cut_short_in_its_first_kilobyte_is_read_with_what_arrived() {
     let page = r#"<select id="selOrgao"><option value="1">A</option><option value="2">B</option></select>"#;
-    let server = RawServer::start(announced_longer(page)).await;
+    let server = RawServer::always(announced_longer(page)).await;
 
     let orgs = bounded(list_orgs(&server.url, &options(chrono_tz::UTC)))
         .await
@@ -452,7 +466,7 @@ async fn login_page_cut_short_in_its_first_kilobyte_is_read_with_what_arrived() 
 
 #[tokio::test]
 async fn login_page_cut_short_before_any_byte_has_no_agency_list() {
-    let server = RawServer::start(announced_longer("")).await;
+    let server = RawServer::always(announced_longer("")).await;
 
     let error = bounded(list_orgs(&server.url, &options(chrono_tz::UTC)))
         .await
@@ -509,4 +523,222 @@ async fn login_page_parse_stops_at_the_request_deadline() {
         error.to_string(),
         "sei: read the login page: the time limit of the request was reached"
     );
+}
+
+const WSSEI_VERSION: &str = "/sei/modulos/wssei/controlador_ws.php/api/v2/versao";
+const MOD_WSSEI_VERSION: &str = "/sei/modulos/mod-wssei/controlador_ws.php/api/v2/versao";
+const MEETING_BOUND: Duration = Duration::from_secs(3);
+const VERSION_ANSWER: &str = r#"{"sucesso":true,"data":{"versao":"5.0.5","versaoModulo":"3.0.4"}}"#;
+const ONE_AGENCY_PAGE: &str =
+    r#"<select id="selOrgao"><option value="63">SEDEMO</option></select>"#;
+
+#[derive(Default)]
+struct Rendezvous {
+    arrived: [Notify; 2],
+}
+
+impl Rendezvous {
+    async fn meet(&self, side: usize) -> bool {
+        self.arrived[side].notify_one();
+        tokio::time::timeout(MEETING_BOUND, self.arrived[1 - side].notified())
+            .await
+            .is_ok()
+    }
+}
+
+struct Routes {
+    url: String,
+    server: JoinHandle<()>,
+}
+
+impl Routes {
+    async fn start(router: Router) -> Routes {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the routes listener");
+        let address = listener.local_addr().expect("read the routes address");
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router)
+                .await
+                .expect("serve the routes");
+        });
+        Routes {
+            url: format!("http://{address}"),
+            server,
+        }
+    }
+}
+
+impl Drop for Routes {
+    fn drop(&mut self) {
+        self.server.abort();
+    }
+}
+
+fn html_not_found() -> axum::response::Response {
+    let html = [(CONTENT_TYPE, "text/html")];
+    (StatusCode::NOT_FOUND, html, "<html><body>404</body></html>").into_response()
+}
+
+fn version_answer() -> axum::response::Response {
+    let json = [(CONTENT_TYPE, "application/json")];
+    (StatusCode::OK, json, VERSION_ANSWER).into_response()
+}
+
+#[tokio::test]
+async fn both_discovery_probes_are_in_flight_at_the_same_time() {
+    let meeting = Arc::new(Rendezvous::default());
+    let first = Arc::clone(&meeting);
+    let second = Arc::clone(&meeting);
+    let router = Router::new()
+        .route(
+            WSSEI_VERSION,
+            get(move || async move {
+                if first.meet(0).await {
+                    return version_answer();
+                }
+                html_not_found()
+            }),
+        )
+        .route(
+            MOD_WSSEI_VERSION,
+            get(move || async move {
+                second.meet(1).await;
+                html_not_found()
+            }),
+        );
+    let server = Routes::start(router).await;
+
+    let api_url = bounded(discover(&server.url, &options(chrono_tz::UTC)))
+        .await
+        .expect("both probes met");
+
+    assert_eq!(api_url, format!("{}{API_PATH}", server.url));
+}
+
+#[tokio::test]
+async fn connect_discovers_and_reads_the_login_page_at_the_same_time() {
+    let meeting = Arc::new(Rendezvous::default());
+    let probe = Arc::clone(&meeting);
+    let page = Arc::clone(&meeting);
+    let router = Router::new()
+        .route(
+            WSSEI_VERSION,
+            get(move || async move {
+                if probe.meet(0).await {
+                    return version_answer();
+                }
+                html_not_found()
+            }),
+        )
+        .route(MOD_WSSEI_VERSION, get(|| async { html_not_found() }))
+        .route(
+            "/sei/",
+            get(move || async move {
+                if page.meet(1).await {
+                    let html = [(CONTENT_TYPE, "text/html")];
+                    return (StatusCode::OK, html, ONE_AGENCY_PAGE).into_response();
+                }
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }),
+        );
+    let server = Routes::start(router).await;
+    let target = Target {
+        sei_url: server.url.clone(),
+        api_url: String::new(),
+        org: ORG_ACRONYM.to_owned(),
+        username: USERNAME.to_owned(),
+        password: password(),
+    };
+
+    let connection = bounded(connect(&target, &options(chrono_tz::UTC)))
+        .await
+        .expect("discovery and the login page met");
+
+    assert_eq!(connection.api_url, format!("{}{API_PATH}", server.url));
+    assert_eq!(connection.org, org(ORG_ID, ORG_ACRONYM));
+}
+
+#[tokio::test]
+async fn disabled_module_wins_over_a_connection_failure_on_the_other_candidate() {
+    let inactive = r#"{"sucesso":false,"mensagem":"Módulo inativo.","exception":null}"#;
+    let answer = format!(
+        "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{inactive}",
+        inactive.len()
+    )
+    .into_bytes();
+    let server = RawServer::start(Arc::new(move |request: &str| {
+        request
+            .starts_with(&format!("GET {MOD_WSSEI_VERSION} "))
+            .then(|| answer.clone())
+    }))
+    .await;
+
+    let error = bounded(discover(&server.url, &options(chrono_tz::UTC)))
+        .await
+        .expect_err("a disabled module");
+
+    assert_eq!(error.kind(), Some(ErrorKind::ModuleUnavailable), "{error}");
+    assert_eq!(error.to_string(), "sei: /versao: Módulo inativo.");
+}
+
+fn stalled_after(first: Vec<u8>) -> axum::response::Response {
+    let body = stream::iter([Ok::<_, Infallible>(Bytes::from(first))]).chain(stream::pending());
+    let html = [(CONTENT_TYPE, "text/html")];
+    (html, Body::from_stream(body)).into_response()
+}
+
+#[tokio::test]
+async fn login_page_read_failures_are_named_like_go() {
+    let router = Router::new()
+        .route(
+            "/short/sei/",
+            get(|| async { stalled_after(b"<html><head>".to_vec()) }),
+        )
+        .route(
+            "/long/sei/",
+            get(|| async { stalled_after(vec![b'a'; 2000]) }),
+        );
+    let server = Routes::start(router).await;
+    let options = Options {
+        timeout: Duration::from_millis(300),
+        ..options(chrono_tz::UTC)
+    };
+    let cases = [
+        ("short", "sei: decode the login page: "),
+        ("long", "sei: read the login page: "),
+    ];
+    for (path, prefix) in cases {
+        let error = bounded(list_orgs(&format!("{}/{path}", server.url), &options))
+            .await
+            .expect_err("a stalled login page");
+
+        assert!(
+            matches!(error, SeiError::Transport { .. }),
+            "{path}: {error}"
+        );
+        assert!(error.to_string().starts_with(prefix), "{path}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn login_page_past_the_cap_is_cut_at_the_cap() {
+    let mut page = br#"<select id="selOrgao"><option value="1">A</option>"#.to_vec();
+    page.resize(17 << 20, b'x');
+    page.extend_from_slice(br#"<option value="2">B</option></select>"#);
+    let page = Bytes::from(page);
+    let router = Router::new().route(
+        "/sei/",
+        get(move || {
+            let page = page.clone();
+            async move { ([(CONTENT_TYPE, "text/html")], page).into_response() }
+        }),
+    );
+    let server = Routes::start(router).await;
+
+    let orgs = bounded(list_orgs(&server.url, &options(chrono_tz::UTC)))
+        .await
+        .expect("the agencies before the cap");
+
+    assert_eq!(orgs, [org(1, "A")]);
 }

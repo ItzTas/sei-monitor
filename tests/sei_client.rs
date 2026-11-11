@@ -3,8 +3,8 @@ mod support;
 use std::future::{Future, ready};
 use std::io::Write;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use chrono::NaiveDate;
@@ -12,6 +12,9 @@ use flate2::Compression;
 use flate2::write::GzEncoder;
 use futures_util::future::join_all;
 use serde_json::{Value, json};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::task::JoinHandle;
 
 use sei_monitor::password::{CommandFailure, PasswordCommandError, PasswordSource, StaticPassword};
 use sei_monitor::secret::Secret;
@@ -655,4 +658,194 @@ fn first_page() -> ProcessQuery {
         limit: PROCESS_PAGE_SIZE,
         kind: String::new(),
     }
+}
+
+const CAPTURED_PASSWORD: &str = "s3nha-capturada";
+const CAPTURED_TOKEN: &str = "token-capturado-0123456789";
+
+struct Captured {
+    head: String,
+    body: Vec<u8>,
+}
+
+impl Captured {
+    fn request_line(&self) -> &str {
+        self.head.lines().next().unwrap_or_default()
+    }
+
+    fn header_lines(&self) -> Vec<&str> {
+        let mut lines: Vec<&str> = self.head.split("\r\n").skip(1).collect();
+        lines.sort_unstable();
+        lines
+    }
+
+    fn occurrences(&self, needle: &str) -> usize {
+        let raw = [self.head.as_bytes(), b"\r\n\r\n", &self.body].concat();
+        String::from_utf8_lossy(&raw).matches(needle).count()
+    }
+}
+
+struct Recorder {
+    url: String,
+    requests: Arc<Mutex<Vec<Captured>>>,
+    server: JoinHandle<()>,
+}
+
+impl Recorder {
+    async fn start() -> Recorder {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the recording listener");
+        let address = listener.local_addr().expect("read the recording address");
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let recorded = Arc::clone(&requests);
+        let server = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    return;
+                };
+                answer(stream, &recorded).await;
+            }
+        });
+        Recorder {
+            url: format!("http://{address}"),
+            requests,
+            server,
+        }
+    }
+
+    fn requests(&self) -> Vec<Captured> {
+        std::mem::take(&mut *self.requests.lock().expect("the recorded requests"))
+    }
+}
+
+impl Drop for Recorder {
+    fn drop(&mut self) {
+        self.server.abort();
+    }
+}
+
+async fn answer(mut stream: TcpStream, recorded: &Mutex<Vec<Captured>>) {
+    let captured = read_request(&mut stream).await;
+    let body = if captured.request_line().contains(ROUTE_LOGIN) {
+        json!({
+            "sucesso": true,
+            "data": {
+                "token": CAPTURED_TOKEN,
+                "loginData": {"IdUsuario": "101", "sigla": USERNAME, "nome": USER_NAME, "IdUnidadeAtual": "1001"},
+                "unidades": [],
+            },
+        })
+    } else {
+        json!({"sucesso": true, "data": [], "total": "0"})
+    };
+    recorded
+        .lock()
+        .expect("the recorded requests")
+        .push(captured);
+    let body = body.to_string();
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream
+        .write_all(response.as_bytes())
+        .await
+        .expect("answer the recorded request");
+    stream
+        .shutdown()
+        .await
+        .expect("close the recorded connection");
+}
+
+async fn read_request(stream: &mut TcpStream) -> Captured {
+    let mut raw = Vec::new();
+    let mut chunk = [0; 4096];
+    let end = loop {
+        if let Some(end) = raw.windows(4).position(|window| window == b"\r\n\r\n") {
+            break end;
+        }
+        let read = stream.read(&mut chunk).await.expect("read the request");
+        assert_ne!(read, 0, "the request ended before its head");
+        raw.extend_from_slice(&chunk[..read]);
+    };
+    let head = String::from_utf8(raw[..end].to_vec()).expect("an ASCII request head");
+    let length = head
+        .split("\r\n")
+        .find_map(|line| {
+            line.strip_prefix("Content-Length: ")
+                .or_else(|| line.strip_prefix("content-length: "))
+        })
+        .map_or(0, |value| value.parse().expect("a numeric Content-Length"));
+    let mut body = raw[end + 4..].to_vec();
+    while body.len() < length {
+        let read = stream
+            .read(&mut chunk)
+            .await
+            .expect("read the request body");
+        assert_ne!(read, 0, "the request ended before its body");
+        body.extend_from_slice(&chunk[..read]);
+    }
+    Captured { head, body }
+}
+
+#[tokio::test]
+async fn token_and_password_travel_only_where_go_sends_them() {
+    let recorder = Recorder::start().await;
+    let credentials = Credentials {
+        username: USERNAME.to_owned(),
+        password: static_password(CAPTURED_PASSWORD),
+        org_id: ORG_ID,
+    };
+    let options = Options {
+        user_agent: USER_AGENT.to_owned(),
+        zone: chrono_tz::UTC,
+        timeout: TEST_TIMEOUT,
+    };
+    let client = Client::new(&format!("{}/api", recorder.url), credentials, &options);
+
+    bounded(client.process_page(UNIT_NUPROC, &first_page()))
+        .await
+        .expect("a listing after the login");
+
+    let requests = recorder.requests();
+    let [login, listing] = requests.as_slice() else {
+        panic!("{} requests, want a login and a listing", requests.len());
+    };
+    let host = format!("Host: {}", recorder.url.trim_start_matches("http://"));
+    let form = format!("contexto=&orgao={ORG_ID}&senha={CAPTURED_PASSWORD}&usuario={USERNAME}");
+    assert_eq!(login.request_line(), "POST /api/autenticar HTTP/1.1");
+    assert_eq!(
+        login.header_lines(),
+        [
+            "Accept-Encoding: gzip",
+            "Accept: application/json",
+            &format!("Content-Length: {}", form.len()),
+            "Content-Type: application/x-www-form-urlencoded",
+            &host,
+            "User-Agent: sei-monitor/test",
+        ]
+    );
+    assert_eq!(login.body, form.as_bytes());
+    assert_eq!(login.occurrences(CAPTURED_PASSWORD), 1);
+    assert_eq!(login.occurrences(CAPTURED_TOKEN), 0);
+
+    assert_eq!(
+        listing.request_line(),
+        "GET /api/processo/listar?limit=50&start=0 HTTP/1.1"
+    );
+    assert_eq!(
+        listing.header_lines(),
+        [
+            "Accept-Encoding: gzip",
+            "Accept: application/json",
+            &host,
+            &format!("Token: {CAPTURED_TOKEN}"),
+            "Unidade: 1001",
+            "User-Agent: sei-monitor/test",
+        ]
+    );
+    assert!(listing.body.is_empty());
+    assert_eq!(listing.occurrences(CAPTURED_TOKEN), 1);
+    assert_eq!(listing.occurrences(CAPTURED_PASSWORD), 0);
 }

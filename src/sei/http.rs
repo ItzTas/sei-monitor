@@ -41,6 +41,7 @@ fn build(options: &Options, redirects: Policy) -> Result<reqwest::Client, reqwes
         .user_agent(options.user_agent.as_str())
         .timeout(options.timeout)
         .gzip(true)
+        .http1_title_case_headers()
         .redirect(redirects)
         .tls_certs_only(roots)
         .build()

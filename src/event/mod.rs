@@ -63,16 +63,15 @@ const KINDS: [(Kind, &str, &str); 8] = [
 ];
 
 impl Kind {
-    pub const ALL: [Kind; 8] = [
-        Kind::ProcessEntered,
-        Kind::ProcessLeft,
-        Kind::ActivityAdded,
-        Kind::DocumentAdded,
-        Kind::AssignmentChanged,
-        Kind::ReturnDueSoon,
-        Kind::ReturnOverdue,
-        Kind::AccountLoginFailed,
-    ];
+    pub const ALL: [Kind; 8] = {
+        let mut all = [KINDS[0].0; 8];
+        let mut index = 0;
+        while index < all.len() {
+            all[index] = KINDS[index].0;
+            index += 1;
+        }
+        all
+    };
 
     fn row(self) -> &'static (Kind, &'static str, &'static str) {
         KINDS

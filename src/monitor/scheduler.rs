@@ -87,12 +87,21 @@ impl Monitor {
             match self.standing() {
                 Standing::Active => {}
                 Standing::Held => {
-                    self.wait_for_check(&mut manual).await;
+                    if self
+                        .unless_stopped(self.wait_for_check(&mut manual))
+                        .await
+                        .is_none()
+                    {
+                        return;
+                    }
                     trigger = Trigger::Manual;
                 }
-                Standing::Paused => return std::future::pending().await,
+                Standing::Paused => return self.stop_requested().await,
             }
             let outcome = self.run_once(trigger).await;
+            if matches!(outcome, Err(MonitorError::Canceled)) {
+                return;
+            }
             if let Some(rejection) = rejected_login(&outcome) {
                 self.pause(rejection).await;
                 continue;
@@ -117,6 +126,7 @@ impl Monitor {
             trigger = tokio::select! {
                 () = self.clock.sleep(wait) => Trigger::Scheduled,
                 Some(()) = manual.recv() => Trigger::Manual,
+                () = self.stop_requested() => return,
             };
         }
     }
@@ -208,14 +218,17 @@ impl Monitor {
     async fn prepare_until_ready(&self) -> Readiness {
         let mut failures = 0u32;
         loop {
-            let Err(failure) = self.prepare().await else {
+            let Some(prepared) = self.unless_stopped(self.prepare()).await else {
+                return Readiness::Stopped;
+            };
+            let Err(failure) = prepared else {
                 self.inner().state.prepare_error = None;
                 return Readiness::Ready;
             };
             match prepare_failure(&failure) {
                 PrepareFailure::Retry => {}
                 PrepareFailure::Fatal => {
-                    self.stop(&failure);
+                    self.give_up(&failure);
                     return Readiness::Stopped;
                 }
                 PrepareFailure::Rejected(rejection) => {
@@ -231,11 +244,13 @@ impl Monitor {
                 retry_in = %go_seconds(wait),
                 "could not reach SEI; trying again"
             );
-            self.clock.sleep(wait).await;
+            if self.unless_stopped(self.clock.sleep(wait)).await.is_none() {
+                return Readiness::Stopped;
+            }
         }
     }
 
-    fn stop(&self, failure: &MonitorError) {
+    fn give_up(&self, failure: &MonitorError) {
         self.inner().state.fatal = Some(failure.to_string());
         error!(
             error = failure as &dyn Error,

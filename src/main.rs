@@ -1,0 +1,147 @@
+use std::error::Error;
+use std::io;
+use std::process::ExitCode;
+use std::time::Duration;
+
+use clap::Parser;
+use monitor_hub_plugin::{NOT_LAUNCHED_BY_HUB, launched_by_hub, logging};
+use sei_monitor::app::run_plugin;
+use sei_monitor::cli::{Cli, Command, usage_exit};
+use sei_monitor::config::{ConfigError, PluginConfig, Source};
+use sei_monitor::harden::harden;
+use tokio::runtime::{Builder, Runtime};
+use tracing::error;
+
+const RUNTIME_SHUTDOWN_LIMIT: Duration = Duration::from_millis(500);
+
+fn main() -> ExitCode {
+    if let Err(failure) = harden() {
+        eprintln!("warning: could not harden the process: {failure}");
+    }
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(usage) => return usage_exit(usage),
+    };
+    match cli.command {
+        Some(Command::Plugin) => plugin(),
+        None => not_launched_by_hub(),
+    }
+}
+
+fn not_launched_by_hub() -> ExitCode {
+    eprintln!("{NOT_LAUNCHED_BY_HUB}");
+    ExitCode::FAILURE
+}
+
+fn plugin() -> ExitCode {
+    if !launched_by_hub() {
+        return not_launched_by_hub();
+    }
+    let config = match PluginConfig::load(&Source::environment()) {
+        Ok(config) => config,
+        Err(problems) => return refuse(&problems),
+    };
+    if let Err(failure) = logging::init(config.log_filter()) {
+        eprintln!("cannot start logging: {failure}");
+        return ExitCode::FAILURE;
+    }
+    let runtime = match runtime() {
+        Ok(runtime) => runtime,
+        Err(failure) => {
+            error!(
+                error = &failure as &dyn Error,
+                "cannot start the async runtime"
+            );
+            return ExitCode::FAILURE;
+        }
+    };
+    let result = runtime.block_on(run_plugin(config));
+    runtime.shutdown_timeout(RUNTIME_SHUTDOWN_LIMIT);
+    let Err(failure) = result else {
+        return ExitCode::SUCCESS;
+    };
+    error!(error = &*failure as &dyn Error, "fatal");
+    ExitCode::FAILURE
+}
+
+fn refuse(problems: &ConfigError) -> ExitCode {
+    if let Err(failure) = logging::init("info") {
+        eprintln!("cannot start logging: {failure}");
+        return ExitCode::FAILURE;
+    }
+    error!(error = problems as &dyn Error, "fatal");
+    ExitCode::FAILURE
+}
+
+fn runtime() -> io::Result<Runtime> {
+    Builder::new_multi_thread().enable_all().build()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    use sei_monitor::password::{PasswordCommand, PasswordSource};
+
+    use super::runtime;
+
+    const REAP_LIMIT: Duration = Duration::from_secs(5);
+
+    fn sleep_installed() -> bool {
+        let installed = Command::new("sleep")
+            .arg("0")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success());
+        if installed {
+            return true;
+        }
+        if std::env::var_os("CI").is_some_and(|value| !value.is_empty()) {
+            panic!("sleep is required when CI is set");
+        }
+        eprintln!("skipping: sleep is not available");
+        false
+    }
+
+    fn children() -> Vec<(u32, char)> {
+        let own = std::process::id();
+        let Ok(entries) = fs::read_dir("/proc") else {
+            return Vec::new();
+        };
+        entries
+            .filter_map(Result::ok)
+            .filter_map(|entry| fs::read_to_string(entry.path().join("stat")).ok())
+            .filter_map(|stat| {
+                let (head, rest) = stat.rsplit_once(')')?;
+                let pid = head.split_whitespace().next()?.parse().ok()?;
+                let mut fields = rest.split_whitespace();
+                let state = fields.next()?.chars().next()?;
+                let parent: u32 = fields.next()?.parse().ok()?;
+                (parent == own).then_some((pid, state))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_password_command_past_its_time_leaves_no_zombie() {
+        if !sleep_installed() {
+            return;
+        }
+        let runtime = runtime().expect("the plugin runtime");
+        let command = PasswordCommand::new("sleep 30")
+            .expect("a command line")
+            .with_timeout(Duration::from_millis(200));
+
+        let result = runtime.block_on(command.password());
+
+        assert!(result.is_err());
+        let deadline = Instant::now() + REAP_LIMIT;
+        while !children().is_empty() && Instant::now() < deadline {
+            runtime.block_on(tokio::time::sleep(Duration::from_millis(20)));
+        }
+        assert_eq!(children(), []);
+    }
+}

@@ -9,23 +9,27 @@ name = "sei_monitor"
 path = "src/lib.rs"
 
 [dependencies]
+anyhow = "1.0.104"
 bytes = "1.12.1"
 chrono = { version = "=0.4.45", default-features = false }
 chrono-tz = { version = "=0.10.4", default-features = false }
+clap = { version = "4.6.7", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage"] }
 deadpool-postgres = { version = "0.14.2", default-features = false, features = ["rt_tokio_1"] }
 encoding_rs = "0.8.42"
 futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
 html5ever = "0.40.1"
 libc = "0.2.191"
 monitor-hub-plugin = { git = "https://github.com/ItzTas/monitor-hub", tag = "sdk-rust/v0.1.1", features = ["postgres"] }
+prost-types = "0.14.4"
 rand = "0.10.3"
 reqwest = { version = "0.13.5", default-features = false, features = ["gzip", "rustls"] }
 scraper = { version = "0.29.0", default-features = false }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
 thiserror = "2.0.21"
-tokio = { version = "1.54.1", features = ["io-util", "macros", "process", "rt", "sync", "time"] }
+tokio = { version = "1.54.1", features = ["io-util", "macros", "process", "rt", "rt-multi-thread", "sync", "time"] }
 tokio-postgres = { version = "0.7.18", features = ["with-chrono-0_4"] }
+tonic = { version = "0.14.8", default-features = false, features = ["codegen"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 unicode-normalization = "=0.1.25"
 unicode-properties = { version = "=0.1.4", default-features = false, features = ["general-category"] }
@@ -38,3 +42,5 @@ base64 = "0.23.1"
 flate2 = "1.1.10"
 monitor-hub-plugin-testkit = { git = "https://github.com/ItzTas/monitor-hub", tag = "sdk-rust/v0.1.1" }
 tokio = { version = "1.54.1", features = ["net", "rt", "sync"] }
+tonic = { version = "0.14.8", default-features = false, features = ["channel"] }
+tonic-prost = { version = "0.14.8", default-features = false }

@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tracing::{debug, info, warn};
 
 use self::details::{build_changes, fetch_details, observe_units};
@@ -23,7 +23,7 @@ use crate::gotext::{capped, trim};
 use crate::sei::{
     Client, Connection, Options, SeiError, Session, Target, Unit, connect, list_orgs,
 };
-use crate::store::{Account, AccountInfo, AccountKey, Store, StoreError, Trigger};
+use crate::store::{Account, AccountInfo, AccountKey, CycleChanges, Store, StoreError, Trigger};
 
 pub use self::scheduler::TriggerError;
 
@@ -107,6 +107,8 @@ pub enum MonitorError {
         "monitoring is paused because SEI rejected the login; restart sei-monitor after fixing the configuration"
     )]
     Paused,
+    #[error("context canceled")]
+    Canceled,
 }
 
 pub struct Monitor {
@@ -117,6 +119,7 @@ pub struct Monitor {
     acked: AtomicI64,
     manual: mpsc::Sender<()>,
     manual_signals: tokio::sync::Mutex<mpsc::Receiver<()>>,
+    stopping: watch::Sender<bool>,
     inner: Mutex<Inner>,
 }
 
@@ -167,6 +170,7 @@ impl Monitor {
             acked: AtomicI64::new(0),
             manual,
             manual_signals: tokio::sync::Mutex::new(manual_signals),
+            stopping: watch::Sender::new(false),
             inner: Mutex::new(Inner {
                 prepared: None,
                 logins: 0,
@@ -185,6 +189,14 @@ impl Monitor {
 
     pub fn config(&self) -> &MonitorConfig {
         &self.config
+    }
+
+    pub(crate) fn shut_down(&self) {
+        self.stopping.send_replace(true);
+    }
+
+    pub(crate) fn report_fatal(&self, reason: &str) {
+        self.inner().state.fatal = Some(reason.to_owned());
     }
 
     pub async fn prepare(&self) -> Result<(), MonitorError> {
@@ -255,7 +267,26 @@ impl Monitor {
             .unwrap_or_default()
     }
 
+    fn stopping(&self) -> bool {
+        *self.stopping.borrow()
+    }
+
+    async fn stop_requested(&self) {
+        let mut stopping = self.stopping.subscribe();
+        let _ = stopping.wait_for(|stopping| *stopping).await;
+    }
+
+    async fn unless_stopped<T>(&self, work: impl Future<Output = T>) -> Option<T> {
+        tokio::select! {
+            done = work => Some(done),
+            () = self.stop_requested() => None,
+        }
+    }
+
     fn begin(&self) -> Result<(Prepared, DateTime<Utc>), MonitorError> {
+        if self.stopping() {
+            return Err(MonitorError::Canceled);
+        }
         let mut inner = self.inner();
         if inner.state.paused {
             return Err(MonitorError::Paused);
@@ -290,6 +321,36 @@ impl Monitor {
         run_id: i64,
         started: DateTime<Utc>,
     ) -> Result<CycleResult, MonitorError> {
+        let account_id = prepared.account.id;
+        let (mut changes, processes_seen) = self
+            .unless_stopped(self.gather(prepared, run_id, started))
+            .await
+            .ok_or(MonitorError::Canceled)??;
+        changes.finished_at = self.clock.now();
+        let inserted = self.store.apply_cycle(&changes).await?;
+        let baseline = changes.baseline;
+        self.after_success(account_id, baseline, started).await;
+        self.prune(account_id, started).await;
+        let result = CycleResult {
+            processes_seen,
+            events_created: inserted.len(),
+        };
+        info!(
+            processes = result.processes_seen,
+            events = result.events_created,
+            baseline,
+            duration = %self.elapsed_since(started),
+            "cycle finished"
+        );
+        Ok(result)
+    }
+
+    async fn gather(
+        &self,
+        prepared: &Prepared,
+        run_id: i64,
+        started: DateTime<Utc>,
+    ) -> Result<(CycleChanges, usize), MonitorError> {
         let account = &prepared.account;
         let client = &prepared.connection.client;
         let ((session, observations), previous) =
@@ -318,23 +379,8 @@ impl Monitor {
         )
         .await?;
         let processes_seen = diff.present.len();
-        let mut changes = build_changes(account.id, run_id, started, baseline, diff, details);
-        changes.finished_at = self.clock.now();
-        let inserted = self.store.apply_cycle(&changes).await?;
-        self.after_success(account.id, baseline, started).await;
-        self.prune(account.id, started).await;
-        let result = CycleResult {
-            processes_seen,
-            events_created: inserted.len(),
-        };
-        info!(
-            processes = result.processes_seen,
-            events = result.events_created,
-            baseline,
-            duration = %self.elapsed_since(started),
-            "cycle finished"
-        );
-        Ok(result)
+        let changes = build_changes(account.id, run_id, started, baseline, diff, details);
+        Ok((changes, processes_seen))
     }
 
     async fn observe(

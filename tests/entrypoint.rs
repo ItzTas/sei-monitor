@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use monitor_hub_plugin::NOT_LAUNCHED_BY_HUB;
 use monitor_hub_plugin::proto::{State, StatusResponse};
-use monitor_hub_plugin_testkit::Database;
+use monitor_hub_plugin_testkit::{Database, database};
 use serde_json::Value;
 use tokio_postgres::{Client, NoTls};
 
@@ -114,19 +114,6 @@ fn single_error(stderr: &str) -> Value {
     error.clone()
 }
 
-async fn goose_versions(client: &Client) -> Vec<(i64, bool)> {
-    client
-        .query(
-            "SELECT version_id, is_applied FROM goose_db_version ORDER BY id",
-            &[],
-        )
-        .await
-        .expect("goose_db_version")
-        .iter()
-        .map(|row| (row.get(0), row.get(1)))
-        .collect()
-}
-
 async fn stop_cleanly(plugin: &mut RunningPlugin) {
     terminate(&mut plugin.child);
     let status = plugin.exit_within(STOP_LIMIT);
@@ -210,7 +197,7 @@ fn config_errors_exit_before_the_handshake() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn second_process_refuses_to_start() {
-    let Some(database) = migrated_database().await else {
+    let Some(database) = database().await else {
         return;
     };
     let fake = FakeSei::start();
@@ -219,7 +206,6 @@ async fn second_process_refuses_to_start() {
         .await
         .expect("hold the lock");
     let client = admin(&database.url).await;
-    let before = goose_versions(&client).await;
     let env = sei_env(&fake, &database.url, PASSWORD);
     let mut args = vec![COOKIE];
     args.extend(borrowed(&env));
@@ -238,7 +224,12 @@ async fn second_process_refuses_to_start() {
         exited.stderr
     );
     assert!(!exited.stderr.contains(&database.url), "{}", exited.stderr);
-    assert_eq!(goose_versions(&client).await, before);
+    let migrated: bool = client
+        .query_one("SELECT to_regclass('goose_db_version') IS NOT NULL", &[])
+        .await
+        .expect("look for the migration table")
+        .get(0);
+    assert!(!migrated, "the second process migrated the database");
     assert_eq!(fake.calls(ROUTE_LOGIN), 0);
     assert_eq!(fake.calls(ROUTE_VERSION), 0);
 }

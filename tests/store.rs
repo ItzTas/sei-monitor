@@ -23,6 +23,7 @@ use support::{database_url_as, migrated_database};
 const PASSWORD: &str = "hunter2";
 const LOCK_TIMEOUT: Duration = Duration::from_secs(5);
 const SLACK: Duration = Duration::from_secs(3);
+const READ_LIMIT: Duration = Duration::from_secs(10);
 
 fn repo_now() -> DateTime<Utc> {
     DateTime::parse_from_rfc3339("2026-11-04T18:00:00Z")
@@ -1473,6 +1474,17 @@ async fn store_broken(client: &Client, account_id: i64, kind: &str, payload: &st
         .get(0)
 }
 
+async fn read_within(
+    pooled: &Store,
+    account_id: i64,
+    after: i64,
+    limit: i64,
+) -> Result<Vec<Event>, StoreError> {
+    tokio::time::timeout(READ_LIMIT, pooled.events_after(account_id, after, limit))
+        .await
+        .expect("events_after outlived its time limit")
+}
+
 fn readable(account_id: i64, reference: &str) -> CycleChanges {
     CycleChanges {
         events: vec![event(Kind::ActivityAdded, 9001, reference)],
@@ -1499,7 +1511,7 @@ async fn unreadable_stored_events_are_skipped_and_reported_once() {
     .await;
     let after = apply(&pooled, readable(account.id, "after")).await;
 
-    let (first, logs) = captured(pooled.events_after(account.id, 0, 100)).await;
+    let (first, logs) = captured(read_within(&pooled, account.id, 0, 100)).await;
 
     assert_eq!(
         first.expect("the readable events"),
@@ -1524,7 +1536,7 @@ async fn unreadable_stored_events_are_skipped_and_reported_once() {
         ]
     );
 
-    let (again, logs) = captured(pooled.events_after(account.id, 0, 100)).await;
+    let (again, logs) = captured(read_within(&pooled, account.id, 0, 100)).await;
     assert_eq!(again.expect("the same events again").len(), 2);
     assert_eq!(logs, Vec::<LoggedEvent>::new());
 }
@@ -1547,15 +1559,13 @@ async fn a_page_of_unreadable_events_is_not_the_end() {
     store_broken(&client, account.id, "activity_added", r#""x""#).await;
 
     assert_eq!(
-        pooled
-            .events_after(account.id, 0, 2)
+        read_within(&pooled, account.id, 0, 2)
             .await
             .expect("the events after a page of unreadable ones"),
         readable_events
     );
     assert_eq!(
-        pooled
-            .events_after(account.id, readable_events[1].id, 2)
+        read_within(&pooled, account.id, readable_events[1].id, 2)
             .await
             .expect("only unreadable events left"),
         Vec::new()

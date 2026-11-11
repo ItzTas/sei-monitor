@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use tokio_postgres::Row;
+use tokio_postgres::{Row, Transaction};
 
 use super::records::{CycleRun, Trigger};
 use super::{Store, StoreError};
@@ -24,6 +24,10 @@ WHERE runs.account_id = $1 AND runs.id <= (
 
 const GET_LAST_CYCLE_RUN: &str =
     "SELECT * FROM cycle_runs WHERE account_id = $1 ORDER BY id DESC LIMIT 1";
+
+const GET_LAST_SUCCESSFUL_CYCLE_RUN: &str = "SELECT * FROM cycle_runs
+WHERE account_id = $1 AND error = '' AND finished_at IS NOT NULL
+ORDER BY id DESC LIMIT 1";
 
 impl Store {
     pub async fn start_cycle_run(
@@ -52,30 +56,62 @@ impl Store {
     ) -> Result<(), StoreError> {
         let mut client = self.client().await?;
         let transaction = client.transaction().await?;
-        transaction
-            .execute(
-                FINISH_CYCLE_RUN,
-                &[&finished_at, &error, &0_i64, &0_i64, &run_id, &account_id],
-            )
-            .await?;
-        transaction
-            .execute(PRUNE_CYCLE_RUNS, &[&account_id, &KEPT_RUNS_PER_ACCOUNT])
-            .await?;
+        finish_run(&transaction, run_id, account_id, finished_at, error, 0, 0).await?;
         transaction.commit().await?;
         Ok(())
     }
 
     pub async fn last_cycle_run(&self, account_id: i64) -> Result<Option<CycleRun>, StoreError> {
+        self.one_run(GET_LAST_CYCLE_RUN, account_id).await
+    }
+
+    pub async fn last_successful_cycle_run(
+        &self,
+        account_id: i64,
+    ) -> Result<Option<CycleRun>, StoreError> {
+        self.one_run(GET_LAST_SUCCESSFUL_CYCLE_RUN, account_id)
+            .await
+    }
+
+    async fn one_run(&self, query: &str, account_id: i64) -> Result<Option<CycleRun>, StoreError> {
         let row = self
             .client()
             .await?
-            .query_opt(GET_LAST_CYCLE_RUN, &[&account_id])
+            .query_opt(query, &[&account_id])
             .await?;
         let Some(row) = row else {
             return Ok(None);
         };
         Ok(Some(cycle_run(&row)?))
     }
+}
+
+pub(super) async fn finish_run(
+    transaction: &Transaction<'_>,
+    run_id: i64,
+    account_id: i64,
+    finished_at: DateTime<Utc>,
+    error: &str,
+    processes_seen: i64,
+    events_created: i64,
+) -> Result<(), StoreError> {
+    transaction
+        .execute(
+            FINISH_CYCLE_RUN,
+            &[
+                &finished_at,
+                &error,
+                &processes_seen,
+                &events_created,
+                &run_id,
+                &account_id,
+            ],
+        )
+        .await?;
+    transaction
+        .execute(PRUNE_CYCLE_RUNS, &[&account_id, &KEPT_RUNS_PER_ACCOUNT])
+        .await?;
+    Ok(())
 }
 
 fn cycle_run(row: &Row) -> Result<CycleRun, tokio_postgres::Error> {

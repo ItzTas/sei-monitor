@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use tokio_postgres::Row;
+use tokio_postgres::{Row, Transaction};
 
 use super::records::{Account, AccountInfo, AccountKey};
 use super::{Store, StoreError};
@@ -10,6 +10,8 @@ ON CONFLICT (sei_base_url, username, org_id) DO UPDATE SET username = excluded.u
 RETURNING *";
 
 const SET_PAUSED_REASON: &str = "UPDATE accounts SET paused_reason = $1 WHERE id = $2";
+
+const LOCK_ACCOUNT: &str = "SELECT id FROM accounts WHERE id = $1 FOR UPDATE";
 
 const UPDATE_ACCOUNT_INFO: &str = "UPDATE accounts
 SET org_acronym = $1, sei_version = $2, wssei_version = $3
@@ -63,6 +65,14 @@ impl Store {
             .await?;
         Ok(())
     }
+}
+
+pub(super) async fn lock_account(
+    transaction: &Transaction<'_>,
+    account_id: i64,
+) -> Result<(), StoreError> {
+    transaction.execute(LOCK_ACCOUNT, &[&account_id]).await?;
+    Ok(())
 }
 
 fn account(row: &Row) -> Result<Account, tokio_postgres::Error> {

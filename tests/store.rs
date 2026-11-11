@@ -1,16 +1,19 @@
 mod support;
 
+use std::collections::HashSet;
 use std::error::Error;
 use std::time::{Duration, Instant};
 
 use chrono::{DateTime, TimeDelta, Utc};
 use monitor_hub_plugin_testkit::database;
+use sei_monitor::event::{Event, Kind, Payload};
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{
-    Account, AccountInfo, AccountKey, CycleRun, Store, StoreError, Trigger, WRITER_LOCK_ID,
-    WriterLock, acquire_writer_lock,
+    Account, AccountInfo, AccountKey, CycleChanges, CycleRun, DocumentRow, ProcessRow, Pruned,
+    Store, StoreError, Trigger, WRITER_LOCK_ID, WriterLock, acquire_writer_lock,
 };
 use tokio::net::TcpListener;
+use tokio::task::JoinHandle;
 use tokio_postgres::error::SqlState;
 use tokio_postgres::{Client, NoTls};
 
@@ -622,4 +625,812 @@ async fn only_the_latest_cycle_runs_are_kept() {
         .expect("newest")
         .get(0);
     assert_eq!((total, newest), (1000, 1000));
+}
+
+const GO_PAYLOAD: &str = concat!(
+    r#"{"process_number":"00000.000001/2026-00","description":"Compra \u003curgente\u003e \u0026 \"rápida\"\u2028linha\u2029fim","activity_text":"tab\there\nline\b\f\u0001\u001f"#,
+    "\u{7f}",
+    r#"\\ é 😀","assigned_to_self":true,"reason":"a\u003cb\u003ec\u0026d"}"#,
+);
+
+async fn account(pooled: &Store) -> Account {
+    pooled
+        .ensure_account(&key(), repo_now())
+        .await
+        .expect("account")
+}
+
+fn cycle(account_id: i64, now: DateTime<Utc>) -> CycleChanges {
+    CycleChanges {
+        account_id,
+        now,
+        ..CycleChanges::default()
+    }
+}
+
+fn process(procedure_id: i64, number: &str) -> ProcessRow {
+    ProcessRow {
+        procedure_id,
+        number: number.to_owned(),
+        unit_id: 1001,
+        ..ProcessRow::default()
+    }
+}
+
+fn document(document_id: i64, procedure_id: i64) -> DocumentRow {
+    DocumentRow {
+        document_id,
+        procedure_id,
+        ..DocumentRow::default()
+    }
+}
+
+fn event(kind: Kind, procedure_id: i64, reference: &str) -> Event {
+    Event {
+        id: 0,
+        account_id: 0,
+        kind,
+        procedure_id,
+        reference: reference.to_owned(),
+        occurred_at: None,
+        detected_at: None,
+        payload: Payload::default(),
+    }
+}
+
+async fn apply(pooled: &Store, changes: CycleChanges) -> Vec<Event> {
+    pooled.apply_cycle(&changes).await.expect("apply the cycle")
+}
+
+async fn all_events(pooled: &Store, account_id: i64) -> Vec<Event> {
+    pooled
+        .events_after(account_id, 0, 100)
+        .await
+        .expect("events")
+}
+
+fn references(events: &[Event]) -> Vec<&str> {
+    events
+        .iter()
+        .map(|event| event.reference.as_str())
+        .collect()
+}
+
+async fn procedure_ids(pooled: &Store, account_id: i64) -> Vec<i64> {
+    pooled
+        .processes(account_id)
+        .await
+        .expect("processes")
+        .iter()
+        .map(|process| process.procedure_id)
+        .collect()
+}
+
+async fn count(client: &Client, query: &str) -> i64 {
+    client.query_one(query, &[]).await.expect("count").get(0)
+}
+
+#[tokio::test]
+async fn apply_cycle_keeps_the_snapshot() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let first = ProcessRow {
+        procedure_id: 9001,
+        number: "00000.000001/2026-00".to_owned(),
+        process_type: "Contrato".to_owned(),
+        description: "Compra de cadeiras".to_owned(),
+        unit_id: 1001,
+        unit_acronym: "SEDEMO/NUPROC".to_owned(),
+        assigned_user: "fulano.tal".to_owned(),
+        assigned_user_id: 101,
+        return_date: "2026-11-06".to_owned(),
+        return_overdue: true,
+        last_activity_id: 50003,
+        document_total: 2,
+        ..ProcessRow::default()
+    };
+    let second = ProcessRow {
+        unit_acronym: "SEDEMO/NUPROC".to_owned(),
+        ..process(9002, "00000.000002/2026-00")
+    };
+    let named = DocumentRow {
+        protocol: "0012345".to_owned(),
+        document_type: "Ofício".to_owned(),
+        name: "Ofício 12 (0012345)".to_owned(),
+        ..document(80001, 9001)
+    };
+    let renamed = DocumentRow {
+        name: "Ofício 12 renomeado".to_owned(),
+        ..named.clone()
+    };
+
+    for (now, document) in [
+        (repo_now(), named),
+        (repo_now() + TimeDelta::hours(1), renamed),
+    ] {
+        apply(
+            &pooled,
+            CycleChanges {
+                baseline: true,
+                processes: vec![first.clone(), second.clone()],
+                documents: vec![document],
+                ..cycle(account.id, now)
+            },
+        )
+        .await;
+    }
+
+    let seen = |row: ProcessRow| ProcessRow {
+        first_seen_at: Some(repo_now()),
+        last_seen_at: Some(repo_now() + TimeDelta::hours(1)),
+        ..row
+    };
+    assert_eq!(
+        pooled.processes(account.id).await.expect("processes"),
+        vec![seen(first), seen(second)]
+    );
+    assert_eq!(
+        pooled
+            .document_ids(account.id, 9001)
+            .await
+            .expect("document ids"),
+        HashSet::from([80001])
+    );
+    let client = connect(&db.url).await;
+    assert_eq!(
+        count(
+            &client,
+            "SELECT count(*) FROM documents WHERE name = 'Ofício 12 (0012345)'"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        pooled
+            .ensure_account(&key(), repo_now())
+            .await
+            .expect("account again")
+            .baseline_at,
+        Some(repo_now())
+    );
+}
+
+#[tokio::test]
+async fn processes_leave_and_come_back() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let staying = process(9001, "00000.000001/2026-00");
+    let leaving = process(9002, "00000.000002/2026-00");
+
+    apply(
+        &pooled,
+        CycleChanges {
+            processes: vec![staying.clone(), leaving.clone()],
+            ..cycle(account.id, repo_now())
+        },
+    )
+    .await;
+    for minutes in [15, 20] {
+        apply(
+            &pooled,
+            CycleChanges {
+                processes: vec![staying.clone()],
+                left: vec![9002],
+                ..cycle(account.id, repo_now() + TimeDelta::minutes(minutes))
+            },
+        )
+        .await;
+    }
+
+    let gone = pooled.processes(account.id).await.expect("processes");
+    assert_eq!(gone[0].left_at, None);
+    assert_eq!(gone[1].left_at, Some(repo_now() + TimeDelta::minutes(15)));
+
+    apply(
+        &pooled,
+        CycleChanges {
+            processes: vec![staying, leaving.clone()],
+            ..cycle(account.id, repo_now() + TimeDelta::minutes(30))
+        },
+    )
+    .await;
+
+    let back = pooled.processes(account.id).await.expect("processes");
+    assert_eq!(
+        back[1],
+        ProcessRow {
+            first_seen_at: Some(repo_now()),
+            last_seen_at: Some(repo_now() + TimeDelta::minutes(30)),
+            left_at: None,
+            ..leaving
+        }
+    );
+}
+
+#[tokio::test]
+async fn events_are_stored_once_per_key() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let entered = Event {
+        payload: Payload {
+            process_number: "00000.000001/2026-00".to_owned(),
+            ..Payload::default()
+        },
+        ..event(Kind::ProcessEntered, 9001, "9001:1")
+    };
+    let activity = Event {
+        occurred_at: Some(repo_now() - TimeDelta::hours(1)),
+        payload: Payload {
+            activity_text: "Processo recebido".to_owned(),
+            ..Payload::default()
+        },
+        ..event(Kind::ActivityAdded, 9001, "50003")
+    };
+    let mut changes = CycleChanges {
+        events: vec![entered.clone(), activity.clone()],
+        ..cycle(account.id, repo_now())
+    };
+
+    let inserted = apply(&pooled, changes.clone()).await;
+    changes
+        .events
+        .push(event(Kind::ActivityAdded, 9001, "50004"));
+    let again = apply(&pooled, changes).await;
+
+    assert_eq!(inserted.len(), 2, "{inserted:?}");
+    assert_ne!(inserted[0].id, inserted[1].id);
+    assert_eq!(
+        inserted,
+        vec![
+            Event {
+                id: inserted[0].id,
+                account_id: account.id,
+                occurred_at: Some(repo_now()),
+                detected_at: Some(repo_now()),
+                ..entered
+            },
+            Event {
+                id: inserted[1].id,
+                account_id: account.id,
+                occurred_at: Some(repo_now() - TimeDelta::hours(1)),
+                detected_at: Some(repo_now()),
+                ..activity
+            },
+        ]
+    );
+    assert_eq!(references(&again), vec!["50004"]);
+    let client = connect(&db.url).await;
+    assert_eq!(count(&client, "SELECT count(*) FROM events").await, 3);
+    assert_eq!(
+        all_events(&pooled, account.id).await,
+        [inserted, again].concat()
+    );
+}
+
+#[tokio::test]
+async fn payloads_are_stored_as_go_writes_them() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let payload = Payload {
+        process_number: "00000.000001/2026-00".to_owned(),
+        description: "Compra <urgente> & \"rápida\"\u{2028}linha\u{2029}fim".to_owned(),
+        activity_text: "tab\there\nline\u{8}\u{c}\u{1}\u{1f}\u{7f}\\ é 😀".to_owned(),
+        assigned_to_self: true,
+        reason: "a<b>c&d".to_owned(),
+        ..Payload::default()
+    };
+
+    apply(
+        &pooled,
+        CycleChanges {
+            events: vec![Event {
+                payload: payload.clone(),
+                ..event(Kind::ActivityAdded, 9001, "50001")
+            }],
+            ..cycle(account.id, repo_now())
+        },
+    )
+    .await;
+
+    let client = connect(&db.url).await;
+    let stored: String = client
+        .query_one("SELECT payload FROM events", &[])
+        .await
+        .expect("payload")
+        .get(0);
+    assert_eq!(stored, GO_PAYLOAD);
+    assert_eq!(all_events(&pooled, account.id).await[0].payload, payload);
+}
+
+#[tokio::test]
+async fn apply_cycle_is_all_or_nothing() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let run = pooled
+        .start_cycle_run(account.id, Trigger::Scheduled, repo_now())
+        .await
+        .expect("start");
+
+    let error = pooled
+        .apply_cycle(&CycleChanges {
+            run_id: Some(run),
+            finished_at: repo_now() + TimeDelta::minutes(1),
+            baseline: true,
+            processes: vec![process(9001, "00000.000001/2026-00")],
+            documents: vec![document(80001, 9999)],
+            events: vec![event(Kind::ProcessEntered, 9001, "9001:1")],
+            ..cycle(account.id, repo_now())
+        })
+        .await
+        .expect_err("a document of an unknown process was accepted");
+
+    let StoreError::Database(cause) = &error else {
+        panic!("{error:?}")
+    };
+    assert_eq!(cause.code(), Some(&SqlState::FOREIGN_KEY_VIOLATION));
+    let client = connect(&db.url).await;
+    assert_eq!(
+        count(
+            &client,
+            "SELECT (SELECT count(*) FROM processes) + (SELECT count(*) FROM events)"
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        pooled
+            .ensure_account(&key(), repo_now())
+            .await
+            .expect("account again")
+            .baseline_at,
+        None
+    );
+    let last = pooled
+        .last_cycle_run(account.id)
+        .await
+        .expect("last run")
+        .expect("the started run");
+    assert_eq!((last.id, last.finished_at), (run, None));
+}
+
+#[tokio::test]
+async fn a_finished_cycle_closes_its_run() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let started_at = repo_now() + TimeDelta::minutes(1);
+    let run = pooled
+        .start_cycle_run(account.id, Trigger::Manual, started_at)
+        .await
+        .expect("start");
+
+    apply(
+        &pooled,
+        CycleChanges {
+            run_id: Some(run),
+            finished_at: repo_now() + TimeDelta::minutes(2),
+            processes: vec![process(9001, "00000.000001/2026-00")],
+            events: vec![event(Kind::ProcessEntered, 9001, "9001:1")],
+            ..cycle(account.id, started_at)
+        },
+    )
+    .await;
+
+    assert_eq!(
+        pooled.last_cycle_run(account.id).await.expect("last run"),
+        Some(CycleRun {
+            id: run,
+            account_id: account.id,
+            trigger: Trigger::Manual,
+            started_at,
+            finished_at: Some(repo_now() + TimeDelta::minutes(2)),
+            error: String::new(),
+            processes_seen: 1,
+            events_created: 1,
+        })
+    );
+}
+
+#[tokio::test]
+async fn last_successful_run_skips_failures_and_unfinished_runs() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let other = pooled
+        .ensure_account(
+            &AccountKey {
+                org_id: 64,
+                ..key()
+            },
+            repo_now(),
+        )
+        .await
+        .expect("another agency");
+    let finished = |start: DateTime<Utc>| start + TimeDelta::seconds(10);
+    let mut runs = Vec::new();
+    for (hours, error) in [(0, ""), (1, "SEI answered 500")] {
+        let started_at = repo_now() + TimeDelta::hours(hours);
+        let run = pooled
+            .start_cycle_run(account.id, Trigger::Scheduled, started_at)
+            .await
+            .expect("start");
+        pooled
+            .finish_cycle_run(run, account.id, finished(started_at), error)
+            .await
+            .expect("finish");
+        runs.push(run);
+    }
+    pooled
+        .start_cycle_run(
+            account.id,
+            Trigger::Scheduled,
+            repo_now() + TimeDelta::hours(2),
+        )
+        .await
+        .expect("start the unfinished run");
+
+    assert_eq!(
+        pooled
+            .last_successful_cycle_run(account.id)
+            .await
+            .expect("last success"),
+        Some(CycleRun {
+            id: runs[0],
+            account_id: account.id,
+            trigger: Trigger::Scheduled,
+            started_at: repo_now(),
+            finished_at: Some(finished(repo_now())),
+            error: String::new(),
+            processes_seen: 0,
+            events_created: 0,
+        })
+    );
+    assert_eq!(
+        pooled
+            .last_successful_cycle_run(other.id)
+            .await
+            .expect("no runs"),
+        None
+    );
+}
+
+#[tokio::test]
+async fn events_after_returns_one_account_in_increasing_ids() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let first = account(&pooled).await;
+    let second = pooled
+        .ensure_account(
+            &AccountKey {
+                org_id: 64,
+                ..key()
+            },
+            repo_now(),
+        )
+        .await
+        .expect("another agency");
+    for (owner, reference) in [
+        (&first, "a1"),
+        (&second, "b1"),
+        (&first, "a2"),
+        (&second, "b2"),
+        (&first, "a3"),
+    ] {
+        apply(
+            &pooled,
+            CycleChanges {
+                events: vec![event(Kind::ActivityAdded, 9001, reference)],
+                ..cycle(owner.id, repo_now())
+            },
+        )
+        .await;
+    }
+
+    let events = all_events(&pooled, first.id).await;
+    assert_eq!(references(&events), vec!["a1", "a2", "a3"]);
+    assert!(events.iter().all(|event| event.account_id == first.id));
+    assert!(events.windows(2).all(|pair| pair[0].id < pair[1].id));
+    assert_eq!(
+        pooled
+            .events_after(first.id, events[0].id, 1)
+            .await
+            .expect("one after the first"),
+        vec![events[1].clone()]
+    );
+}
+
+async fn prune_scenario(pooled: &Store, account_id: i64) {
+    let staying = process(9001, "00000.000001/2026-00");
+    let left_early = process(9002, "00000.000002/2026-00");
+    let left_late = process(9003, "00000.000003/2026-00");
+    apply(
+        pooled,
+        CycleChanges {
+            processes: vec![staying.clone(), left_early, left_late.clone()],
+            documents: vec![document(80001, 9001), document(80002, 9002)],
+            events: vec![event(Kind::ActivityAdded, 9001, "50001")],
+            ..cycle(account_id, repo_now())
+        },
+    )
+    .await;
+    apply(
+        pooled,
+        CycleChanges {
+            processes: vec![staying.clone(), left_late],
+            left: vec![9002],
+            ..cycle(account_id, repo_now() + TimeDelta::hours(1))
+        },
+    )
+    .await;
+    apply(
+        pooled,
+        CycleChanges {
+            processes: vec![staying],
+            left: vec![9003],
+            events: vec![event(Kind::ActivityAdded, 9001, "50002")],
+            ..cycle(account_id, repo_now() + TimeDelta::days(40))
+        },
+    )
+    .await;
+}
+
+fn prune_cutoff() -> DateTime<Utc> {
+    repo_now() + TimeDelta::days(30)
+}
+
+#[tokio::test]
+async fn prune_before_removes_only_what_is_older_than_the_cutoff() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    prune_scenario(&pooled, account.id).await;
+    let acked = all_events(&pooled, account.id).await[1].id;
+
+    let pruned = pooled
+        .prune_before(account.id, prune_cutoff(), acked)
+        .await
+        .expect("prune");
+
+    assert_eq!(
+        pruned,
+        Pruned {
+            events: 1,
+            processes: 1
+        }
+    );
+    assert_eq!(
+        references(&all_events(&pooled, account.id).await),
+        vec!["50002"]
+    );
+    assert_eq!(procedure_ids(&pooled, account.id).await, vec![9001, 9003]);
+    assert_eq!(
+        pooled
+            .document_ids(account.id, 9001)
+            .await
+            .expect("document ids"),
+        HashSet::from([80001])
+    );
+    let client = connect(&db.url).await;
+    assert_eq!(
+        count(
+            &client,
+            "SELECT count(*) FROM documents WHERE procedure_id = 9002"
+        )
+        .await,
+        0
+    );
+}
+
+#[tokio::test]
+async fn prune_before_keeps_events_the_hub_has_not_read() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    prune_scenario(&pooled, account.id).await;
+    let before = all_events(&pooled, account.id).await;
+
+    let unread = pooled
+        .prune_before(account.id, prune_cutoff(), 0)
+        .await
+        .expect("prune with nothing read");
+    assert_eq!(
+        unread,
+        Pruned {
+            events: 0,
+            processes: 1
+        }
+    );
+    assert_eq!(all_events(&pooled, account.id).await, before);
+
+    let future = pooled
+        .prune_before(account.id, repo_now() + TimeDelta::days(400), before[0].id)
+        .await
+        .expect("prune with a cutoff in the future");
+    assert_eq!(
+        future,
+        Pruned {
+            events: 1,
+            processes: 1
+        }
+    );
+    assert_eq!(all_events(&pooled, account.id).await, before[1..].to_vec());
+    assert_eq!(procedure_ids(&pooled, account.id).await, vec![9001]);
+}
+
+const LOCK_WAITERS: &str = "SELECT count(*) FROM pg_stat_activity
+WHERE datname = current_database() AND wait_event_type = 'Lock'";
+
+type CycleTask = JoinHandle<Result<Vec<Event>, StoreError>>;
+
+async fn settle(watcher: &Client, waiters: i64, task: &CycleTask) {
+    let started = Instant::now();
+    loop {
+        let waiting: i64 = watcher
+            .query_one(LOCK_WAITERS, &[])
+            .await
+            .expect("lock waiters")
+            .get(0);
+        if waiting >= waiters || task.is_finished() {
+            return;
+        }
+        assert!(
+            started.elapsed() < LOCK_TIMEOUT,
+            "{waiting} lock waiters, want {waiters}"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+fn spawn_cycle(pooled: &Store, changes: CycleChanges) -> CycleTask {
+    let pooled = pooled.clone();
+    tokio::spawn(async move { pooled.apply_cycle(&changes).await })
+}
+
+#[tokio::test]
+async fn concurrent_cycles_commit_in_position_order() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let run = pooled
+        .start_cycle_run(account.id, Trigger::Scheduled, repo_now())
+        .await
+        .expect("start");
+    let mut outside = connect(&db.url).await;
+    let held = outside.transaction().await.expect("begin");
+    held.query_one(
+        "SELECT id FROM cycle_runs WHERE id = $1 FOR UPDATE",
+        &[&run],
+    )
+    .await
+    .expect("hold the run row");
+    let watcher = connect(&db.url).await;
+
+    let first = spawn_cycle(
+        &pooled,
+        CycleChanges {
+            run_id: Some(run),
+            finished_at: repo_now() + TimeDelta::minutes(1),
+            events: vec![event(Kind::ActivityAdded, 9001, "first")],
+            ..cycle(account.id, repo_now())
+        },
+    );
+    settle(&watcher, 1, &first).await;
+    assert!(
+        !first.is_finished(),
+        "the first cycle did not wait on its run"
+    );
+    let second = spawn_cycle(
+        &pooled,
+        CycleChanges {
+            events: vec![event(Kind::ActivityAdded, 9001, "second")],
+            ..cycle(account.id, repo_now())
+        },
+    );
+    settle(&watcher, 2, &second).await;
+
+    assert_eq!(
+        all_events(&pooled, account.id).await,
+        Vec::new(),
+        "a later position was readable while an earlier one was still uncommitted"
+    );
+    assert!(!second.is_finished());
+
+    held.rollback().await.expect("release the run row");
+    let first = first.await.expect("join").expect("the first cycle");
+    let second = second.await.expect("join").expect("the second cycle");
+    assert!(first[0].id < second[0].id, "{first:?} {second:?}");
+    assert_eq!(
+        all_events(&pooled, account.id).await,
+        [first, second].concat()
+    );
+}
+
+#[tokio::test]
+async fn an_unreadable_stored_event_names_itself() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let changes = |reference: &str| CycleChanges {
+        events: vec![event(Kind::ActivityAdded, 9001, reference)],
+        ..cycle(account.id, repo_now())
+    };
+    apply(&pooled, changes("before")).await;
+    let client = connect(&db.url).await;
+    let mut broken = Vec::new();
+    for (kind, reference, payload) in [
+        ("activity_added", "garbled", "{\"activity_text\":"),
+        ("activity_renamed", "unknown", "{}"),
+    ] {
+        let id: i64 = client
+            .query_one(
+                "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
+                 VALUES ($1, $2, 9001, $3, $4, $4, $5) RETURNING id",
+                &[&account.id, &kind, &reference, &repo_now(), &payload],
+            )
+            .await
+            .expect("store a broken event")
+            .get(0);
+        broken.push(id);
+    }
+    let after = apply(&pooled, changes("after")).await;
+
+    let garbled = pooled
+        .events_after(account.id, 0, 100)
+        .await
+        .expect_err("a garbled payload was read");
+    assert!(
+        matches!(garbled, StoreError::Payload { event_id, .. } if event_id == broken[0]),
+        "{garbled:?}"
+    );
+    assert!(
+        garbled
+            .to_string()
+            .starts_with(&format!("event {} has an unreadable payload: ", broken[0])),
+        "{garbled}"
+    );
+    let unknown = pooled
+        .events_after(account.id, broken[0], 100)
+        .await
+        .expect_err("an unknown kind was read");
+    let StoreError::Payload { event_id, detail } = &unknown else {
+        panic!("{unknown:?}")
+    };
+    assert_eq!(*event_id, broken[1]);
+    assert!(detail.contains("activity_renamed"), "{detail}");
+    assert_eq!(
+        pooled
+            .events_after(account.id, broken[1], 100)
+            .await
+            .expect("the events after the broken ones"),
+        after
+    );
 }

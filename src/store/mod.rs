@@ -1,4 +1,6 @@
 mod accounts;
+mod cycle;
+mod events;
 mod records;
 mod runs;
 
@@ -12,7 +14,10 @@ use tokio_postgres::{Client, Config, NoTls};
 
 use crate::secret::Secret;
 
-pub use records::{Account, AccountInfo, AccountKey, CycleRun, Trigger};
+pub use records::{
+    Account, AccountInfo, AccountKey, CycleChanges, CycleRun, DocumentRow, ProcessRow, Pruned,
+    Trigger,
+};
 
 pub const MIGRATIONS: &[Migration] = &[
     Migration {

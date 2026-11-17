@@ -623,6 +623,12 @@ async fn a_check_whose_login_gets_no_verdict_keeps_the_rejection_on_hold() {
     .await;
     let fired = fire_pending_sleeps(&h, 3).await;
     let state = h.monitor.state();
+    let stored = stored_reason(&h).await;
+    let logins = (
+        h.fake.calls(ROUTE_LOGIN),
+        h.fake.logins(),
+        h.fake.failed_logins(),
+    );
     let too_soon = h.monitor.trigger_cycle();
     h.clock.advance(minutes(5));
     let again = h.monitor.trigger_cycle();
@@ -635,9 +641,8 @@ async fn a_check_whose_login_gets_no_verdict_keeps_the_rejection_on_hold() {
         (state.paused, state.held, state.paused_reason.as_str()),
         (true, true, reason.as_str())
     );
-    assert_eq!(stored_reason(&h).await, Some(reason));
-    assert_eq!(h.fake.calls(ROUTE_LOGIN), 1);
-    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (0, 0));
+    assert_eq!(stored, Some(reason));
+    assert_eq!(logins, (1, 0, 0));
     assert_eq!(
         too_soon,
         Err(TriggerError::TooSoon {

@@ -140,10 +140,11 @@ pub fn is_go_space(c: char) -> bool {
 
 pub(crate) const TEXT_LIMIT: usize = 500;
 
-pub(crate) fn capped(text: &str) -> &str {
-    text.char_indices()
-        .nth(TEXT_LIMIT)
-        .map_or(text, |(end, _)| &text[..end])
+pub(crate) fn capped(text: &str) -> String {
+    text.chars()
+        .filter(|character| *character != '\0')
+        .take(TEXT_LIMIT)
+        .collect()
 }
 
 pub(crate) fn trim(text: &str) -> &str {

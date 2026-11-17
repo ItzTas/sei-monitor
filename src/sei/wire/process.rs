@@ -21,9 +21,9 @@ pub(super) fn process(item: &Value) -> Result<Process, String> {
     let origin = string_field(status, "processoGeradoRecebido")?;
     Ok(Process {
         procedure_id: or_fallback(procedure_id, id),
-        number: capped(trim(&number)).to_owned(),
-        process_type: capped(&unescape(trim(&process_type))).to_owned(),
-        description: capped(&unescape(trim(&description))).to_owned(),
+        number: capped(trim(&number)),
+        process_type: capped(&unescape(trim(&process_type))),
+        description: capped(&unescape(trim(&description))),
         assignee: assignee(field(attributes, "usuarioAtribuido")),
         return_date: (scheduled == "S")
             .then(|| return_date(field(status, "retornoData")))
@@ -44,8 +44,8 @@ fn assignee(raw: Option<&Value>) -> Option<User> {
     }
     Some(User {
         id,
-        acronym: capped(acronym).to_owned(),
-        name: capped(&unescape(trim(&name))).to_owned(),
+        acronym: capped(acronym),
+        name: capped(&unescape(trim(&name))),
     })
 }
 

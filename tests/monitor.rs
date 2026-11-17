@@ -1102,3 +1102,58 @@ async fn login_failures_match_go() {
         assert_event(&event, &case.event, &case.name);
     }
 }
+
+#[tokio::test]
+async fn nul_characters_from_sei_are_dropped_before_they_are_stored() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    h.fake.update_process(UNIT_NUPROC, 9002, |process| {
+        process.description = "Di\u{0}rias".to_owned();
+    });
+    h.prepare().await;
+    h.run_once().await;
+    h.clock.advance(FIFTEEN_MINUTES);
+    h.fake.add_process(
+        UNIT_NUPROC,
+        FakeProcess {
+            description: "Compra\u{0} de mesas".to_owned(),
+            ..process(9003, 3, "Of\u{0}ício")
+        },
+    );
+    h.fake.add_activities(
+        9001,
+        vec![activity(50004, start(), "Documento\u{0} assinado")],
+    );
+
+    h.run_once().await;
+
+    let processes = store_processes(&h).await;
+    let description = |id: i64| {
+        processes
+            .iter()
+            .find(|row| row.procedure_id == id)
+            .map(|row| (row.process_type.clone(), row.description.clone()))
+    };
+    assert_eq!(
+        description(9002),
+        Some(("Diárias".to_owned(), "Dirias".to_owned()))
+    );
+    assert_eq!(
+        description(9003),
+        Some(("Ofício".to_owned(), "Compra de mesas".to_owned()))
+    );
+    let events = h.events().await;
+    let entered = events
+        .iter()
+        .find(|event| event.kind == Kind::ProcessEntered)
+        .expect("the new process");
+    assert_eq!(entered.payload.description, "Compra de mesas");
+    let added = events
+        .iter()
+        .find(|event| event.kind == Kind::ActivityAdded)
+        .expect("the new activity");
+    assert_eq!(added.payload.activity_text, "Documento assinado");
+}

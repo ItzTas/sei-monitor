@@ -189,7 +189,7 @@ impl Plugin for SeiPlugin {
         let (current, message) = state_and_message(&state, database_answered, hub_ahead);
         Ok(Response::new(StatusResponse {
             state: current.into(),
-            message: capped(&message).to_owned(),
+            message: capped(&message),
             last_check_started_at: state.last_started_at.map(timestamp),
             last_success_at: last_success.flatten().map(timestamp),
             next_check_at: next_check(&state).map(timestamp),

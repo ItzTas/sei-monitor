@@ -222,7 +222,7 @@ impl Monitor {
                 .update_account_info(account.id, &account.info)
                 .await?;
         }
-        account.paused_reason = capped(&account.paused_reason).to_owned();
+        account.paused_reason = capped(&account.paused_reason);
         let mut inner = self.inner();
         inner.state.account_id = account.id;
         inner.state.paused_reason.clone_from(&account.paused_reason);
@@ -265,7 +265,7 @@ impl Monitor {
 
     async fn org_acronym(&self, connection: &Connection) -> String {
         if !connection.org.acronym.is_empty() {
-            return capped(&connection.org.acronym).to_owned();
+            return capped(&connection.org.acronym);
         }
         let orgs = match list_orgs(&self.config.target.sei_url, &self.config.options).await {
             Ok(orgs) => orgs,
@@ -279,7 +279,7 @@ impl Monitor {
         };
         orgs.into_iter()
             .find(|org| org.id == connection.org.id)
-            .map(|org| capped(&org.acronym).to_owned())
+            .map(|org| capped(&org.acronym))
             .unwrap_or_default()
     }
 

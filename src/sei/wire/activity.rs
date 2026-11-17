@@ -22,9 +22,9 @@ pub(super) fn activity(item: &Value, procedure_id: i64, zone: Tz) -> Result<Acti
     Ok(Activity {
         id,
         procedure_id: or_fallback(own_procedure_id, procedure_id),
-        user: capped(trim(&user)).to_owned(),
-        unit: capped(trim(&unit)).to_owned(),
-        text: capped(&unescape(trim(&text))).to_owned(),
+        user: capped(trim(&user)),
+        unit: capped(trim(&unit)),
+        text: capped(&unescape(trim(&text))),
         at: local.map(|local| local_to_utc(local, zone)),
     })
 }

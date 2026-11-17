@@ -72,7 +72,7 @@ pub(crate) fn read_envelope(route: &str, status: u16, body: &[u8]) -> Result<Env
     }
     let message = envelope.message();
     let kind = classify(route, status, &message);
-    Err(api_error(route, status, capped(&message).to_owned(), kind))
+    Err(api_error(route, status, capped(&message), kind))
 }
 
 fn decode(body: &[u8]) -> Option<(bool, Envelope)> {
@@ -190,8 +190,8 @@ fn login(data: Option<&Value>) -> Result<(String, Session), String> {
     let login = nested(data, "loginData")?;
     let session = Session {
         user_id: whole(login, "IdUsuario")?,
-        user_acronym: capped(&string_field(login, "sigla")?).to_owned(),
-        user_name: capped(&unescape(&string_field(login, "nome")?)).to_owned(),
+        user_acronym: capped(&string_field(login, "sigla")?),
+        user_name: capped(&unescape(&string_field(login, "nome")?)),
         current_unit_id: whole(login, "IdUnidadeAtual")?,
         units: units(field(data, "unidades"))?,
     };
@@ -210,8 +210,8 @@ fn unit(item: &Value) -> Result<Unit, String> {
     let item = object(Some(item))?;
     Ok(Unit {
         id: whole(item, "id")?,
-        acronym: capped(&string_field(item, "sigla")?).to_owned(),
-        description: capped(&unescape(&string_field(item, "descricao")?)).to_owned(),
+        acronym: capped(&string_field(item, "sigla")?),
+        description: capped(&unescape(&string_field(item, "descricao")?)),
     })
 }
 
@@ -222,8 +222,8 @@ pub(crate) fn version(envelope: &Envelope) -> Result<Version, SeiError> {
 fn read_version(data: Option<&Value>) -> Result<Version, String> {
     let data = present(data)?;
     Ok(Version {
-        sei: capped(&string_field(data, "sei")?).to_owned(),
-        module: capped(&string_field(data, "wssei")?).to_owned(),
+        sei: capped(&string_field(data, "sei")?),
+        module: capped(&string_field(data, "wssei")?),
     })
 }
 

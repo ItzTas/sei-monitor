@@ -19,9 +19,9 @@ pub(super) fn document(item: &Value, procedure_id: i64) -> Result<Document, Stri
     Ok(Document {
         id,
         procedure_id: or_fallback(own_procedure_id, procedure_id),
-        protocol: capped(trim(&protocol)).to_owned(),
-        name: capped(&name(&label, &document_type, &number, &file_name)).to_owned(),
-        document_type: capped(&unescape(trim(&document_type))).to_owned(),
+        protocol: capped(trim(&protocol)),
+        name: capped(&name(&label, &document_type, &number, &file_name)),
+        document_type: capped(&unescape(trim(&document_type))),
     })
 }
 

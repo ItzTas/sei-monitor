@@ -523,7 +523,18 @@ pub fn login_failure(error: &SeiError, now: DateTime<Utc>) -> (String, Event) {
 }
 
 fn error_text(error: &MonitorError) -> String {
-    describe(&error.to_string())
+    let chain = std::iter::successors(error.source(), |&cause| cause.source()).fold(
+        error.to_string(),
+        |mut text, cause| {
+            let part = cause.to_string();
+            if !text.ends_with(&part) {
+                text.push_str(": ");
+                text.push_str(&part);
+            }
+            text
+        },
+    );
+    describe(&chain)
 }
 
 fn describe(text: &str) -> String {

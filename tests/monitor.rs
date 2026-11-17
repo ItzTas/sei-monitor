@@ -1157,3 +1157,30 @@ async fn nul_characters_from_sei_are_dropped_before_they_are_stored() {
         .expect("the new activity");
     assert_eq!(added.payload.activity_text, "Documento assinado");
 }
+
+#[tokio::test]
+async fn a_database_failure_is_stored_with_its_cause() {
+    let Some((database, store)) = database_store().await else {
+        return;
+    };
+    let fake = FakeSei::start();
+    populate(&fake);
+    let monitor_config = config(&fake, PASSWORD);
+    let denied = store_as(&database, "sei_processes_denied", "INSERT ON processes").await;
+    let h = Harness::with(fake, denied, monitor_config);
+    h.prepare().await;
+
+    let failure = bounded(h.monitor.run_once(Trigger::Scheduled))
+        .await
+        .expect_err("a cycle that cannot store its processes");
+
+    let run = store
+        .last_cycle_run(h.account_id())
+        .await
+        .expect("last run")
+        .expect("a run");
+    let expected = "db error: ERROR: permission denied for table processes";
+    assert_eq!(failure.to_string(), "db error");
+    assert_eq!(run.error, expected);
+    assert_eq!(h.monitor.state().cycle_error.as_deref(), Some(expected));
+}

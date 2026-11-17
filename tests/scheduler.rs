@@ -26,6 +26,7 @@ const EVENTUALLY: Duration = Duration::from_secs(10);
 const CHANGED_PASSWORD: &str = "changed-by-the-user";
 const REJECTED: &str = "Usuário ou Senha Inválida.";
 const RECORDED_REASON: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
+const PAUSE_WRITE: &str = "UPDATE accounts SET paused_reason%";
 
 fn minutes(n: u64) -> Duration {
     Duration::from_secs(n * 60)
@@ -669,19 +670,6 @@ async fn reason_in(observer: &tokio_postgres::Client) -> String {
         .get(0)
 }
 
-async fn waiting_to_clear(observer: &tokio_postgres::Client) -> bool {
-    let waiting: i64 = observer
-        .query_one(
-            "SELECT count(*) FROM pg_stat_activity
-             WHERE wait_event_type = 'Lock' AND query LIKE 'UPDATE accounts SET paused_reason%'",
-            &[],
-        )
-        .await
-        .expect("pg_stat_activity")
-        .get(0);
-    waiting > 0
-}
-
 #[tokio::test]
 async fn a_failed_clear_of_the_rejection_is_tried_again_after_the_next_successful_cycle() {
     let Some((database, store)) = database_store().await else {
@@ -700,8 +688,8 @@ async fn a_failed_clear_of_the_rejection_is_tried_again_after_the_next_successfu
         .expect("hold the account row");
 
     let checked = h.monitor.trigger_cycle();
-    let blocked = eventually(|| waiting_to_clear(&observer)).await;
-    let gave_up = eventually(|| async { !waiting_to_clear(&observer).await }).await;
+    let blocked = eventually(|| waiting_on(&observer, PAUSE_WRITE)).await;
+    let gave_up = eventually(|| async { !waiting_on(&observer, PAUSE_WRITE).await }).await;
     let stored_while_held = reason_in(&observer).await;
     holder.batch_execute("ROLLBACK").await.expect("release");
     let scheduled = h.clock.next_sleep().await;
@@ -715,4 +703,75 @@ async fn a_failed_clear_of_the_rejection_is_tried_again_after_the_next_successfu
     assert_eq!((run.trigger, run.error.as_str()), (Trigger::Manual, ""));
     assert_eq!(reason_in(&observer).await, "");
     assert_eq!((h.fake.logins(), h.fake.failed_logins()), (1, 0));
+}
+
+async fn waiting_on(observer: &tokio_postgres::Client, pattern: &str) -> bool {
+    let waiting: i64 = observer
+        .query_one(
+            "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE $1",
+            &[&pattern],
+        )
+        .await
+        .expect("pg_stat_activity")
+        .get(0);
+    waiting > 0
+}
+
+#[tokio::test]
+async fn a_pause_the_database_did_not_take_is_recorded_once_the_row_is_free() {
+    let Some((database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    h.fake.set_password(CHANGED_PASSWORD);
+    let observer = admin(&database.url).await;
+    let runs_holder = admin(&database.url).await;
+    runs_holder
+        .batch_execute("BEGIN; LOCK TABLE cycle_runs IN SHARE ROW EXCLUSIVE MODE")
+        .await
+        .expect("hold cycle_runs");
+    let first = spawn_run(&h.monitor);
+    let reached_the_cycle = eventually(|| waiting_on(&observer, "INSERT INTO cycle_runs%")).await;
+    let account_holder = admin(&database.url).await;
+    account_holder
+        .batch_execute("BEGIN; SELECT id FROM accounts FOR NO KEY UPDATE")
+        .await
+        .expect("hold the account row");
+    runs_holder
+        .batch_execute("ROLLBACK")
+        .await
+        .expect("release");
+    let write_blocked = eventually(|| waiting_on(&observer, PAUSE_WRITE)).await;
+    let write_failed = eventually(|| async { !waiting_on(&observer, PAUSE_WRITE).await }).await;
+
+    let retry = h.clock.next_sleep().await;
+    let reason_while_held = reason_in(&observer).await;
+    account_holder
+        .batch_execute("ROLLBACK")
+        .await
+        .expect("release");
+    h.clock.advance(retry.duration);
+    retry.fire.send(()).expect("the monitor is waiting");
+    let landed = eventually(|| async { !reason_in(&observer).await.is_empty() }).await;
+    let more_retries = fire_pending_sleeps(&h, 3).await;
+    let paused = h.monitor.state();
+    drop(first);
+    let restarted = another_monitor(&h);
+    let _second = spawn_run(&restarted);
+    let restarted_held = held(&restarted).await;
+
+    assert!(reached_the_cycle, "the cycle never reached cycle_runs");
+    assert!(
+        write_blocked && write_failed,
+        "the pause never ran into the lock"
+    );
+    assert_eq!(reason_while_held, "");
+    assert_eq!(retry.duration, Duration::from_secs(30));
+    assert!(landed, "the pause reason never landed");
+    assert_eq!(more_retries, 0);
+    assert!(paused.paused && !paused.held, "{paused:?}");
+    assert_eq!(reason_in(&observer).await, paused.paused_reason);
+    assert!(restarted_held, "the restarted monitor did not hold");
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (0, 1));
 }

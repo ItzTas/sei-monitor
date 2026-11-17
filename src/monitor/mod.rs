@@ -128,6 +128,7 @@ struct Inner {
     prepared: Option<Prepared>,
     logins: u64,
     reason_to_clear: bool,
+    pause_unrecorded: bool,
     state: State,
 }
 
@@ -177,6 +178,7 @@ impl Monitor {
                 prepared: None,
                 logins: 0,
                 reason_to_clear: false,
+                pause_unrecorded: false,
                 state,
             }),
         })

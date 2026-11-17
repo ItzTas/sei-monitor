@@ -96,7 +96,10 @@ impl Monitor {
                     }
                     trigger = Trigger::Manual;
                 }
-                Standing::Paused => return self.stop_requested().await,
+                Standing::Paused => {
+                    self.unless_stopped(self.record_the_pause()).await;
+                    return self.stop_requested().await;
+                }
             }
             let outcome = self.run_once(trigger).await;
             if matches!(outcome, Err(MonitorError::Canceled)) {
@@ -299,6 +302,7 @@ impl Monitor {
             self.record_event(account_id, now, event)
         );
         if let Err(failure) = paused {
+            self.inner().pause_unrecorded = true;
             error!(error = &failure as &dyn Error, "could not record the pause");
         }
         if let Err(failure) = recorded {
@@ -307,6 +311,28 @@ impl Monitor {
                 "could not record the login failure event"
             );
         }
+    }
+
+    async fn record_the_pause(&self) {
+        let mut failures = 0u32;
+        while let Some((account_id, reason)) = self.unrecorded_pause() {
+            failures = failures.saturating_add(1);
+            self.clock
+                .sleep(backoff(failures, self.config.poll_interval, &*self.jitter))
+                .await;
+            let Err(failure) = self.store.set_paused_reason(account_id, &reason).await else {
+                self.inner().pause_unrecorded = false;
+                continue;
+            };
+            warn!(error = &failure as &dyn Error, "could not record the pause");
+        }
+    }
+
+    fn unrecorded_pause(&self) -> Option<(i64, String)> {
+        let inner = self.inner();
+        inner
+            .pause_unrecorded
+            .then(|| (inner.state.account_id, inner.state.paused_reason.clone()))
     }
 
     fn mark_paused(&self, reason: &str) -> i64 {

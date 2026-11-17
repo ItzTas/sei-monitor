@@ -11,7 +11,8 @@ use sei_monitor::store::{AccountKey, CycleRun, Store, Trigger};
 use tokio::task::JoinHandle;
 
 use support::fake_sei::{
-    FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN_PAGE, ROUTE_PROCESSES, ROUTE_VERSION, USERNAME,
+    FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_LOGIN_PAGE, ROUTE_PROCESSES, ROUTE_VERSION,
+    USERNAME,
 };
 use support::harness::{
     FIFTEEN_MINUTES, Harness, bounded, config, database_store, no_jitter, populate,
@@ -560,14 +561,57 @@ async fn a_check_with_the_password_fixed_resumes_monitoring() {
 }
 
 #[tokio::test]
-async fn a_failed_check_keeps_the_recorded_rejection_on_hold() {
+async fn a_login_accepted_by_a_check_clears_the_rejection_even_when_the_cycle_fails() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    record_rejection(&h).await;
+    h.fake.fail_next(ROUTE_PROCESSES, 502, 1);
+    let _run = spawn_run(&h.monitor);
+    let was_held = held(&h.monitor).await;
+
+    let checked = h.monitor.trigger_cycle();
+    let retry = h.clock.next_sleep().await;
+    let failed = (last_run(&h).await, h.monitor.state());
+    let reason_after_the_failure = stored_reason(&h).await;
+    let logins_after_the_failure = (h.fake.logins(), h.fake.failed_logins());
+    h.clock.advance(retry.duration);
+    retry.fire.send(()).expect("the monitor is waiting");
+    let scheduled = h.clock.next_sleep().await;
+
+    assert!(was_held, "the monitor did not start held");
+    assert_eq!(checked, Ok(()));
+    let (failed_run, failed_state) = failed;
+    assert_eq!(failed_run.trigger, Trigger::Manual);
+    assert!(failed_run.error.contains("HTTP 502"), "{failed_run:?}");
+    assert_eq!(
+        (
+            failed_state.paused,
+            failed_state.held,
+            failed_state.paused_reason.as_str()
+        ),
+        (false, false, "")
+    );
+    assert_eq!(reason_after_the_failure.as_deref(), Some(""));
+    assert_eq!(logins_after_the_failure, (1, 0));
+    assert_eq!(retry.duration, Duration::from_secs(30));
+    assert_eq!(scheduled.duration, FIFTEEN_MINUTES);
+    let run = last_run(&h).await;
+    assert_eq!((run.trigger, run.error.as_str()), (Trigger::Scheduled, ""));
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (1, 0));
+}
+
+#[tokio::test]
+async fn a_check_whose_login_gets_no_verdict_keeps_the_rejection_on_hold() {
     let Some((_database, store)) = database_store().await else {
         return;
     };
     let h = Harness::new(&store, |_| {});
     populate(&h.fake);
     let reason = record_rejection(&h).await;
-    h.fake.fail_next(ROUTE_PROCESSES, 502, 1);
+    h.fake.fail_next(ROUTE_LOGIN, 502, 1);
     let _run = spawn_run(&h.monitor);
     let was_held = held(&h.monitor).await;
 
@@ -592,7 +636,8 @@ async fn a_failed_check_keeps_the_recorded_rejection_on_hold() {
         (true, true, reason.as_str())
     );
     assert_eq!(stored_reason(&h).await, Some(reason));
-    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (1, 0));
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), 1);
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (0, 0));
     assert_eq!(
         too_soon,
         Err(TriggerError::TooSoon {

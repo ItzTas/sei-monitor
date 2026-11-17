@@ -341,7 +341,7 @@ impl Monitor {
         changes.finished_at = self.clock.now();
         let inserted = self.store.apply_cycle(&changes).await?;
         let baseline = changes.baseline;
-        self.after_success(account_id, baseline, started).await;
+        self.after_success(baseline, started);
         self.prune(account_id, started).await;
         let result = CycleResult {
             processes_seen,
@@ -401,6 +401,7 @@ impl Monitor {
         account: &Account,
     ) -> Result<(Session, Vec<Observation>), MonitorError> {
         let session = client.session().await?;
+        self.accept_login(account.id).await;
         let listing = async {
             let units = session.select_units(&self.config.units, self.config.all_units)?;
             self.remember_session(&session, &units);
@@ -443,28 +444,39 @@ impl Monitor {
         };
     }
 
-    async fn after_success(&self, account_id: i64, baseline: bool, started: DateTime<Utc>) {
-        if !self.forget_pause(baseline, started) {
-            return;
-        }
-        if let Err(error) = self.store.set_paused_reason(account_id, "").await {
-            warn!(
-                error = &error as &dyn Error,
-                "could not clear the pause reason"
-            );
+    async fn accept_login(&self, account_id: i64) {
+        if self.forget_rejection() {
+            self.clear_recorded_reason(account_id).await;
         }
     }
 
-    fn forget_pause(&self, baseline: bool, started: DateTime<Utc>) -> bool {
+    fn forget_rejection(&self) -> bool {
         let mut inner = self.inner();
-        inner.state.paused_reason.clear();
         let Some(prepared) = inner.prepared.as_mut() else {
             return false;
         };
-        if baseline {
+        if std::mem::take(&mut prepared.account.paused_reason).is_empty() {
+            return false;
+        }
+        inner.state.paused_reason.clear();
+        true
+    }
+
+    async fn clear_recorded_reason(&self, account_id: i64) {
+        let Err(error) = self.store.set_paused_reason(account_id, "").await else {
+            return;
+        };
+        warn!(
+            error = &error as &dyn Error,
+            "could not clear the pause reason"
+        );
+    }
+
+    fn after_success(&self, baseline: bool, started: DateTime<Utc>) {
+        let mut inner = self.inner();
+        if baseline && let Some(prepared) = inner.prepared.as_mut() {
             prepared.account.baseline_at = Some(started);
         }
-        !std::mem::take(&mut prepared.account.paused_reason).is_empty()
     }
 
     fn elapsed_since(&self, started: DateTime<Utc>) -> String {

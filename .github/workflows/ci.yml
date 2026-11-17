@@ -20,22 +20,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
 
-      - name: gofmt
-        run: test -z "$(gofmt -l .)"
+      - uses: Swatinem/rust-cache@v2.9.3
 
-      - name: go vet
-        run: go vet ./...
+      - name: cargo fmt
+        run: cargo fmt --check
 
-      - name: sqlc output is up to date
-        run: go tool sqlc generate && git diff --exit-code -- internal/db
-
-      - uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.15
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
     name: Tests (Postgres)
@@ -54,25 +48,27 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
-      rabbitmq:
-        image: rabbitmq:4-alpine
-        ports:
-          - 5672:5672
-        options: >-
-          --health-cmd "rabbitmq-diagnostics -q ping"
-          --health-interval 5s
-          --health-timeout 10s
-          --health-retries 20
     env:
       TEST_DATABASE_URL: postgres://sei_monitor:sei_monitor@localhost:5432/sei_monitor?sslmode=disable
-      TEST_AMQP_URL: amqp://guest:guest@localhost:5672/
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
 
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: 1.27.2
+          cache: false
 
-      - name: go test
-        run: go test -race ./...
+      - name: Install the conformance command
+        run: |
+          GOBIN="$RUNNER_TEMP/bin" go install github.com/ItzTas/monitor-hub/sdk/cmd/plugin-conformance@v0.2.1
+          echo "PLUGIN_CONFORMANCE=$RUNNER_TEMP/bin/plugin-conformance" >> "$GITHUB_ENV"
 
+      - uses: Swatinem/rust-cache@v2.9.3
+
+      - name: cargo test
+        run: cargo test --locked

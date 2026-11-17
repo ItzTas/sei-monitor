@@ -387,7 +387,7 @@ async fn a_failing_cycle_shows_in_status_until_one_succeeds() {
     let deadline = Instant::now() + PREPARATION_RETRY_LIMIT;
     let recovered = loop {
         let status = client.status().await.expect("status");
-        if status.last_success_at.is_some() {
+        if status.last_success_at.is_some() && status.state != i32::from(State::Checking) {
             break status;
         }
         if Instant::now() >= deadline {

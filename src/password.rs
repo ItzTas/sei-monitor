@@ -280,7 +280,7 @@ fn without_secrets(
 }
 
 pub(crate) fn is_secret_name(name: &str) -> bool {
-    const SECRETS: [&str; 9] = [
+    const SECRETS: [&str; 10] = [
         "SEI_PASSWORD",
         "FEED_TOKEN",
         "API_TOKEN",
@@ -290,9 +290,11 @@ pub(crate) fn is_secret_name(name: &str) -> bool {
         "WEBHOOK_SECRET",
         "POSTGRES_PASSWORD",
         "DATABASE_URL",
+        "AMQP_URL",
     ];
     let upper = to_upper(name);
-    let base = upper.strip_suffix("_FILE").unwrap_or(&upper);
+    let unprefixed = upper.rsplit("__").next().unwrap_or(&upper);
+    let base = unprefixed.strip_suffix("_FILE").unwrap_or(unprefixed);
     let base = base.strip_suffix("_CMD").unwrap_or(base);
     SECRETS.contains(&base)
 }
@@ -774,7 +776,41 @@ mod tests {
             let kept: Vec<String> = without_secrets(vars)
                 .map(|(_, entry)| entry.into_string().unwrap())
                 .collect();
-            assert_eq!(kept, case.kept, "environ {:?}", case.environ);
+            let expected: Vec<String> = case
+                .kept
+                .iter()
+                .filter(|entry| !entry.starts_with("AMQP_URL="))
+                .cloned()
+                .collect();
+            assert_eq!(kept, expected, "environ {:?}", case.environ);
+        }
+    }
+
+    #[test]
+    fn prefixed_secrets_and_the_broker_address_are_secret() {
+        let secret = [
+            "AMQP_URL",
+            "AMQP_URL_FILE",
+            "SEI__SEI_PASSWORD",
+            "SEI__SEI_PASSWORD_CMD",
+            "SEI__DATABASE_URL",
+            "DIARIO__DATABASE_URL_FILE",
+            "hub__amqp_url",
+            "A__B__API_TOKEN",
+        ];
+        let kept = [
+            "SEI__SEI_URL",
+            "SEI__SEI_PASSWORDS",
+            "SEI__",
+            "__PATH",
+            "SEI_PASSWORD__X",
+            "AMQP_URLS",
+        ];
+        for name in secret {
+            assert!(is_secret_name(name), "{name}");
+        }
+        for name in kept {
+            assert!(!is_secret_name(name), "{name}");
         }
     }
 }

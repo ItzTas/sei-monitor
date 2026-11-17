@@ -14,8 +14,8 @@ use sei_monitor::secret::Secret;
 use sei_monitor::store::{AccountKey, Store, WRITER_LOCK_ID, acquire_writer_lock};
 
 use support::fake_sei::{
-    FakeSei, ORG_ACRONYM, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_PROCESSES, ROUTE_VERSION, TIME_ZONE,
-    UNIT_NUPROC, USERNAME,
+    FakeSei, ORG_ACRONYM, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_LOGIN_PAGE, ROUTE_PROCESSES,
+    ROUTE_VERSION, TIME_ZONE, UNIT_NUPROC, USERNAME,
 };
 use support::harness::{Harness, populate, process, start};
 use support::process::{
@@ -30,6 +30,8 @@ const PATIENCE: Duration = Duration::from_secs(20);
 const POLL: Duration = Duration::from_millis(20);
 const STAY_UP: Duration = Duration::from_secs(3);
 const CLOSE_LIMIT: Duration = Duration::from_millis(700);
+const FIRST_RETRY: Duration = Duration::from_secs(30);
+const PREPARATION_RETRY_LIMIT: Duration = Duration::from_secs(45);
 const REJECTED: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
 const GO_PAUSE: &str = "monitoring is paused because SEI rejected the login; restart sei-monitor after fixing the configuration";
 const HELD: &str = "nothing is logging in: request a check once the configuration is fixed";
@@ -331,15 +333,28 @@ async fn a_fatal_configuration_keeps_the_plugin_up() {
     let failing = status_where(
         &mut plugin,
         &mut client,
-        "the preparation stops",
+        "the preparation fails",
         |status| status.message.starts_with("agency not found"),
     )
     .await;
     assert_eq!(failing.state, i32::from(State::Failing));
-    tokio::time::sleep(STAY_UP.saturating_sub(started.elapsed())).await;
+    let deadline = started + PREPARATION_RETRY_LIMIT;
+    while fake.calls(ROUTE_LOGIN_PAGE) < 2 {
+        if Instant::now() >= deadline {
+            plugin.fail("the preparation was never tried again");
+        }
+        tokio::time::sleep(POLL).await;
+    }
+    let retried = client.status().await.expect("status");
 
     assert!(plugin.still_running(), "{}", plugin.stderr_text());
-    assert_eq!(fake.calls(ROUTE_LOGIN), 0);
+    assert!(started.elapsed() >= FIRST_RETRY, "{:?}", started.elapsed());
+    assert_eq!(retried.state, i32::from(State::Failing));
+    assert!(
+        retried.message.starts_with("agency not found"),
+        "{retried:?}"
+    );
+    assert_eq!((fake.logins(), fake.failed_logins()), (0, 0));
     drop(client);
     stop_cleanly(&mut plugin).await;
 }

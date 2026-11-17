@@ -10,7 +10,9 @@ use sei_monitor::secret::Secret;
 use sei_monitor::store::{AccountKey, CycleRun, Store, Trigger};
 use tokio::task::JoinHandle;
 
-use support::fake_sei::{FakeSei, ORG_ID, PASSWORD, ROUTE_PROCESSES, USERNAME};
+use support::fake_sei::{
+    FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN_PAGE, ROUTE_PROCESSES, ROUTE_VERSION, USERNAME,
+};
 use support::harness::{
     FIFTEEN_MINUTES, Harness, bounded, config, database_store, no_jitter, populate,
 };
@@ -308,23 +310,90 @@ async fn run_waits_for_a_disabled_module() {
 }
 
 #[tokio::test]
-async fn run_stops_preparing_on_an_unknown_agency() {
+async fn an_unknown_agency_fails_and_is_tried_again_after_each_back_off() {
     let fake = FakeSei::start();
     let mut monitor_config = config(&fake, PASSWORD);
     monitor_config.target.org = "NOPE".to_owned();
     let h = Harness::with(fake, store_that_never_connects(), monitor_config);
 
-    bounded(tokio::spawn(Arc::clone(&h.monitor).run()))
-        .await
-        .expect("join the run task");
+    let (attempts, logs) = captured(async {
+        let _run = spawn_run(&h.monitor);
+        let mut attempts = Vec::new();
+        for _ in 0..3 {
+            let retry = h.clock.next_sleep().await;
+            let state = h.monitor.state();
+            attempts.push((retry.duration, h.fake.calls(ROUTE_LOGIN_PAGE), state));
+            h.clock.advance(retry.duration);
+            retry.fire.send(()).expect("the monitor is waiting");
+        }
+        h.clock.next_sleep().await;
+        attempts
+    })
+    .await;
 
-    let state = h.monitor.state();
-    let fatal = state.fatal.expect("a fatal error");
+    let waits: Vec<(Duration, usize)> = attempts
+        .iter()
+        .map(|(wait, pages, _)| (*wait, *pages))
+        .collect();
+    assert_eq!(
+        waits,
+        [
+            (Duration::from_secs(30), 1),
+            (minutes(1), 2),
+            (minutes(2), 3)
+        ]
+    );
+    for (_, _, state) in &attempts {
+        let fatal = state.fatal.as_deref().expect("a fatal error");
+        assert!(
+            fatal.starts_with(r#"agency not found on the SEI login page: "NOPE" ("#),
+            "{fatal}"
+        );
+        assert_eq!(state.account_id, 0);
+    }
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (0, 0));
+    let reported = messages(
+        &logs,
+        "sei-monitor cannot monitor SEI with this configuration; trying again with a back-off",
+    );
+    assert_eq!(reported.len(), 1, "{logs:?}");
+}
+
+#[tokio::test]
+async fn a_maintenance_page_while_preparing_is_tried_again_until_sei_answers() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    h.fake.respond_next(
+        ROUTE_VERSION,
+        503,
+        &[("content-type", "text/html")],
+        b"<html><body>Sistema em manutencao</body></html>".to_vec(),
+    );
+    let _run = spawn_run(&h.monitor);
+
+    let retry = h.clock.next_sleep().await;
+    let failing = h.monitor.state();
+    let logins_while_failing = (h.fake.logins(), h.fake.failed_logins());
+    h.clock.advance(retry.duration);
+    retry.fire.send(()).expect("the monitor is waiting");
+    let scheduled = h.clock.next_sleep().await;
+
+    assert_eq!(retry.duration, Duration::from_secs(30));
+    let fatal = failing.fatal.as_deref().expect("a fatal error");
     assert!(
-        fatal.contains(r#"agency not found on the SEI login page: "NOPE""#),
+        fatal.starts_with("the mod-wssei module was not found on this SEI: tried "),
         "{fatal}"
     );
-    assert_eq!(state.account_id, 0);
+    assert_eq!(logins_while_failing, (0, 0));
+    assert_eq!(scheduled.duration, FIFTEEN_MINUTES);
+    let state = h.monitor.state();
+    assert_eq!((state.fatal, state.prepare_error), (None, None));
+    let run = last_run(&h).await;
+    assert_eq!((run.error.as_str(), run.processes_seen), ("", 2));
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (1, 0));
 }
 
 #[tokio::test]

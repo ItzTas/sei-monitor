@@ -222,39 +222,49 @@ impl Monitor {
                 return Readiness::Stopped;
             };
             let Err(failure) = prepared else {
-                self.inner().state.prepare_error = None;
+                let mut inner = self.inner();
+                inner.state.prepare_error = None;
+                inner.state.fatal = None;
                 return Readiness::Ready;
             };
+            failures = failures.saturating_add(1);
+            let wait = backoff(failures, self.config.poll_interval, &*self.jitter);
             match prepare_failure(&failure) {
-                PrepareFailure::Retry => {}
-                PrepareFailure::Fatal => {
-                    self.give_up(&failure);
-                    return Readiness::Stopped;
-                }
+                PrepareFailure::Retry => self.retry_preparation(&failure, wait),
+                PrepareFailure::Fatal => self.report_configuration(&failure),
                 PrepareFailure::Rejected(rejection) => {
                     self.pause(rejection).await;
                     return Readiness::Paused;
                 }
             }
-            failures = failures.saturating_add(1);
-            let wait = backoff(failures, self.config.poll_interval, &*self.jitter);
-            self.inner().state.prepare_error = Some(failure.to_string());
-            warn!(
-                error = &failure as &dyn Error,
-                retry_in = %go_seconds(wait),
-                "could not reach SEI; trying again"
-            );
             if self.unless_stopped(self.clock.sleep(wait)).await.is_none() {
                 return Readiness::Stopped;
             }
         }
     }
 
-    fn give_up(&self, failure: &MonitorError) {
-        self.inner().state.fatal = Some(failure.to_string());
+    fn retry_preparation(&self, failure: &MonitorError, wait: Duration) {
+        {
+            let mut inner = self.inner();
+            inner.state.fatal = None;
+            inner.state.prepare_error = Some(failure.to_string());
+        }
+        warn!(
+            error = failure as &dyn Error,
+            retry_in = %go_seconds(wait),
+            "could not reach SEI; trying again"
+        );
+    }
+
+    fn report_configuration(&self, failure: &MonitorError) {
+        let text = failure.to_string();
+        let previous = self.inner().state.fatal.replace(text.clone());
+        if previous.as_deref() == Some(text.as_str()) {
+            return;
+        }
         error!(
             error = failure as &dyn Error,
-            "sei-monitor cannot monitor SEI with this configuration; fix it and restart sei-monitor"
+            "sei-monitor cannot monitor SEI with this configuration; trying again with a back-off"
         );
     }
 

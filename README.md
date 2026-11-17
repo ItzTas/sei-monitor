@@ -1,12 +1,17 @@
 # sei-monitor
 
-sei-monitor watches your processes on SEI and tells you when something changes. It logs in with
-your own SEI account through SEI's REST module (`mod-wssei`), checks the processes of your units
-every few minutes and turns what changed into events. You can read them in an RSS feed or a JSON
-API, or get them by email, Telegram, ntfy, webhook, AMQP (RabbitMQ) or WhatsApp.
+sei-monitor watches your processes on SEI. It logs in with your own SEI account through SEI's REST
+module (`mod-wssei`), checks the processes of your units every few minutes and records what
+changed as events.
 
-It is self-hosted. It runs on your own machine or server, keeps its data in Postgres, and
-talks only to your SEI and to the channels you turn on. The name is provisional.
+It is a plugin for monitor-hub and does not run on its own. The hub starts it, reads its events
+and sends the notifications through the hub's channels (email, Telegram, ntfy, webhook, AMQP,
+WhatsApp, the feed). The plugin keeps its data in its own Postgres database and talks only to your
+SEI and to that database.
+
+Release `1.0.0` was a standalone service with its own notifications, feed, API and web page. That
+code is gone. Its image, `ghcr.io/itztas/sei-monitor:1.0.0`, is still the way back (see
+[Switching between the Go release and the plugin](#switching-between-the-go-release-and-the-plugin)).
 
 ## What it reports
 
@@ -21,393 +26,350 @@ talks only to your SEI and to the channels you turn on. The name is provisional.
 | `return_overdue` | A scheduled return is overdue. |
 | `account_login_failed` | SEI refused the login, so monitoring paused (see [When SEI refuses the login](#when-sei-refuses-the-login)). |
 
-The very first check only takes note of what is already there. You won't get a message for every
-process you had before you installed sei-monitor; reports start with the second check.
+`account_login_failed` and `return_overdue` reach the hub as urgent, the rest as info.
 
-## Before you start
+The first check of a new account only takes note of what is already there. You don't get a
+message for every process you had before; reports start with the second check.
 
-- Your SEI needs the `mod-wssei` module turned on. The `orgs` and `test-login` commands tell you
-  whether it answers.
-- Docker with Compose, or Go 1.27 to build from source.
+## How monitor-hub runs it
 
-## Quick start with Docker
+The image `ghcr.io/itztas/sei-monitor` holds two files: `/plugin/plugin.json` and the static binary
+`/plugin/sei-monitor`, built for amd64 and arm64. The hub's `plugins.json` names the image, and the
+hub's image build copies `/plugin/` to `/opt/monitor-hub/plugins/sei/`. The manifest tells the hub
+to run `sei-monitor plugin`:
 
-1. Copy the example configuration, `cp .env.example .env`, and set `POSTGRES_PASSWORD` in it.
-2. Set `SEI_URL` and list the agencies to find yours:
-   `docker compose run --rm sei-monitor orgs`.
-3. Fill in `SEI_USERNAME`, `SEI_ORG` and the password (see [Passwords](#passwords)).
-4. Check the login: `docker compose run --rm sei-monitor test-login`. It shows the SEI and module
-   versions and your units, and never the session token.
-5. Create the tokens for the feed and the API, running the command once for each:
-   `docker compose run --rm sei-monitor generate-token`.
-6. Turn on the channels you want in `.env` and try them:
-   `docker compose run --rm sei-monitor send-test`.
-7. Start it: `docker compose up -d`, and follow the logs with `docker compose logs -f sei-monitor`.
-
-Compose pulls the published image, `ghcr.io/itztas/sei-monitor`, and starts a Postgres next to it.
-The data stays in the `postgres` volume. sei-monitor waits for the database to accept connections
-and creates its tables on the first start. `docker compose up -d --build` builds the image from
-your checkout instead.
-
-### Coming from a SQLite install
-
-Installs that kept their data in SQLite have to start over on Postgres. The first check only takes
-note of what is already there, so you won't get a flood of old events. Pair the WhatsApp number
-again with `whatsapp-pair`.
-
-### Running on a server
-
-The server needs only `compose.yaml` and your `.env`. Every push to `main` publishes
-`ghcr.io/itztas/sei-monitor:latest` for amd64 and arm64, and a `v1.2.3` tag also publishes `1.2.3`
-and `1.2`. To update to the newest image:
-
-```sh
-docker compose pull
-docker compose up -d
+```json
+{"protocol_version":1,"name":"sei","command":["sei-monitor","plugin"],"apk":[]}
 ```
 
-To stay on a release rather than follow `main`, put its tag in the `image` line of `compose.yaml`,
-for example `ghcr.io/itztas/sei-monitor:1.2`.
+The plugin needs no Alpine package. It carries its own TLS roots and time zone table.
 
-## Running without Docker
+Set the plugin's variables in the hub's `.env` with the `SEI__` prefix: `SEI__SEI_URL`,
+`SEI__DATABASE_URL` and so on. The hub gives the plugin only the variables with that prefix, with
+the prefix removed, plus its own `PATH`, `TZ`, `TMPDIR` and `MONITOR_HUB_DATA_DIR`. A misspelled
+name is not an error: the plugin never sees it.
 
-With Go 1.27 installed, `make local` runs `serve` with the variables from `.env`, the same file
-Compose reads. Pass another command in `CMD`, as in `make local CMD=test-login` or
-`make local CMD=send-test`. A variable already set in your shell takes precedence over the file, so
-`LOG_LEVEL=debug make local` works. `make dev` runs it with hot reload and rebuilds on every change.
+Run the image by hand and it prints that the hub did not launch it, then exits with code 1.
 
-Outside Compose, point `DATABASE_URL` at a Postgres server you run yourself; the commented line in
-`.env.example` shows the shape. `HTTP_ADDRESS` is used as written, so `:8080` listens on every
-interface; use `127.0.0.1:8080` to keep it on your machine. `SEI_PASSWORD_CMD` fits best here,
-since tools such as `secret-tool` have the desktop session they need.
-
-## Passwords
-
-Set exactly one of these:
-
-- `SEI_PASSWORD`: the simplest, and the least safe. Anyone who can inspect the process or the
-  container can read environment variables.
-- `SEI_PASSWORD_FILE`: the path of a file that holds the password, such as a Docker secret.
-- `SEI_PASSWORD_CMD`: a command that prints the password, for example `pass show sei/monitor`.
-  sei-monitor runs it at every login, without a shell, with a 30-second limit, and without passing
-  on its own secret variables. Tools such as `secret-tool` need a D-Bus session, which a container
-  doesn't have, so this option fits best when sei-monitor runs outside Docker.
-
-Every secret variable accepts the same `_FILE` form: `SEI_PASSWORD`, `DATABASE_URL`, `FEED_TOKEN`,
-`API_TOKEN`, `SMTP_PASSWORD`, `TELEGRAM_TOKEN`, `NTFY_TOKEN`, `WEBHOOK_SECRET` and `AMQP_URL`.
-
-A Docker secret for the password looks like this in `compose.yaml`:
-
-```yaml
-services:
-  sei-monitor:
-    environment:
-      SEI_PASSWORD_FILE: /run/secrets/sei_password
-    secrets:
-      - sei_password
-
-secrets:
-  sei_password:
-    file: ./sei_password.txt
-```
-
-The image runs as user 65532, so that user must be able to read the file.
-
-The session token SEI hands out after the login is a credential too. sei-monitor keeps it only in
-memory, never in the database, a file, a log or a message.
+The hub's API shows the plugin in `GET /api/plugins` (state and message) and starts a check with
+`POST /api/plugins/sei/check`. A check is refused while one is running and within 5 minutes of the
+last one. The hub's own deploy guide (`docs/deploy.md` in the monitor-hub repository) is the full
+runbook for moving the old service onto the hub.
 
 ## Configuration
 
-`.env.example` documents every variable. In short:
-
 | Variable | Default | What it does |
 |---|---|---|
-| `SEI_URL` | | SEI address, without `/sei` at the end. |
+| `DATABASE_URL` | | Required, secret. `postgres://user:password@host/database`. The plugin connects without TLS. `DATABASE_URL_FILE` reads it from a file. |
+| `SEI_URL` | | Required. SEI address, without `/sei` at the end. Must be https; plain http works only for localhost. |
 | `SEI_API_URL` | discovered | Address of the `mod-wssei` API, only if the discovery fails. |
-| `SEI_USERNAME` | | Your SEI login. |
-| `SEI_PASSWORD`, `_FILE`, `_CMD` | | The password; set exactly one. |
-| `SEI_ORG` | | Agency acronym or id, as `orgs` lists them. |
+| `SEI_USERNAME` | | Required. Your SEI login. |
+| `SEI_PASSWORD`, `_FILE`, `_CMD` | | Required, secret. Set exactly one (see [Passwords](#passwords)). |
+| `SEI_ORG` | | Required. Agency acronym or id, as `orgs` lists them. |
 | `SEI_UNITS` | your current unit | Unit acronyms separated by commas, or `all`. |
-| `SEI_TIMEZONE` | `America/Sao_Paulo` | Time zone of the dates SEI shows. |
-| `POLL_INTERVAL` | `15m` | Time between checks, at least `5m`. |
+| `SEI_TIMEZONE` | `America/Sao_Paulo` | Time zone of the dates SEI shows. Roraima uses `America/Boa_Vista`. |
 | `SEI_CONCURRENCY` | `3` | Simultaneous calls to SEI, from 1 to 10. |
-| `DATABASE_URL` | | Required. `postgres://user:password@host/database`. Compose builds it from `POSTGRES_PASSWORD`. |
-| `POSTGRES_PASSWORD` | | Password of the Postgres that Compose starts. |
-| `HTTP_ADDRESS` | `:8080` | Address of the HTTP server; empty turns it off. |
-| `PUBLIC_URL` | | Public address behind nginx, used only for the feed's link to itself. |
-| `FEED_TOKEN` | | Turns on the RSS feed. At least 32 characters. |
-| `API_TOKEN` | | Turns on the JSON API and the web interface. At least 32 characters, different from `FEED_TOKEN`. |
-| `NOTIFICATION_DETAIL` | `minimal` | Detail of the feed and the messages: `minimal` or `full`. |
-| `API_DETAIL` | `NOTIFICATION_DETAIL` | Detail of the API: `minimal` or `full`. |
-| `RETURN_WARNING_DAYS` | `2` | How early to warn about a scheduled return. |
-| `RETENTION_DAYS` | `90` | How many days to keep events and the processes that left your units. Use at least `RETURN_WARNING_DAYS` + 2, or `0` to keep them forever. |
+| `POLL_INTERVAL` | `15m` | Time between checks, at least `5m`. |
+| `RETURN_WARNING_DAYS` | `2` | How many days before a scheduled return to warn, from 0 to 60. |
+| `RETENTION_DAYS` | `90` | How many days to keep events and the processes that left your units, up to 3650. Use at least `RETURN_WARNING_DAYS` + 2, or `0` to keep everything. |
+| `NOTIFICATION_DETAIL` | `minimal` | `minimal` or `full`, see [Detail level](#detail-level). |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
-| `SMTP_*`, `TELEGRAM_*`, `NTFY_*`, `WEBHOOK_*`, `AMQP_*`, `WHATSAPP_RECIPIENTS` | | The channels, below. |
 
-## Reading the events
+A bad value stops the plugin at start-up with one `fatal` line in the hub's log that lists every
+problem at once. The hub then restarts it with a back-off until the configuration is fixed.
 
-### RSS feed
+Keep `SEI_URL`, `SEI_USERNAME` and `SEI_ORG` stable. Together they identify the account in the
+database. A change starts a new account, and its first check is a silent baseline.
 
-With `FEED_TOKEN` set, the feed lives at `/feed/<FEED_TOKEN>.xml` and holds the latest 100 events.
-The token is the feed's only protection, so treat the address like a password. A wrong token gets
-the same 404 as any unknown page, and sei-monitor's own access log masks the token. If you set
-`PUBLIC_URL`, the feed links to itself, which puts its full address, token included, inside the
-feed.
+### Passwords
 
-### JSON API
+Set exactly one of these:
 
-With `API_TOKEN` set, these routes answer to `Authorization: Bearer <API_TOKEN>`:
+- `SEI_PASSWORD`: the simplest, and the least safe. Anyone who can inspect the hub's container can
+  read its environment.
+- `SEI_PASSWORD_FILE`: the path of a file that holds the password, such as a Docker secret mounted
+  into the hub's container. The plugin reads it once, at start-up. The hub runs as user 65532, so
+  that user must be able to read the file.
+- `SEI_PASSWORD_CMD`: a command that prints the password. The plugin runs it at every login,
+  without a shell, with a 30-second limit, and without the secret variables in its environment. Its
+  program must exist inside the hub's image, which has no password manager; start-up refuses a
+  program it cannot find on `PATH`.
 
-| Route | What it returns |
-|---|---|
-| `GET /status` | The agency, the watched units, the SEI versions, the latest check, the next one and the deliveries per channel. |
-| `GET /processes` | The processes in your units. Filters: `unit`, `assigned_to_me`, `return_scheduled`, `return_overdue`, `include_left`. |
-| `GET /processes/{procedure_id}` | One process, the documents sei-monitor has seen in it and its latest 50 events. |
-| `GET /events` | The events, newest first. Filters: `kind` (repeatable), `procedure_id`, `since`, `until`. |
-| `GET /deliveries` | The deliveries per channel. Filters: `status`, `channel`. |
-| `POST /cycle` | Starts a check now. |
-| `GET /openapi.json` | The OpenAPI document. It needs no token. |
-
-```sh
-curl -H "Authorization: Bearer $API_TOKEN" https://example.org/api/v1/status
-curl -H "Authorization: Bearer $API_TOKEN" "https://example.org/api/v1/events?kind=document_added&limit=20"
-```
-
-Lists come as `{"items": [...], "next_cursor": "..."}`. Pass `next_cursor` back as `cursor` to read
-the next page; it is `null` on the last one. `limit` goes from 1 to 200 and defaults to 50. Errors
-use the `application/problem+json` format. `POST /cycle` answers 202 when the check starts, 409
-while a check is running, while monitoring is paused or before sei-monitor first reaches SEI, and
-429 with `Retry-After` when the last check started less than 5 minutes ago.
-
-[`docs/openapi.json`](docs/openapi.json) describes every route and field.
-
-### Web interface
-
-With `API_TOKEN` set, sei-monitor also serves a page at `/ui/` that lists the latest 50 events and
-refreshes the list every minute. Sign in with the `API_TOKEN`, and the browser keeps a session
-cookie for 7 days. The cookie carries a signature made with the token, so the browser never stores
-the token itself. Changing `API_TOKEN` signs every browser out; signing out on the page only clears
-the cookie in the browser you're using.
-
-The cookie is marked `Secure`, so open the page over HTTPS or on `localhost`. Browsers refuse it on
-plain HTTP to any other address, and signing in then sends you straight back to the form. With the
-nginx setup below, the page is at `https://example.org/api/v1/ui/`. It shows the events at the
-API's detail level (`API_DETAIL`).
+The session token SEI hands out after the login is a credential too. The plugin keeps it only in
+memory.
 
 ### Detail level
 
 At the `minimal` level, events carry the event type, the process number, the unit and the date.
 `full` adds the process type and description, the activity text, the document name and who did
-what. Choose it only if you are fine with that content passing through the channels you use.
+what. Choose it only if you are fine with that content passing through the hub's channels.
 
-Your own SEI login, which is often your CPF, never shows up. Texts say "you", the API answers
-`assigned_to_me` and `activity_by_me`, and `/status` never returns the username.
+Your own SEI login, which is often your CPF, never shows up. Texts say "you", and the event data
+carries `assigned_to_me` and `activity_by_me` instead of your acronym.
 
-## Notifications
+## Status
 
-Every 30 seconds sei-monitor sends each channel one message with everything new for it. The
-message lists up to ten events and ends with "and N more" when there are others. When a channel
-fails, sei-monitor tries again after 1 minute, 5 minutes, 30 minutes, 2 hours and 6 hours, and
-then gives up on those events for that channel. `/status` counts the deliveries per channel, and
-`/deliveries` shows why the last attempt failed. Each event goes to the channels that were on when
-sei-monitor recorded it.
+The hub polls the plugin every 15 seconds. `GET /api/plugins` shows what the plugin answered:
 
-### Email
+| State | Message | Meaning |
+|---|---|---|
+| `checking` | | A check is running. |
+| `idle` | | The last check is done. `next_check_at` says when the next one starts. |
+| `paused` | the reason, then what to do | SEI refused the login. See below. |
+| `failing` | `sei-monitor has not reached SEI yet`, with the error when there is one | The plugin has not reached SEI since it started. It tries again with a back-off. |
+| `failing` | an unknown agency or module | `SEI_ORG` or the module does not exist. Fix it and restart the hub. |
+| `failing` | `the database is unavailable` | The plugin's database does not answer. Events wait in the database until it does. |
+| `failing` | `the hub is ahead of this database: reset the hub's position for the sei plugin` | The plugin's database was reset and the hub's position for `sei` was not. Reset both together. |
 
-Set `SMTP_HOST`, `SMTP_FROM` and `SMTP_TO`, plus `SMTP_USERNAME` and `SMTP_PASSWORD` if the server
-asks for a login. `SMTP_TLS` picks the encryption:
+`last_success_at` is the end of the last check that finished without an error.
 
-- `starttls`, the default, on port 587. The server must offer STARTTLS, or the email isn't sent.
-- `tls` on port 465.
-- `none` on port 25, which refuses a password.
-
-The subject reads like `[sei-monitor] 3 updates on your processes`, and the body is plain text.
-
-### Telegram
-
-Create a bot with @BotFather and put its token in `TELEGRAM_TOKEN`. Send the bot any message, or add
-it to a group, then open `https://api.telegram.org/bot<TELEGRAM_TOKEN>/getUpdates` and copy the
-`chat.id` you find there into `TELEGRAM_CHAT_ID`. Group ids start with `-100`. A public channel
-also works as `@channel_name`.
-
-### ntfy
-
-Set `NTFY_URL` to the server and topic, such as `https://ntfy.sh/<topic>`. On the public ntfy.sh,
-anyone who knows a topic can read it, so pick a long random one (the output of `generate-token`
-works) or use a server with access control and `NTFY_TOKEN`. Login failures and overdue returns
-arrive with high priority.
-
-### Webhook
-
-sei-monitor posts the events as JSON to `WEBHOOK_URL`:
-
-```json
-{
-  "events": [
-    {
-      "id": 42,
-      "kind": "document_added",
-      "procedure_id": 9001,
-      "process_number": "00000.000001/2026-00",
-      "unit": "SEDEMO/NUPROC",
-      "title": "New document on process 00000.000001/2026-00",
-      "occurred_at": "2026-11-04T17:13:05Z",
-      "detected_at": "2026-11-04T17:15:00Z",
-      "detail": { "document_protocol": "0012345" }
-    }
-  ]
-}
-```
-
-Each event has the fields of the `Event` schema in `docs/openapi.json`, at the level set by
-`NOTIFICATION_DETAIL`. The message from `send-test` is `{"test": true, "events": []}`. Any 2xx
-answer counts as delivered, and sei-monitor doesn't follow redirects.
-
-The `X-Sei-Monitor-Signature` header carries `sha256=` followed by the hex HMAC-SHA256 of the raw
-body, keyed with `WEBHOOK_SECRET`. Check it before trusting a request. In Python:
-
-```python
-import hashlib
-import hmac
-
-def is_from_sei_monitor(secret: bytes, body: bytes, signature: str) -> bool:
-    expected = "sha256=" + hmac.new(secret, body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature)
-```
-
-### AMQP (RabbitMQ)
-
-Set `AMQP_URL` to the broker, as `amqp://user:password@host:5672/vhost` or `amqps://...` for TLS,
-with any special character in the password percent-encoded. Plain `amqp` sends the password and the
-events unencrypted. Keep it for a broker on the same machine or the same Docker network, and use
-`amqps` for anything else. The broker user needs the configure and write permissions on the
-exchange.
-
-sei-monitor declares a durable topic exchange named by `AMQP_EXCHANGE` (`sei-monitor` by default)
-and publishes one persistent message per event, with the event kind as the routing key. Bind a
-queue to `#` to get everything, or only to the kinds you care about, such as `return_overdue`. The
-body is a single event, the same object as one item of the webhook's `events` list. `message_id`
-holds the event id and `type` the kind. The message from `send-test` goes out under the routing key
-`test`, with the body `{"test": true}`.
-
-sei-monitor waits for the broker to confirm every message. If part of a batch fails, it sends the
-whole batch again, so a consumer can get the same event twice; drop duplicates by `message_id`.
-RabbitMQ confirms a message that no queue is bound to and then throws it away, so bind your queues
-before the events you want start arriving.
-
-### WhatsApp
-
-The WhatsApp channel uses an unofficial client library (whatsmeow), not an API offered by
-WhatsApp. WhatsApp may block a number it sees doing this, so pair a spare number, never your
-personal one.
-
-1. Set `WHATSAPP_RECIPIENTS` to the phone numbers that get the messages, with country and area
-   code (`5595991234567`), or to group ids, which end in `@g.us`.
-2. Pair the number that sends the messages:
-   `docker compose run --rm sei-monitor whatsapp-pair 5595991234567`. It prints a code. On the
-   phone with that number, open WhatsApp > Linked devices > Link a device, tap "Link with phone
-   number instead" and type the code.
-3. Restart sei-monitor.
-
-The WhatsApp session lives in sei-monitor's database, so protect the database like a password.
-Until the number is paired, the WhatsApp messages wait in the queue. To pair another number, unlink
-sei-monitor under Linked devices on the paired phone, start sei-monitor once so it drops the old
-session, and run `whatsapp-pair` again.
-
-## Behind nginx
-
-sei-monitor speaks plain HTTP and expects a reverse proxy in front of it for HTTPS. The compose file
-publishes it only on `127.0.0.1:8080`. Inside the `server` block of your site:
-
-```nginx
-location /api/v1/feed/ {
-    access_log off;
-    proxy_pass http://127.0.0.1:8080/feed/;
-}
-
-location /api/v1/ {
-    proxy_pass http://127.0.0.1:8080/;
-}
-```
-
-The first block keeps the feed token out of nginx's logs. sei-monitor doesn't need to know the
-prefix: it never builds absolute addresses and ignores the `X-Forwarded-*` headers. The one
-exception is the feed's link to itself, which comes from `PUBLIC_URL`.
-
-## Health check
-
-`GET /healthz` answers `{"ok": true}` with status 200 when the latest check finished without an
-error less than three intervals ago, and `{"ok": false}` with 503 otherwise. Right after the start,
-it answers 200 for one interval while the first check runs. The Docker image uses it for its
-`HEALTHCHECK`.
+The plugin does not exit on these errors. An exit would make the hub restart it in a loop, and with
+a wrong password every restart would cost a rejected login.
 
 ## When SEI refuses the login
 
-sei-monitor doesn't try again, because repeated failures can lock the account. It pauses, records
-an `account_login_failed` event, delivers it through the channels and keeps serving the feed, the
-API and the web interface. Fix the configuration and restart it. Network errors and SEI outages are different: those
-are retried after 30 seconds, then a minute, doubling up to the check interval.
+The plugin tries the login once. When SEI rejects it, the plugin stops logging in, because repeated
+failures can lock the account. It stays up, keeps serving its events, and:
 
-## Commands
+- records one `account_login_failed` event (urgent) titled `sei-monitor could not log in to SEI`.
+  The body gives SEI's reason, for example `Reason: SEI rejected the login (Usuário ou Senha
+  Inválida.)`, and says monitoring is paused until sei-monitor restarts with the configuration
+  fixed. That wording comes from the Go release: a restart alone is not enough, see the steps below;
+- logs `SEI rejected the login; monitoring is paused until sei-monitor restarts with the
+  configuration fixed` at `error`, with the reason;
+- answers `paused` with `<reason>; restart the plugin with the configuration fixed, then request a
+  check`, and refuses checks.
+
+It also stores the reason in its database. A plugin process that starts with a reason on record is
+held: it does not log in at all. It logs `SEI rejected the login in an earlier run; monitoring stays
+paused until a check is requested with the configuration fixed`, answers `paused` with `<reason>;
+nothing is logging in: request a check once the configuration is fixed`, and records one more
+`account_login_failed` event. That event is recorded at most once per UTC day, however often the
+plugin restarts.
+
+After a rejected login, a restart alone never logs in again, on purpose. The hub restarts the
+plugin by itself, for example after a lost database connection, and every attempt with a wrong
+password counts toward SEI locking the account. Only a check you request retries the login. With a
+correct password, each plugin restart costs one login.
+
+To resume:
+
+1. Fix the password: in SEI, or in the hub's `.env`, the secret file or the password command.
+2. Restart the hub so the plugin starts held with the new configuration. After editing `.env`, run
+   `docker compose up -d` in the hub's folder (a plain `restart` keeps the old environment);
+   otherwise `docker compose restart monitor-hub`. You can skip this step when the plugin already
+   shows the held message and its configuration did not change: you fixed the password in SEI, or
+   it comes from `SEI_PASSWORD_CMD`, which runs at every login.
+3. Request a check, with the hub's `API_TOKEN` in a shell variable (the hub's deploy guide shows
+   how to set it without writing it into the history) and the hub's port:
+
+   ```sh
+   curl -s -X POST -H "Authorization: Bearer $API_TOKEN" http://127.0.0.1:8090/api/plugins/sei/check
+   ```
+
+   Expect `{"accepted":true,...}`. `sei-monitor has not reached SEI yet` means the plugin is still
+   connecting after the restart: ask again in a minute.
+4. Read `GET /api/plugins` after half a minute. `sei` should be `idle` with a fresh
+   `last_success_at`. If SEI rejected the password again, it is `paused` with the first message,
+   and you start over from step 1.
+
+A requested check that fails for another reason, such as SEI being down, leaves the plugin held.
+Request another one later. Network errors and SEI outages outside a pause are retried on their
+own: after 30 seconds, then a minute, doubling up to the check interval.
+
+## The hub's first read
+
+The first time the hub reads a plugin it does not know, it stores what the plugin already holds as
+a baseline and announces none of it. That read comes on the hub's first poll after the plugin has
+reached SEI.
+
+The plugin's own first check may find changes before that read happens. So the plugin holds back
+everything newer than what it held at start-up until the hub's first read has ended. Those events
+reach the hub on the next poll and are announced as usual.
+
+That hold belongs to one plugin process. If the plugin or the hub restarts after the first check
+recorded events and before the hub logged `baseline complete` for `sei`, the new process counts
+those events as history and the baseline takes them in. Nobody announces them. When that happens,
+check by hand:
+
+1. In the hub's log, look for the plugin's `cycle finished` lines from before the restart. An
+   `events` count above 0 means that check recorded events.
+2. List the events recorded since the hub started (use your role and database names, and the
+   start time in UTC):
+
+   ```sql
+   SELECT id, kind, payload::jsonb->>'process_number' AS process, detected_at
+   FROM events
+   WHERE detected_at >= '<when the hub started>'
+   ORDER BY id;
+   ```
+
+3. Look for each of them in your channels, and pass on the ones that never arrived.
+
+## Operator commands
+
+The binary has three commands for you, besides `plugin`:
 
 | Command | What it does |
 |---|---|
-| `serve` | Watches SEI, sends the notifications and serves the feed, the API and the web interface. It runs when you give no command. |
-| `test-login` | Logs in and shows the SEI and module versions and your units. |
-| `orgs` | Lists the acronym and id of every agency on the SEI login page. It needs only `SEI_URL`. |
+| `orgs` | Lists the acronym and id of every agency on the SEI login page. It needs only `SEI_URL` and never logs in. |
+| `test-login` | Logs in and shows the SEI and module versions and your units, never the session token. |
 | `diagnose` | Checks how the SEI API behaves and prints only counts and types, so its output is safe to share. |
-| `send-test` | Sends a test message through every channel that is on and says which one failed. |
-| `whatsapp-pair` | Pairs the WhatsApp number that sends the messages. |
-| `generate-token` | Prints a random token for `FEED_TOKEN` or `API_TOKEN`. |
 
-## Known limitations
+They run with your real account. `test-login` and `diagnose` cost one login each run. `diagnose`
+stops at the first rejected login instead of trying the remaining calls.
 
-- Agencies without `mod-wssei` aren't supported. sei-monitor doesn't read SEI's web pages, apart
-  from the login page that lists the agencies.
-- Special follow-ups (acompanhamentos especiais) aren't monitored, because the module's route for
-  them fails on at least one SEI instance.
-- Suspended processes (sobrestados) disappear from the module's process list, so sei-monitor
-  reports them as having left your units, and as new when they come back.
-- Accounts with two-factor authentication are untested.
-- One SEI account per sei-monitor instance.
-- Messages show the process number without a link, since SEI's internal links depend on the
-  session.
-- A captcha or Cloudflare challenge in front of SEI stops sei-monitor.
+Run them inside the hub's container, where the binary lives. They read the same variables as the
+plugin, without the `SEI__` prefix. This copies the hub's `SEI__` variables to the plain names
+inside the container, so no secret shows up on a command line:
+
+```sh
+cd /opt/stacks/monitor-hub
+docker compose exec monitor-hub sh -c '
+for name in SEI_URL SEI_API_URL SEI_USERNAME SEI_PASSWORD SEI_PASSWORD_FILE SEI_PASSWORD_CMD \
+  SEI_ORG SEI_UNITS SEI_TIMEZONE SEI_CONCURRENCY; do
+  eval "value=\${SEI__$name-}"
+  [ -z "$value" ] || export "$name=$value"
+done
+exec /opt/monitor-hub/plugins/sei/sei-monitor "$@"' sei test-login
+```
+
+Put `orgs` or `diagnose` in place of `test-login` at the end. When the hub reads the password from
+`SEI__SEI_PASSWORD_FILE` or `SEI__SEI_PASSWORD_CMD`, the command uses the same file or program.
+Ctrl+C stops a command with exit code 130.
+
+## Switching between the Go release and the plugin
+
+Both programs use the same database and schema, and neither needs a SQL step to take over from the
+other. Neither keeps the other out either: the Go release holds no lock while it runs, and the
+plugin's lock only keeps a second plugin out. Running both at once makes two monitors fight over
+the same account, so stop one completely before starting the other.
+
+### Releases and `latest`
+
+`v2.0.0` is tagged on the branch head before the merge into `main`, so the tag publishes
+`ghcr.io/itztas/sei-monitor:2.0.0` and `:2.0` and leaves `latest` alone. The merge into `main` moves
+`latest` to the plugin. The old production compose file names `ghcr.io/itztas/sei-monitor:latest`
+directly, and the plugin image exits at once when run alone, which `restart: unless-stopped` turns
+into a restart loop with SEI unwatched. So pin the old stack to `ghcr.io/itztas/sei-monitor:1.0.0`
+before the merge, and keep it pinned: the rollback needs that image.
+
+### From the Go release to the plugin
+
+1. Pin the old stack to `:1.0.0` (above).
+2. Let the Go release send everything it has. It sends pending notifications every 30 seconds and
+   retries a failed one after 1 minute, 5 minutes, 30 minutes, 2 hours and 6 hours. In its
+   database this must return 0:
+
+   ```sql
+   SELECT count(*) FROM deliveries WHERE status = 'pending';
+   ```
+
+   A notification still pending at the switch is never sent while the plugin runs: the hub's first
+   read takes that event as history.
+3. Give the hub the same `SEI_URL`, `SEI_USERNAME` and `SEI_ORG` as the old `.env`, with the
+   `SEI__` prefix, and point `SEI__DATABASE_URL` at the old database.
+4. Stop the Go release, then start the hub.
+5. The plugin reads the database as Go left it: no new account, no new baseline, no repeated
+   events. The hub's first read takes the Go-era events as history (see [The hub's first
+   read](#the-hubs-first-read)).
+6. If the Go release was paused by a rejected login, the plugin starts held. Fix the password and
+   request a check (see [When SEI refuses the login](#when-sei-refuses-the-login)).
+
+### Back to the Go release
+
+1. Stop the hub completely.
+2. Start `ghcr.io/itztas/sei-monitor:1.0.0` on the same database, with the same `SEI_URL`,
+   `SEI_USERNAME` and `SEI_ORG`. If a pause reason is on record, Go tries the login once at start,
+   as it always did.
+
+What to expect:
+
+- Go announces only what it detects from then on. It never announces an event the plugin stored,
+  even when it detects the same change again, because Go writes a notification row only for the
+  events it inserts itself. Its first notification can take up to 30 seconds after the check that
+  found it.
+- Notifications Go left pending before the switch to the plugin go out right after the rollback,
+  possibly days late. Step 2 above avoids that.
+- When the plugin pruned old events, Go's notification rows for them went too (`ON DELETE
+  CASCADE`), pending ones included. Those are never sent.
+- Notifications the hub had not delivered are not sent by anyone. List them in the hub's database
+  before you stop it.
+- The plugin adds no table or column. A future migration keeps this way back open only while it
+  leaves alone the tables, columns, constraints and event formats the Go release uses. Go does not
+  refuse a database that holds a migration it does not know, so a breaking change would show up as
+  wrong or failing queries.
 
 ## Security
 
-- Secrets (the password, the tokens, the SMTP password, the webhook secret, the AMQP address) print
-  as `[redacted]` everywhere, and none of them goes into the database.
-- On Linux, sei-monitor turns off core dumps and blocks other processes from reading its memory
-  through debugging interfaces. It has no profiling endpoint.
-- Calls to SEI and to the email, Telegram, ntfy, webhook and AMQP channels verify TLS and time out
-  after 30 seconds. Logs never include request headers, and errors never include addresses that may
-  carry a token.
-- The feed and the API compare their tokens in constant time. The API sends `no-store`, has no
-  CORS and never returns the username.
-- Webhook bodies are signed with HMAC-SHA256.
-- The image runs as an unprivileged user. The compose file makes its filesystem read-only and drops
-  every Linux capability. Everything sei-monitor keeps, the WhatsApp session included, lives in
-  Postgres, so treat the database and its backups as secrets.
+- The SEI password, the session token and `DATABASE_URL` print as `[redacted]` everywhere. None of
+  them appears in a log, an error, an event, a gRPC answer or command output, and the password is
+  never stored.
+- On start, the binary turns off core dumps, blocks other processes from reading its memory
+  through debugging interfaces, and sets its file mode mask to 077.
+- Calls to SEI verify TLS against the root certificates built into the binary (the
+  `webpki-root-certs` crate), not the system's. Each
+  request has a 30-second total limit, reads at most 16 MiB of a body, and errors never include
+  addresses that may carry a token. API calls refuse redirects.
+- The image has no shell and no other program, and runs as user 65532. Inside the hub the plugin
+  runs as the hub's user, in the hub's hardened container.
+- Database connections have a 10-second connect limit, a 20-second statement limit and TCP
+  keepalives. The connection to Postgres is not encrypted, so keep the database on the same
+  machine or Docker network.
+- Everything the plugin keeps lives in Postgres. Treat the database and its backups as secrets: they
+  hold your processes and, with `full`, their contents.
 - To keep the load on SEI low, checks run at least 5 minutes apart, with a cap on simultaneous
   calls and some random spread between checks.
 
+## Known limitations
+
+- Agencies without `mod-wssei` aren't supported. The plugin doesn't read SEI's web pages, apart
+  from the login page that lists the agencies.
+- Special follow-ups (acompanhamentos especiais) aren't monitored, because the module's route for
+  them fails on at least one SEI instance.
+- Suspended processes (sobrestados) disappear from the module's process list, so the plugin
+  reports them as having left your units, and as new when they come back.
+- Accounts with two-factor authentication are untested.
+- One SEI account per plugin.
+- A captcha or Cloudflare challenge in front of SEI stops the plugin.
+- A list of more than 400 pages for one unit fails the check instead of being cut short.
+
+### Where the plugin differs from the Go release
+
+The plugin was checked against the Go release's own output. These differences are deliberate:
+
+- A login rejected in an earlier run holds the plugin until you request a check. Go tried again at
+  every start.
+- `diagnose` stops at the first rejected login. Interrupted, it exits with 130 (Go went on and
+  exited 0). A user without units and `SEI_UNITS=all` is an error with exit 1.
+- `SEI_TIMEZONE=Local`, `Factory` and `posixrules` are refused. The time zone table is the 2025b
+  release built into the binary. It differs from Go's for a few zones outside Brazil, none of them
+  Brazilian.
+- A secret that is not valid UTF-8 (the password, `DATABASE_URL`, their files, the output of the
+  password command) is refused without showing it. Go used the raw bytes.
+- `SEI_PASSWORD_CMD` runs a program found through a relative `PATH` entry, which Go refused.
+- The pruning cutoff is computed in UTC, and never deletes an event the hub has not read.
+- SEI answers that the real server never sends (lone surrogate escapes, numbers too large for a
+  float, duplicate keys, nesting of 128 levels or more) are refused as `answer outside the API
+  format`.
+- A login page that is slow to parse fails at the request time limit, and pages in some East Asian
+  or UTF-16 encodings decode slightly differently. The real login page is plain ISO-8859-1.
+- The database pool keeps up to 10 connections open, where Go closed idle ones after 5 minutes.
+- The `User-Agent` is `sei-monitor/<version>`.
+
 ## Development
 
-- `make check` runs gofmt, go vet, golangci-lint and the tests with the race detector.
-- The database tests run on Postgres. Point `TEST_DATABASE_URL` at a server, or install `initdb`
-  and `postgres` and the tests start a throwaway one. With `CI` set, a missing Postgres fails the
-  tests instead of skipping them.
-- The queries are in `sql/queries` and the migrations in `sql/schema`. `make generate` runs sqlc,
-  which writes `internal/db`, so don't edit that folder by hand. To change the schema, add a new
-  migration file instead of editing an old one.
-- The AMQP channel tests need a RabbitMQ: point `TEST_AMQP_URL` at one, such as
-  `amqp://guest:guest@localhost:5672/`. Without it they are skipped, and with `CI` set they fail.
-- `make openapi` regenerates `docs/openapi.json`, and a test fails while the file lags behind the
-  code.
+- `make check` runs `cargo fmt --check`, clippy and the tests. `make up` starts a development
+  Postgres on `127.0.0.1:5432` from `compose.yaml`; copy `.env.example` to `.env` first and set
+  `POSTGRES_PASSWORD`.
+- The database tests use `TEST_DATABASE_URL` when it is set, and otherwise start a throwaway
+  Postgres from `initdb` and `postgres` on `PATH`. The compatibility tests build the Go release from
+  the tag `v1.0.0` with `go`. With `CI` set, a missing tool fails the tests instead of skipping them.
 - `git config core.hooksPath .githooks` turns on the hooks: Conventional Commits messages, and
-  gofmt plus the tests before each commit.
-- No test talks to a real SEI. `internal/sei/seitest` plays its part.
+  `cargo fmt --check` plus the tests before each commit.
+- No test talks to a real SEI. A fake server in `tests/support/` plays its part.
+- To run the operator commands from a checkout, export the plain variables and run
+  `cargo run -- test-login`. The binary never reads `.env`.
 
 ## License
 

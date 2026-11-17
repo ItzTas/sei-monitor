@@ -257,7 +257,17 @@ async fn rejected_password_pauses_and_stays_up() {
     assert!(!refused.accepted);
     assert_eq!(refused.message, format!("{GO_PAUSE}, then request a check"));
     assert_eq!(client.events(0, 0).await.expect("first read"), []);
-    let events = client.events(0, 0).await.expect("second read");
+    let deadline = Instant::now() + PATIENCE;
+    let events = loop {
+        let events = client.events(0, 0).await.expect("a later read");
+        if !events.is_empty() {
+            break events;
+        }
+        if Instant::now() >= deadline {
+            plugin.fail("the login failure event was never served");
+        }
+        tokio::time::sleep(POLL).await;
+    };
     let kinds: Vec<&str> = events.iter().map(|event| event.kind.as_str()).collect();
     assert_eq!(kinds, ["account_login_failed"]);
 

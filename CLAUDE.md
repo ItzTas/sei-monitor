@@ -53,7 +53,9 @@ git config core.hooksPath .githooks   # once per clone
 ```
 
 The pre-commit hook runs `cargo fmt --check` and `cargo test`. The commit-msg hook enforces
-Conventional Commits.
+Conventional Commits. The hook and the `Makefile` run cargo with `rustup run <channel>` from
+`rust-toolchain.toml` when `rustup` is installed. A cargo from the system package ignores that file,
+and under another standard library `gotext::tests::case_mappings_match_go_for_every_char` fails.
 
 ## Tests
 
@@ -64,13 +66,18 @@ skipping.
 - Postgres: the SDK test kit's `database()` gives each test its own database. It uses
   `TEST_DATABASE_URL` when set (the compose Postgres works, see `.env.example`), and otherwise
   starts a throwaway cluster with `initdb` and `postgres` from `PATH`.
-  `tests/support::migrated_database` adds the migrations.
+  `tests/support::migrated_database` adds the migrations. With `TEST_DATABASE_URL` every test binary
+  shares one server with password authentication, as in CI. So a test that needs a role of its own
+  creates it with `support::login_role` (create or alter, with a password) under a name no other
+  test uses, and connects with that password.
 - `go`, `git` and the tag `v1.0.0` for `tests/go_compat.rs`. It extracts the Go release with
   `git archive v1.0.0`, builds it and caches the binary under `target/tmp/go-v1.0.0/`. A shallow
   clone has no tag, so CI checks out the full history. These two tests take about 35 s, because
   they wait for Go's 30 s notification poll.
 - The conformance command for `tests/conformance.rs`: the binary named by `PLUGIN_CONFORMANCE`, or
   else `go install` of `plugin-conformance` at the SDK's Go tag `sdk/v0.2.1`.
+
+The tests that call the fake SEI fail when `HTTP_PROXY` is set in their environment.
 
 The SDK refuses Unix socket paths longer than 100 bytes. The tests that start the plugin put its
 socket in a short directory under the system temporary directory, so a long `TMPDIR` breaks them.
@@ -117,7 +124,8 @@ texts, and never shows a secret value.
 - `SEI_USERNAME` and `SEI_ORG` (required). `SEI_ORG` is the agency acronym or numeric id.
 - `SEI_PASSWORD`, `SEI_PASSWORD_FILE` or `SEI_PASSWORD_CMD` (exactly one). The file is read at
   start-up. The command runs at every login, without a shell, with a 30 s limit and without the
-  secret variables in its environment; start-up checks that its program is on `PATH`.
+  secret variables in its environment (also behind a `PREFIX__`, and `AMQP_URL`); start-up checks
+  that its program is on `PATH`.
 - `SEI_UNITS` (unit acronyms or `all`; empty is the user's current unit), `SEI_TIMEZONE`
   (`America/Sao_Paulo`), `SEI_CONCURRENCY` (3, from 1 to 10), `POLL_INTERVAL` (`15m`, at least
   `5m`), `RETURN_WARNING_DAYS` (2, from 0 to 60), `RETENTION_DAYS` (90, from 0 to 3650, at least
@@ -144,6 +152,7 @@ src/
 │                           them (url.rs, url/); the PATH lookup for SEI_PASSWORD_CMD (lookpath.rs)
 ├── gotext.rs               Go's text rules: quoting, EqualFold, Fields, case tables, Atoi, capped
 ├── duration.rs             Go's ParseDuration and Duration.String
+├── golden.rs               test-only: reads the cases of a golden vector file
 ├── timezone.rs             zones, local dates to UTC with Go's time.Date rule, days_until
 ├── secret.rs               Secret
 ├── version.rs              VERSION, User-Agent
@@ -181,20 +190,22 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   start-up step that failed, or starts with `the database lock was lost`. A run outside the hub and
   a failure to start logging or the runtime also exit 1, without a `fatal` line. The hub restarts
   the plugin with a back-off.
-- After the handshake the process exits only on a signal or a lost writer lock. An unknown agency
-  or module, a rejected login and a panic in the scheduler leave it running, with the reason in
-  `Status`, because an exit would make the hub restart it in a loop.
+- After the handshake the process exits only on a signal, a lost writer lock or an error of the
+  SDK's `serve` (a `fatal` line and exit 1). An unknown agency or module, a failing cycle, a
+  rejected login and a panic in the scheduler leave it running, with the reason in `Status`,
+  because an exit would make the hub restart it in a loop.
 - A second process on the same database fails at start-up with `another sei-monitor process holds
   the database lock`, migrates nothing and does not call SEI.
 - On SIGTERM the running cycle is cancelled at once and recorded as `context canceled`. The SDK
   drains the server for at most 1 s.
 - `Describe` names the plugin `sei` (`SEI`) with eight kinds. `account_login_failed` and
   `return_overdue` are urgent, the rest are info.
-- `Status`, first match wins: hub ahead (below), `FAILING`; a fatal preparation error or a panicked
-  scheduler, `FAILING` with the text; a cycle running, `CHECKING`; paused, `PAUSED` (below);
-  account not known yet, `FAILING` with `sei-monitor has not reached SEI yet[: <error>]`; the
-  database does not answer within 10 s, `FAILING` with `the database is unavailable`; otherwise
-  `IDLE`. Messages are cut at 500 characters. `last_success_at` is the last cycle run that finished
+- `Status`, first match wins: hub ahead (below), `FAILING`; an unknown agency or module while
+  preparing, or a panicked scheduler, `FAILING` with the text; a cycle running, `CHECKING`; paused,
+  `PAUSED` (below); the last cycle failed, `FAILING` with its error (the same text as
+  `cycle_runs.error`); account not known yet, `FAILING` with `sei-monitor has not reached SEI
+  yet[: <error>]`; the database does not answer within 10 s or the last `Events` read failed,
+  `FAILING` with `the database is unavailable`; otherwise `IDLE`. Messages are cut at 500 characters. `last_success_at` is the last cycle run that finished
   without an error.
 - `Check` starts a cycle, or refuses with Go's texts: not reached SEI yet, already running, less
   than 5 minutes since the last start, or paused.
@@ -221,7 +232,10 @@ tests/                      one file per area; tests/support/ holds the fake SEI
 
 1. `Monitor::prepare` connects (module discovery, the agency from the login page, no login) and
    finds or creates the account, keyed by the normalized `SEI_URL`, `SEI_USERNAME` and the agency
-   id. A failure is retried with back-off; an unknown agency or module stops the monitor for good.
+   id. A failure is retried with back-off, capped at `POLL_INTERVAL`. An unknown agency or module
+   sets `State::fatal` (logged once per distinct text) and is retried the same way, because one
+   maintenance page from SEI at start-up reads as "module not found"; a preparation that works
+   clears it. Preparation never logs in, so these retries cost the account nothing.
 2. If the account holds a pause reason from an earlier run, the monitor is held (see Pause).
 3. A cycle logs in when it has no session, selects the units, lists their processes (`SEI_CONCURRENCY`
    calls at a time) and diffs them with the stored ones. It then reads the activities and documents
@@ -229,26 +243,32 @@ tests/                      one file per area; tests/support/ holds the fake SEI
    processes, documents, events in Go's order, deduplicated by `(account, kind, ref)`. The account
    row is locked first, so the order of ids is the order of the commits.
 4. The first cycle of an account is a baseline: it records what is there and creates no events.
-5. After a successful cycle the stored pause reason is cleared, then pruning runs.
+5. A failed cycle sets `State::cycle_error` to the error chain, stored also in `cycle_runs.error`;
+   a successful one clears it. After a successful cycle pruning runs.
 6. The scheduler waits `POLL_INTERVAL` plus up to a tenth of it, or 30 s doubling up to the
    interval after a failure. `Check` starts a cycle early.
 
 The SEI client has a 30 s total timeout per request, reads at most 16 MiB of a body, stops at 400
 process pages, refuses redirects on API calls, and cuts SEI text at 500 characters where it enters.
+The NUL character is dropped from SEI text in the same place, since Postgres refuses it in `TEXT`.
 TLS is verified against the root certificates built into the binary (`webpki-root-certs`).
 
 ## Pause
 
 A login that SEI rejects pauses the monitor. The process stays up, records the reason on the
 account and one `account_login_failed` event (ref `login:<time>`), and makes no other login. In
-that process `Check` is refused.
+that process `Check` is refused. When the reason write fails, the parked scheduler writes it again
+with the back-off until it lands or the process stops, without calling SEI.
 
 A process that starts with a reason on record is held: it does not log in, logs `SEI rejected the
 login in an earlier run; ...`, and records one `account_login_failed` event with ref
 `login-held:<UTC date>`, so at most one per day however often it restarts. The hub restarts the
 plugin on its own (after a lost lock, for example), so a restart is not the owner's act and must
-not cost a login. A requested `Check` is the only retry. If it fails for another reason, the monitor
-goes back to held.
+not cost a login. A requested `Check` is the only retry. As soon as SEI accepts its login, the
+reason is cleared in memory and in the database, so a later failure in that cycle follows the
+ordinary back-off with the session it has. A clear that fails is tried again after the next
+successful cycle. Only a check whose login got no verdict (5xx, a time-out, a page that is not the
+API's) goes back to held.
 
 ## Pruning
 

@@ -78,6 +78,13 @@ runbook for moving the old service onto the hub.
 A bad value stops the plugin at start-up with one `fatal` line in the hub's log that lists every
 problem at once. The hub then restarts it with a back-off until the configuration is fixed.
 
+The plugin is stricter about its database than the Go release was. Point `DATABASE_URL` straight
+at Postgres, not at a transaction pooler. Use `sslmode=disable` or `prefer` and no parameter that
+only pgx understands. Don't set `idle_session_timeout` on its role: when the connection that holds
+the plugin's lock closes, the plugin exits, the hub starts it again, and each new start logs in to
+SEI once, up to 12 times an hour. The role must own the tables and be able to read the
+`events_id_seq` sequence.
+
 Keep `SEI_URL`, `SEI_USERNAME` and `SEI_ORG` stable. Together they identify the account in the
 database. A change starts a new account, and its first check is a silent baseline.
 
@@ -91,16 +98,22 @@ Set exactly one of these:
   into the hub's container. The plugin reads it once, at start-up. The hub runs as user 65532, so
   that user must be able to read the file.
 - `SEI_PASSWORD_CMD`: a command that prints the password. The plugin runs it at every login,
-  without a shell, with a 30-second limit, and without the secret variables in its environment. Its
-  program must exist inside the hub's image, which has no password manager; start-up refuses a
-  program it cannot find on `PATH`.
+  without a shell, with a 30-second limit. Its environment leaves out the secret variables: the
+  passwords, tokens and database addresses of the plugin and of the Go release, the same names
+  behind a prefix such as `SEI__` or `DIARIO__`, and `AMQP_URL`. Its program must exist inside the
+  hub's image, which has no password manager; start-up refuses a program it cannot find on `PATH`.
+
+A password with `$` or quotes in the hub's `.env` can reach the plugin changed by the way that file
+is read. That costs one rejected login and a pause, so look at `GET /api/plugins` right after the
+first start.
 
 The session token SEI hands out after the login is a credential too. The plugin keeps it only in
 memory.
 
 ### Detail level
 
-At the `minimal` level, events carry the event type, the process number, the unit and the date.
+At the `minimal` level, events carry the event type, the process number, the unit, the date and
+the link to the process (see [Known limitations](#known-limitations)).
 `full` adds the process type and description, the activity text, the document name and who did
 what. Choose it only if you are fine with that content passing through the hub's channels.
 
@@ -114,17 +127,23 @@ The hub polls the plugin every 15 seconds. `GET /api/plugins` shows what the plu
 | State | Message | Meaning |
 |---|---|---|
 | `checking` | | A check is running. |
-| `idle` | | The last check is done. `next_check_at` says when the next one starts. |
+| `idle` | | The last check worked. `next_check_at` says when the next one starts. |
 | `paused` | the reason, then what to do | SEI refused the login. See below. |
-| `failing` | `sei-monitor has not reached SEI yet`, with the error when there is one | The plugin has not reached SEI since it started. It tries again with a back-off. |
-| `failing` | an unknown agency or module | `SEI_ORG` or the module does not exist. Fix it and restart the hub. |
-| `failing` | `the database is unavailable` | The plugin's database does not answer. Events wait in the database until it does. |
+| `failing` | the error of the last check | The last check failed: SEI answered with an error or with a page that is not the API's, a unit in `SEI_UNITS` is no longer yours, the password command failed, or the database refused what the check found. Nothing is recorded while this lasts. The plugin tries again after 30 seconds, then a minute, doubling up to the check interval, and goes back to `idle` after the first check that works. |
+| `failing` | `sei-monitor has not reached SEI yet`, with the error when there is one | The plugin has not reached SEI since it started. It tries again with the same back-off. |
+| `failing` | an unknown agency or module | The login page does not list `SEI_ORG`, or neither module address answered like the module. A maintenance or error page in front of SEI looks the same, so the plugin keeps trying with the same back-off; these tries never log in. If the message stays, fix `SEI_ORG` or set `SEI_API_URL`, then restart the hub. |
+| `failing` | `the database is unavailable` | The plugin's database does not answer, or the last read of the events failed. Events wait in the database until it answers. |
 | `failing` | `the hub is ahead of this database: reset the hub's position for the sei plugin` | The plugin's database was reset and the hub's position for `sei` was not. Reset both together. |
+| `failing` | `the monitor stopped after an internal error; see the plugin log` | A bug stopped the plugin's scheduler. Restart the hub and send the plugin log. |
 
 `last_success_at` is the end of the last check that finished without an error.
 
 The plugin does not exit on these errors. An exit would make the hub restart it in a loop, and with
 a wrong password every restart would cost a rejected login.
+
+Nobody is told when the plugin is `failing`, or stays `paused` without a new event: the hub sends no
+notification about a plugin's state. Look at `GET /api/plugins` after every hub restart and every
+configuration change.
 
 ## When SEI refuses the login
 
@@ -133,10 +152,11 @@ failures can lock the account. It stays up, keeps serving its events, and:
 
 - records one `account_login_failed` event (urgent) titled `sei-monitor could not log in to SEI`.
   The body gives SEI's reason, for example `Reason: SEI rejected the login (Usuário ou Senha
-  Inválida.)`, and says monitoring is paused until sei-monitor restarts with the configuration
-  fixed. That wording comes from the Go release: a restart alone is not enough, see the steps below;
+  Inválida.)`, and ends with `Fix the configuration, restart the hub if you changed its settings,
+  then request a check for the sei plugin.`;
 - logs `SEI rejected the login; monitoring is paused until sei-monitor restarts with the
-  configuration fixed` at `error`, with the reason;
+  configuration fixed` at `error`, with the reason. That line keeps the Go release's wording: a
+  restart alone is not enough, see the steps below;
 - answers `paused` with `<reason>; restart the plugin with the configuration fixed, then request a
   check`, and refuses checks.
 
@@ -144,8 +164,9 @@ It also stores the reason in its database. A plugin process that starts with a r
 held: it does not log in at all. It logs `SEI rejected the login in an earlier run; monitoring stays
 paused until a check is requested with the configuration fixed`, answers `paused` with `<reason>;
 nothing is logging in: request a check once the configuration is fixed`, and records one more
-`account_login_failed` event. That event is recorded at most once per UTC day, however often the
-plugin restarts.
+`account_login_failed` event. Its reason ends with `still paused after a restart: request a check
+once the configuration is fixed`, followed by the same last sentence as the first event. That event
+is recorded at most once per UTC day, however often the plugin restarts.
 
 After a rejected login, a restart alone never logs in again, on purpose. The hub restarts the
 plugin by itself, for example after a lost database connection, and every attempt with a wrong
@@ -173,9 +194,12 @@ To resume:
    `last_success_at`. If SEI rejected the password again, it is `paused` with the first message,
    and you start over from step 1.
 
-A requested check that fails for another reason, such as SEI being down, leaves the plugin held.
-Request another one later. Network errors and SEI outages outside a pause are retried on their
-own: after 30 seconds, then a minute, doubling up to the check interval.
+Once SEI accepts the login of a requested check, the recorded rejection is gone, from the plugin
+and from its database, even when something later in that check fails. The plugin then shows
+`failing` with the error and tries again on its own after 30 seconds, with the session it already
+has. Only a check whose login got no answer from SEI (an error page, a time-out) leaves the plugin
+held; request another one later. Network errors and SEI outages outside a pause are retried on
+their own: after 30 seconds, then a minute, doubling up to the check interval.
 
 ## The hub's first read
 
@@ -216,20 +240,27 @@ The binary has three commands for you, besides `plugin`:
 | `test-login` | Logs in and shows the SEI and module versions and your units, never the session token. |
 | `diagnose` | Checks how the SEI API behaves and prints only counts and types, so its output is safe to share. |
 
-They run with your real account. `test-login` and `diagnose` cost one login each run. `diagnose`
-stops at the first rejected login instead of trying the remaining calls.
+They run with your real account, also while the plugin is running. `test-login` and `diagnose`
+cost one login each run and don't look at a rejection the plugin recorded, so with a wrong password
+each run is one more rejected login. `diagnose` stops at the first rejected login instead of trying
+the remaining calls.
 
 Run them inside the hub's container, where the binary lives. They read the same variables as the
 plugin, without the `SEI__` prefix. This copies the hub's `SEI__` variables to the plain names
-inside the container, so no secret shows up on a command line:
+inside the container and removes every other variable except `PATH`, so the command, and a
+password command it runs, never see the hub's other settings. No secret shows up on a command
+line:
 
 ```sh
 cd /opt/stacks/monitor-hub
 docker compose exec monitor-hub sh -c '
-for name in SEI_URL SEI_API_URL SEI_USERNAME SEI_PASSWORD SEI_PASSWORD_FILE SEI_PASSWORD_CMD \
-  SEI_ORG SEI_UNITS SEI_TIMEZONE SEI_CONCURRENCY; do
+names="SEI_URL SEI_API_URL SEI_USERNAME SEI_PASSWORD SEI_PASSWORD_FILE SEI_PASSWORD_CMD SEI_ORG SEI_UNITS SEI_TIMEZONE SEI_CONCURRENCY"
+for name in $names; do
   eval "value=\${SEI__$name-}"
   [ -z "$value" ] || export "$name=$value"
+done
+for name in $(env | sed -n "s/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p"); do
+  case " PATH $names " in *" $name "*) ;; *) unset "$name" ;; esac
 done
 exec /opt/monitor-hub/plugins/sei/sei-monitor "$@"' sei test-login
 ```
@@ -266,15 +297,31 @@ before the merge, and keep it pinned: the rollback needs that image.
    ```
 
    A notification still pending at the switch is never sent while the plugin runs: the hub's first
-   read takes that event as history.
+   read takes that event as history. If a channel never delivers (an unpaired WhatsApp number, for
+   example), its rows stay pending: pair it, or accept that they go out after a rollback.
+
+   In the same database this must return an empty reason:
+
+   ```sql
+   SELECT paused_reason FROM accounts;
+   ```
+
+   With a reason there, the plugin starts held and watches nothing until you request a check. It
+   says so once, in an event the hub announces on its second read.
 3. Give the hub the same `SEI_URL`, `SEI_USERNAME` and `SEI_ORG` as the old `.env`, with the
    `SEI__` prefix, and point `SEI__DATABASE_URL` at the old database.
-4. Stop the Go release, then start the hub.
+4. Stop the Go release, then start the hub. Go keeps checking SEI until it stops, and events it
+   detects between step 2 and the stop are never announced, so do both close together.
 5. The plugin reads the database as Go left it: no new account, no new baseline, no repeated
    events. The hub's first read takes the Go-era events as history (see [The hub's first
    read](#the-hubs-first-read)).
 6. If the Go release was paused by a rejected login, the plugin starts held. Fix the password and
    request a check (see [When SEI refuses the login](#when-sei-refuses-the-login)).
+7. After the first start, `GET /api/plugins` shows `sei` as `idle` with a fresh
+   `last_success_at`, `SELECT count(*) FROM accounts` still returns 1, and the hub logs
+   `baseline complete` for `sei`. The baseline comes on the hub's first poll after the plugin has
+   reached SEI. Don't restart the hub before that line (see [The hub's first
+   read](#the-hubs-first-read)).
 
 ### Back to the Go release
 
@@ -295,10 +342,14 @@ What to expect:
   CASCADE`), pending ones included. Those are never sent.
 - Notifications the hub had not delivered are not sent by anyone. List them in the hub's database
   before you stop it.
+- Go logs in once at start even with a pause reason on record, because it has no hold.
 - The plugin adds no table or column. A future migration keeps this way back open only while it
   leaves alone the tables, columns, constraints and event formats the Go release uses. Go does not
   refuse a database that holds a migration it does not know, so a breaking change would show up as
   wrong or failing queries.
+
+Before you come forward to the plugin again, reset the hub's position for `sei`. Otherwise the hub
+announces events Go already announced in between.
 
 ## Security
 
@@ -308,9 +359,9 @@ What to expect:
 - On start, the binary turns off core dumps, blocks other processes from reading its memory
   through debugging interfaces, and sets its file mode mask to 077.
 - Calls to SEI verify TLS against the root certificates built into the binary (the
-  `webpki-root-certs` crate), not the system's. Each
-  request has a 30-second total limit, reads at most 16 MiB of a body, and errors never include
-  addresses that may carry a token. API calls refuse redirects.
+  `webpki-root-certs` crate), not the system's. Each request has a 30-second total limit, reads at
+  most 16 MiB of a body, and errors never include addresses that may carry a token. API calls
+  refuse redirects.
 - The image has no shell and no other program, and runs as user 65532. Inside the hub the plugin
   runs as the hub's user, in the hub's hardened container.
 - Database connections have a 10-second connect limit, a 20-second statement limit and TCP
@@ -331,7 +382,15 @@ What to expect:
   reports them as having left your units, and as new when they come back.
 - Accounts with two-factor authentication are untested.
 - One SEI account per plugin.
-- A captcha or Cloudflare challenge in front of SEI stops the plugin.
+- A captcha or Cloudflare challenge in front of SEI fails every check that meets it. The plugin
+  shows `failing` and keeps trying with the back-off. A challenge on the login route makes each
+  of those tries post the password again, so watch `GET /api/plugins` if SEI puts one up.
+- Each event carries a link to its process, built from `SEI_URL` and the process id:
+  `{SEI_URL}/sei/controlador.php?acao=procedimento_trabalhar&id_procedimento=<id>`. It is the Go
+  release's feed link and holds no session, so SEI may ask you to log in first or refuse it. It
+  was never opened against a real SEI. It is wrong when your SEI does not live under `/sei/`, as
+  can happen when you set `SEI_API_URL`. It goes out at the `minimal` level too and shows your SEI
+  address and SEI's internal process id.
 - A list of more than 400 pages for one unit fails the check instead of being cut short.
 
 ### Where the plugin differs from the Go release
@@ -347,8 +406,11 @@ The plugin was checked against the Go release's own output. These differences ar
   Brazilian.
 - A secret that is not valid UTF-8 (the password, `DATABASE_URL`, their files, the output of the
   password command) is refused without showing it. Go used the raw bytes.
-- `SEI_PASSWORD_CMD` runs a program found through a relative `PATH` entry, which Go refused.
 - The pruning cutoff is computed in UTC, and never deletes an event the hub has not read.
+- The `account_login_failed` event ends with how to resume instead of Go's sentence that a
+  restart resumes monitoring.
+- A NUL character in text from SEI is dropped where the text enters. In Go it failed every check
+  and stored nothing.
 - SEI answers that the real server never sends (lone surrogate escapes, numbers too large for a
   float, duplicate keys, nesting of 128 levels or more) are refused as `answer outside the API
   format`.
@@ -363,10 +425,15 @@ The plugin was checked against the Go release's own output. These differences ar
   Postgres on `127.0.0.1:5432` from `compose.yaml`; copy `.env.example` to `.env` first and set
   `POSTGRES_PASSWORD`.
 - The database tests use `TEST_DATABASE_URL` when it is set, and otherwise start a throwaway
-  Postgres from `initdb` and `postgres` on `PATH`. The compatibility tests build the Go release from
-  the tag `v1.0.0` with `go`. With `CI` set, a missing tool fails the tests instead of skipping them.
+  Postgres from `initdb` and `postgres` on `PATH`. To use the compose Postgres, export
+  `TEST_DATABASE_URL` in your shell, with the same password as `POSTGRES_PASSWORD`. The
+  compatibility tests build the Go release from the tag `v1.0.0` with `go`. The conformance test
+  runs the program named by `PLUGIN_CONFORMANCE`, or else installs `plugin-conformance` with `go`.
+  With `CI` set, a missing tool fails the tests instead of skipping them.
 - `git config core.hooksPath .githooks` turns on the hooks: Conventional Commits messages, and
-  `cargo fmt --check` plus the tests before each commit.
+  `cargo fmt --check` plus the tests before each commit. The hook and `make` run cargo through
+  `rustup run` with the toolchain in `rust-toolchain.toml` when `rustup` is installed, so another
+  cargo earlier on `PATH` is never used by accident.
 - No test talks to a real SEI. A fake server in `tests/support/` plays its part.
 - To run the operator commands from a checkout, export the plain variables and run
   `cargo run -- test-login`. The binary never reads `.env`.

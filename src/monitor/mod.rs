@@ -85,6 +85,7 @@ pub struct State {
     pub last_started_at: Option<DateTime<Utc>>,
     pub fatal: Option<String>,
     pub prepare_error: Option<String>,
+    pub cycle_error: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -231,12 +232,23 @@ impl Monitor {
     pub async fn run_once(&self, trigger: Trigger) -> Result<CycleResult, MonitorError> {
         let (prepared, started) = self.begin()?;
         let _running = RunningGuard(self);
+        let outcome = self.recorded_cycle(&prepared, trigger, started).await;
+        self.inner().state.cycle_error = outcome.as_ref().err().map(error_text);
+        outcome
+    }
+
+    async fn recorded_cycle(
+        &self,
+        prepared: &Prepared,
+        trigger: Trigger,
+        started: DateTime<Utc>,
+    ) -> Result<CycleResult, MonitorError> {
         let account_id = prepared.account.id;
         let run_id = self
             .store
             .start_cycle_run(account_id, trigger, started)
             .await?;
-        let outcome = self.cycle(&prepared, run_id, started).await;
+        let outcome = self.cycle(prepared, run_id, started).await;
         if let Err(error) = &outcome {
             self.record_failure(run_id, account_id, error).await;
         }
@@ -302,7 +314,7 @@ impl Monitor {
     }
 
     async fn record_failure(&self, run_id: i64, account_id: i64, error: &MonitorError) {
-        let text = describe(&error.to_string());
+        let text = error_text(error);
         let finished = self
             .store
             .finish_cycle_run(run_id, account_id, self.clock.now(), &text)
@@ -484,6 +496,10 @@ pub fn login_failure(error: &SeiError, now: DateTime<Utc>) -> (String, Event) {
         },
     };
     (reason, event)
+}
+
+fn error_text(error: &MonitorError) -> String {
+    describe(&error.to_string())
 }
 
 fn describe(text: &str) -> String {

@@ -359,6 +359,44 @@ async fn a_fatal_configuration_keeps_the_plugin_up() {
     stop_cleanly(&mut plugin).await;
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn a_failing_cycle_shows_in_status_until_one_succeeds() {
+    let Some(database) = migrated_database().await else {
+        return;
+    };
+    let fake = FakeSei::start();
+    populate(&fake);
+    fake.fail_next(ROUTE_PROCESSES, 500, 1);
+    let mut plugin = start_plugin(&sei_env(&fake, &database.url, PASSWORD));
+    let mut client = plugin_client(&plugin.socket).await;
+
+    let failing = status_where(&mut plugin, &mut client, "the cycle fails", |status| {
+        status.state == i32::from(State::Failing) && status.message.starts_with("sei: ")
+    })
+    .await;
+    let deadline = Instant::now() + PREPARATION_RETRY_LIMIT;
+    let recovered = loop {
+        let status = client.status().await.expect("status");
+        if status.last_success_at.is_some() {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            plugin.fail(&format!("the retry never succeeded; last {status:?}"));
+        }
+        tokio::time::sleep(POLL).await;
+    };
+
+    assert_eq!(
+        failing.message,
+        "sei: /processo/listar: answer outside the API format (HTTP 500)"
+    );
+    assert_eq!(failing.last_success_at, None);
+    assert_eq!(recovered.state, i32::from(State::Idle), "{recovered:?}");
+    assert_eq!(recovered.message, "");
+    drop(client);
+    stop_cleanly(&mut plugin).await;
+}
+
 async fn last_run(client: &Client) -> Option<(bool, String)> {
     client
         .query_opt(

@@ -28,8 +28,8 @@ use support::fake_sei::{
     FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_PROCESSES, UNIT_NUPROC, USERNAME, process_number,
 };
 use support::harness::{
-    FIFTEEN_MINUTES, Harness, activity, config, database_store, document, populate, process, start,
-    user,
+    FIFTEEN_MINUTES, Harness, activity, bounded, config, database_store, document, no_jitter,
+    populate, process, start, store_as, user,
 };
 
 const POLL: Duration = Duration::from_millis(10);
@@ -480,6 +480,68 @@ async fn status_follows_the_monitor() {
     assert_eq!(paused.message, format!("{REJECTED}; {PAUSED_HERE}"));
     assert_eq!(paused.next_check_at, None);
     assert_eq!(paused.last_success_at, Some(timestamp(finished)));
+}
+
+#[tokio::test]
+async fn status_shows_a_failing_cycle_until_one_succeeds() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    h.fake.fail_next(ROUTE_PROCESSES, 500, 1);
+    let plugin = plugin(&h);
+    let _run = spawn_run(&h.monitor);
+
+    let retry = h.clock.next_sleep().await;
+    let failing = status(&plugin).await;
+    h.clock.advance(retry.duration);
+    retry.fire.send(()).expect("the monitor is waiting");
+    h.clock.next_sleep().await;
+    let recovered = status(&plugin).await;
+
+    assert_eq!(failing.state, i32::from(State::Failing));
+    assert_eq!(
+        failing.message,
+        "sei: /processo/listar: answer outside the API format (HTTP 500)"
+    );
+    assert_eq!(failing.last_success_at, None);
+    assert_eq!(
+        failing.next_check_at,
+        Some(timestamp(start() + chrono::Duration::seconds(30)))
+    );
+    assert_eq!(recovered.state, i32::from(State::Idle));
+    assert_eq!(recovered.message, "");
+    assert!(recovered.last_success_at.is_some(), "{recovered:?}");
+}
+
+#[tokio::test]
+async fn status_shows_events_that_cannot_be_read() {
+    let Some((database, store)) = database_store().await else {
+        return;
+    };
+    let h = with_history(&store).await;
+    let blind = store_as(&database, "sei_events_denied", "SELECT ON events").await;
+    let monitor = Monitor::new(
+        config(&h.fake, PASSWORD),
+        blind,
+        h.clock.clone(),
+        no_jitter(),
+    );
+    bounded(monitor.prepare()).await.expect("prepare");
+    let plugin = SeiPlugin::new(Arc::clone(&monitor), false);
+    let readable = status(&plugin).await;
+
+    let failure = events(&plugin, 0, 0)
+        .await
+        .expect_err("events the role cannot read");
+    let failing = status(&plugin).await;
+
+    assert_eq!(readable.state, i32::from(State::Idle), "{readable:?}");
+    assert_eq!(failure.code(), Code::Unavailable);
+    assert_eq!(failure.message(), UNAVAILABLE);
+    assert_eq!(failing.state, i32::from(State::Failing));
+    assert_eq!(failing.message, UNAVAILABLE);
 }
 
 #[tokio::test]

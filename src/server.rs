@@ -43,6 +43,7 @@ pub struct SeiPlugin {
     first_read_boundary: Option<i64>,
     first_read_over: AtomicBool,
     hub_ahead: AtomicBool,
+    events_failing: AtomicBool,
 }
 
 impl SeiPlugin {
@@ -53,6 +54,7 @@ impl SeiPlugin {
             first_read_boundary: None,
             first_read_over: AtomicBool::new(false),
             hub_ahead: AtomicBool::new(false),
+            events_failing: AtomicBool::new(false),
         }
     }
 
@@ -63,7 +65,7 @@ impl SeiPlugin {
 
     async fn read_events(&self, after: i64, limit: i64) -> Result<Vec<Event>, Status> {
         let store = self.monitor.store();
-        let last_issued = store.last_issued_seq().await.map_err(unavailable)?;
+        let last_issued = self.read_or_fail(store.last_issued_seq().await)?;
         if self.hub_is_ahead(after, last_issued) {
             return Ok(Vec::new());
         }
@@ -72,10 +74,8 @@ impl SeiPlugin {
         if state.account_id == 0 {
             return Err(Status::unavailable(MonitorError::NotReady.to_string()));
         }
-        let stored = store
-            .events_after(state.account_id, after, limit)
-            .await
-            .map_err(unavailable)?;
+        let stored = self.read_or_fail(store.events_after(state.account_id, after, limit).await)?;
+        self.events_failing.store(false, Ordering::SeqCst);
         let formatter = self.formatter(&state);
         let boundary = self.active_boundary();
         Ok(stored
@@ -83,6 +83,13 @@ impl SeiPlugin {
             .take_while(|stored| boundary.is_none_or(|boundary| stored.id <= boundary))
             .map(|stored| self.event(&formatter, &stored))
             .collect())
+    }
+
+    fn read_or_fail<T>(&self, read: Result<T, StoreError>) -> Result<T, Status> {
+        read.map_err(|failure| {
+            self.events_failing.store(true, Ordering::SeqCst);
+            unavailable(failure)
+        })
     }
 
     fn hub_is_ahead(&self, after: i64, last_issued: i64) -> bool {
@@ -177,7 +184,9 @@ impl Plugin for SeiPlugin {
         let state = self.monitor.state();
         let last_success = self.last_success(state.account_id).await;
         let hub_ahead = self.hub_ahead.load(Ordering::SeqCst);
-        let (current, message) = state_and_message(&state, last_success.is_some(), hub_ahead);
+        let database_answered =
+            last_success.is_some() && !self.events_failing.load(Ordering::SeqCst);
+        let (current, message) = state_and_message(&state, database_answered, hub_ahead);
         Ok(Response::new(StatusResponse {
             state: current.into(),
             message: capped(&message).to_owned(),
@@ -265,6 +274,9 @@ fn state_and_message(
     }
     if state.paused {
         return (State::Paused, paused_message(state));
+    }
+    if let Some(failure) = &state.cycle_error {
+        return (State::Failing, failure.clone());
     }
     if state.account_id == 0 {
         return (State::Failing, not_reached(state));

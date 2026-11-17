@@ -13,7 +13,7 @@ use sei_monitor::config::{ConfigError, PluginConfig, Source};
 use sei_monitor::harden::harden;
 use tokio::runtime::{Builder, Runtime};
 use tokio::signal::unix::{SignalKind, signal};
-use tracing::error;
+use tracing::{error, warn};
 
 const RUNTIME_SHUTDOWN_LIMIT: Duration = Duration::from_millis(500);
 
@@ -23,7 +23,8 @@ type Operation = for<'a> fn(
 ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>;
 
 fn main() -> ExitCode {
-    if let Err(failure) = harden() {
+    let hardening = harden();
+    if let Err(failure) = &hardening {
         eprintln!("warning: could not harden the process: {failure}");
     }
     let cli = match Cli::try_parse() {
@@ -31,7 +32,7 @@ fn main() -> ExitCode {
         Err(usage) => return usage_exit(usage),
     };
     match cli.command {
-        Some(Command::Plugin) => plugin(),
+        Some(Command::Plugin) => plugin(hardening.err()),
         Some(Command::TestLogin) => operate(|source, out| Box::pin(test_login(source, out))),
         Some(Command::Orgs) => operate(|source, out| Box::pin(orgs(source, out))),
         Some(Command::Diagnose) => operate(|source, out| Box::pin(diagnose(source, out))),
@@ -76,7 +77,7 @@ fn not_launched_by_hub() -> ExitCode {
     ExitCode::FAILURE
 }
 
-fn plugin() -> ExitCode {
+fn plugin(hardening: Option<io::Error>) -> ExitCode {
     if !launched_by_hub() {
         return not_launched_by_hub();
     }
@@ -87,6 +88,12 @@ fn plugin() -> ExitCode {
     if let Err(failure) = logging::init(config.log_filter()) {
         eprintln!("cannot start logging: {failure}");
         return ExitCode::FAILURE;
+    }
+    if let Some(failure) = &hardening {
+        warn!(
+            error = failure as &dyn Error,
+            "could not harden the process"
+        );
     }
     let runtime = match runtime() {
         Ok(runtime) => runtime,

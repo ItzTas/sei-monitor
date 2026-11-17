@@ -127,6 +127,7 @@ pub struct Monitor {
 struct Inner {
     prepared: Option<Prepared>,
     logins: u64,
+    reason_to_clear: bool,
     state: State,
 }
 
@@ -175,6 +176,7 @@ impl Monitor {
             inner: Mutex::new(Inner {
                 prepared: None,
                 logins: 0,
+                reason_to_clear: false,
                 state,
             }),
         })
@@ -341,7 +343,7 @@ impl Monitor {
         changes.finished_at = self.clock.now();
         let inserted = self.store.apply_cycle(&changes).await?;
         let baseline = changes.baseline;
-        self.after_success(baseline, started);
+        self.after_success(account_id, baseline, started).await;
         self.prune(account_id, started).await;
         let result = CycleResult {
             processes_seen,
@@ -466,17 +468,25 @@ impl Monitor {
         let Err(error) = self.store.set_paused_reason(account_id, "").await else {
             return;
         };
+        self.inner().reason_to_clear = true;
         warn!(
             error = &error as &dyn Error,
             "could not clear the pause reason"
         );
     }
 
-    fn after_success(&self, baseline: bool, started: DateTime<Utc>) {
+    async fn after_success(&self, account_id: i64, baseline: bool, started: DateTime<Utc>) {
+        if self.settle_success(baseline, started) {
+            self.clear_recorded_reason(account_id).await;
+        }
+    }
+
+    fn settle_success(&self, baseline: bool, started: DateTime<Utc>) -> bool {
         let mut inner = self.inner();
         if baseline && let Some(prepared) = inner.prepared.as_mut() {
             prepared.account.baseline_at = Some(started);
         }
+        std::mem::take(&mut inner.reason_to_clear)
     }
 
     fn elapsed_since(&self, started: DateTime<Utc>) -> String {

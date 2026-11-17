@@ -9,6 +9,7 @@ use sei_monitor::monitor::{Clock, Monitor, MonitorError, State, TriggerError};
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{AccountKey, CycleRun, Store, Trigger};
 use tokio::task::JoinHandle;
+use tokio_postgres::NoTls;
 
 use support::fake_sei::{
     FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_LOGIN_PAGE, ROUTE_PROCESSES, ROUTE_VERSION,
@@ -650,4 +651,68 @@ async fn a_check_whose_login_gets_no_verdict_keeps_the_rejection_on_hold() {
         })
     );
     assert_eq!(again, Ok(()));
+}
+
+async fn admin(url: &str) -> tokio_postgres::Client {
+    let (client, connection) = tokio_postgres::connect(url, NoTls)
+        .await
+        .expect("connect as the test superuser");
+    tokio::spawn(connection);
+    client
+}
+
+async fn reason_in(observer: &tokio_postgres::Client) -> String {
+    observer
+        .query_one("SELECT paused_reason FROM accounts", &[])
+        .await
+        .expect("the stored reason")
+        .get(0)
+}
+
+async fn waiting_to_clear(observer: &tokio_postgres::Client) -> bool {
+    let waiting: i64 = observer
+        .query_one(
+            "SELECT count(*) FROM pg_stat_activity
+             WHERE wait_event_type = 'Lock' AND query LIKE 'UPDATE accounts SET paused_reason%'",
+            &[],
+        )
+        .await
+        .expect("pg_stat_activity")
+        .get(0);
+    waiting > 0
+}
+
+#[tokio::test]
+async fn a_failed_clear_of_the_rejection_is_tried_again_after_the_next_successful_cycle() {
+    let Some((database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    record_rejection(&h).await;
+    let _run = spawn_run(&h.monitor);
+    let was_held = held(&h.monitor).await;
+    let observer = admin(&database.url).await;
+    let holder = admin(&database.url).await;
+    holder
+        .batch_execute("BEGIN; SELECT id FROM accounts FOR NO KEY UPDATE")
+        .await
+        .expect("hold the account row");
+
+    let checked = h.monitor.trigger_cycle();
+    let blocked = eventually(|| waiting_to_clear(&observer)).await;
+    let gave_up = eventually(|| async { !waiting_to_clear(&observer).await }).await;
+    let stored_while_held = reason_in(&observer).await;
+    holder.batch_execute("ROLLBACK").await.expect("release");
+    let scheduled = h.clock.next_sleep().await;
+
+    assert!(was_held, "the monitor did not start held");
+    assert_eq!(checked, Ok(()));
+    assert!(blocked && gave_up, "the clear never ran into the lock");
+    assert_eq!(stored_while_held, RECORDED_REASON);
+    assert_eq!(scheduled.duration, FIFTEEN_MINUTES);
+    let run = last_run(&h).await;
+    assert_eq!((run.trigger, run.error.as_str()), (Trigger::Manual, ""));
+    assert_eq!(reason_in(&observer).await, "");
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (1, 0));
 }

@@ -10,6 +10,7 @@ use crate::timezone::{days_until, format_local};
 const LABEL_LIMIT: usize = 40;
 const SUMMARY_LIMIT: usize = 80;
 const PAYLOAD_KEYS: [&str; 4] = ["procedure_id", "process_number", "unit", "detail"];
+const RESUME_STEPS: &str = "Fix the configuration, restart the hub if you changed its settings, then request a check for the sei plugin.";
 
 #[derive(Clone)]
 pub struct Formatter {
@@ -41,11 +42,7 @@ impl Formatter {
     pub fn details(&self, event: &Event) -> Vec<String> {
         let p = &event.payload;
         if event.kind == Kind::AccountLoginFailed {
-            return vec![
-                format!("Reason: {}", p.reason),
-                "Monitoring is paused until sei-monitor restarts with the configuration fixed."
-                    .to_string(),
-            ];
+            return vec![format!("Reason: {}", p.reason), RESUME_STEPS.to_string()];
         }
         let mut lines = vec![format!("When: {}", self.time(event.occurred_at))];
         if !p.unit.is_empty() && !matches!(event.kind, Kind::ProcessEntered | Kind::ProcessLeft) {
@@ -652,7 +649,7 @@ mod tests {
             utc(false, "").details(&failure),
             [
                 "Reason: SEI rejected the login (Usuário ou Senha Inválida.)",
-                "Monitoring is paused until sei-monitor restarts with the configuration fixed.",
+                "Fix the configuration, restart the hub if you changed its settings, then request a check for the sei plugin.",
             ]
         );
     }
@@ -682,7 +679,7 @@ mod tests {
         assert!(utc(true, "").body(&document).starts_with("When: "));
         assert_eq!(
             utc(false, "").body(&failure),
-            "Reason: SEI rejected the login (Usuário ou Senha Inválida.)\nMonitoring is paused until sei-monitor restarts with the configuration fixed."
+            "Reason: SEI rejected the login (Usuário ou Senha Inválida.)\nFix the configuration, restart the hub if you changed its settings, then request a check for the sei plugin."
         );
     }
 
@@ -862,6 +859,20 @@ mod tests {
         assert!(!contains_folded("ab", "abc"));
     }
 
+    const GO_RESUME_LINE: &str =
+        "Monitoring is paused until sei-monitor restarts with the configuration fixed.";
+
+    fn plugin_details(case: &EventTextCase) -> Vec<String> {
+        let mut details = case.details.clone();
+        if case.event.kind != Kind::AccountLoginFailed.as_str() {
+            return details;
+        }
+        let last = details.last_mut().expect("a login failure has details");
+        assert_eq!(last, GO_RESUME_LINE, "{}", case.name);
+        *last = RESUME_STEPS.to_owned();
+        details
+    }
+
     #[test]
     fn event_text_matches_go() {
         let cases = golden::cases::<EventTextCase>("event_text", "");
@@ -880,7 +891,7 @@ mod tests {
             let details = formatter.details(&event);
 
             assert_eq!(formatter.title(&event), case.title, "{} title", case.name);
-            assert_eq!(details, case.details, "{} details", case.name);
+            assert_eq!(details, plugin_details(&case), "{} details", case.name);
             assert_eq!(view_json, case.view, "{} view", case.name);
             assert_eq!(payload, restricted(&case.view), "{} payload", case.name);
 

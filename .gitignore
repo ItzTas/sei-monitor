@@ -1,9 +1,2 @@
-/sei-monitor
 .env
-/tmp/
-*.test
-*.out
-coverage.*
-go.work
-go.work.sum
 /target

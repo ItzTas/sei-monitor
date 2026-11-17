@@ -183,7 +183,7 @@ mod tests {
         assert!(result.is_err());
         let deadline = Instant::now() + REAP_LIMIT;
         while !children().is_empty() && Instant::now() < deadline {
-            runtime.block_on(tokio::time::sleep(Duration::from_millis(20)));
+            runtime.block_on(async { tokio::time::sleep(Duration::from_millis(20)).await });
         }
         assert_eq!(children(), []);
     }

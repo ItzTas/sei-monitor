@@ -1,12 +1,15 @@
 .PHONY: check test up down
 
+TOOLCHAIN := $(shell sed -n 's/^channel = "\(.*\)"$$/\1/p' rust-toolchain.toml)
+CARGO := $(if $(shell command -v rustup),rustup run $(TOOLCHAIN) cargo,cargo)
+
 check:
-	cargo fmt --check
-	cargo clippy --all-targets --all-features -- -D warnings
-	cargo test
+	$(CARGO) fmt --check
+	$(CARGO) clippy --all-targets --all-features -- -D warnings
+	$(CARGO) test
 
 test:
-	cargo test
+	$(CARGO) test
 
 up:
 	docker compose up -d

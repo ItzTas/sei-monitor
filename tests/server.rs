@@ -23,7 +23,6 @@ use sei_monitor::secret::Secret;
 use sei_monitor::server::SeiPlugin;
 use sei_monitor::store::{AccountKey, Store};
 
-use support::database_url_as;
 use support::fake_sei::{
     FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_PROCESSES, UNIT_NUPROC, USERNAME, process_number,
 };
@@ -31,6 +30,7 @@ use support::harness::{
     FIFTEEN_MINUTES, Harness, activity, bounded, config, database_store, document, no_jitter,
     populate, process, start, store_as, user,
 };
+use support::{database_url_as, login_role};
 
 const POLL: Duration = Duration::from_millis(10);
 const EVENTUALLY: Duration = Duration::from_secs(10);
@@ -42,7 +42,7 @@ const NOT_REACHED: &str = "sei-monitor has not reached SEI yet";
 const UNAVAILABLE: &str = "the database is unavailable";
 const HUB_AHEAD: &str =
     "the hub is ahead of this database: reset the hub's position for the sei plugin";
-const DB_ROLE: &str = "sei_test";
+const DB_ROLE: &str = "sei_server_locked_out";
 const DB_PASSWORD: &str = "db-secret-7f3a";
 
 struct Running(JoinHandle<()>);
@@ -712,9 +712,10 @@ async fn database_failures_never_show_the_password() {
     let client = admin(&database.url).await;
     client
         .batch_execute(&format!(
-            "CREATE ROLE {DB_ROLE} LOGIN PASSWORD '{DB_PASSWORD}';
+            "{}
              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {DB_ROLE};
-             GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {DB_ROLE};"
+             GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {DB_ROLE};",
+            login_role(DB_ROLE, DB_PASSWORD)
         ))
         .await
         .expect("create the role");

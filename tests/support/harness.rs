@@ -18,10 +18,11 @@ use super::fake_sei::{
     FakeActivity, FakeDocument, FakeProcess, FakeSei, FakeUser, ORG_ACRONYM, PASSWORD, UNIT_NUPROC,
     USER_ID, USER_NAME, USERNAME, process_number,
 };
-use super::{database_url_as, migrated_database};
+use super::{database_url_as, login_role, migrated_database};
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(20);
 pub const FIFTEEN_MINUTES: Duration = Duration::from_secs(15 * 60);
+const ROLE_PASSWORD: &str = "sei-role-password";
 pub fn start() -> DateTime<Utc> {
     DateTime::parse_from_rfc3339("2026-11-04T18:00:00Z")
         .expect("the start time")
@@ -138,9 +139,9 @@ pub async fn store_as(database: &Database, role: &str, revoke: &str) -> Store {
         .await
         .expect("connect as the test superuser");
     let driver = tokio::spawn(connection);
+    let login = login_role(role, ROLE_PASSWORD);
     let setup = format!(
-        "DO $$ BEGIN CREATE ROLE {role} LOGIN;
-         EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+        "{login}
          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {role};
          GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO {role};
          REVOKE {revoke} FROM {role};"
@@ -154,7 +155,7 @@ pub async fn store_as(database: &Database, role: &str, revoke: &str) -> Store {
         .await
         .expect("join the setup connection")
         .expect("close the setup connection");
-    let url = database_url_as(&database.url, role, "unused");
+    let url = database_url_as(&database.url, role, ROLE_PASSWORD);
     Store::new(&Secret::new(url)).expect("store")
 }
 

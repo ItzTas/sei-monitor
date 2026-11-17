@@ -22,7 +22,7 @@ use support::process::{
     COOKIE, PluginClient, RunningPlugin, error_lines, plugin_client, run_to_exit, spawn_plugin,
     terminate,
 };
-use support::{database_url_as, migrated_database};
+use support::{database_url_as, login_role, migrated_database};
 
 const EXIT_LIMIT: Duration = Duration::from_secs(30);
 const STOP_LIMIT: Duration = Duration::from_secs(2);
@@ -36,7 +36,7 @@ const REJECTED: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
 const GO_PAUSE: &str = "monitoring is paused because SEI rejected the login; restart sei-monitor after fixing the configuration";
 const HELD: &str = "nothing is logging in: request a check once the configuration is fixed";
 const PAUSED_HERE: &str = "restart the plugin with the configuration fixed, then request a check";
-const DB_ROLE: &str = "sei_test";
+const DB_ROLE: &str = "sei_entrypoint_secrets";
 const DB_PASSWORD: &str = "db-secret-7f3a";
 
 async fn admin(url: &str) -> Client {
@@ -623,9 +623,10 @@ async fn secrets_never_reach_logs_or_answers() {
     let client = admin(&database.url).await;
     client
         .batch_execute(&format!(
-            "CREATE ROLE {DB_ROLE} LOGIN PASSWORD '{DB_PASSWORD}';
+            "{}
              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {DB_ROLE};
-             GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {DB_ROLE};"
+             GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {DB_ROLE};",
+            login_role(DB_ROLE, DB_PASSWORD)
         ))
         .await
         .expect("create the role");

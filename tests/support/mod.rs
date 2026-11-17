@@ -47,6 +47,14 @@ pub async fn migrated_database() -> Option<Database> {
     Some(database)
 }
 
+pub fn login_role(role: &str, password: &str) -> String {
+    format!(
+        "DO $$ BEGIN CREATE ROLE {role} LOGIN PASSWORD '{password}';
+         EXCEPTION WHEN duplicate_object OR unique_violation THEN
+         ALTER ROLE {role} LOGIN PASSWORD '{password}'; END $$;"
+    )
+}
+
 pub fn database_url_as(url: &str, role: &str, password: &str) -> String {
     let (scheme, rest) = url.split_once("://").expect("a postgres:// URL");
     let authority_end = rest.find(['/', '?']).unwrap_or(rest.len());

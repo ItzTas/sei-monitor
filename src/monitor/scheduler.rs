@@ -341,6 +341,7 @@ impl Monitor {
         inner.state.held = false;
         inner.state.paused_reason = reason.to_owned();
         inner.state.next_cycle_at = None;
+        inner.reason_to_clear = false;
         if let Some(prepared) = inner.prepared.as_mut() {
             prepared.account.paused_reason = reason.to_owned();
         }

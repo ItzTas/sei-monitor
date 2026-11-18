@@ -29,6 +29,7 @@ const REJECTED: &str = "Usuário ou Senha Inválida.";
 const RECORDED_REASON: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
 const PAUSE_WRITE: &str = "UPDATE accounts SET paused_reason%";
 const PROCESSES_READ: &str = "SELECT * FROM processes%";
+const EARLIER_REASON: &str = "SEI rejected the login (in an earlier run)";
 
 fn minutes(n: u64) -> Duration {
     Duration::from_secs(n * 60)
@@ -900,4 +901,62 @@ async fn a_cancelled_clear_of_the_rejection_is_tried_again_after_the_next_succes
     assert!(restarted_ran, "{:?}", restarted.state());
     assert_eq!(reason_in(&observer).await, "");
     assert_eq!((h.fake.logins(), h.fake.failed_logins()), (2, 0));
+}
+
+#[tokio::test]
+async fn a_rejection_recorded_after_a_cancelled_clear_stays_on_record() {
+    let Some((database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    let (cancelled, logs) = captured(a_check_whose_clear_is_cancelled(
+        &h,
+        &database.url,
+        EARLIER_REASON,
+    ))
+    .await;
+    assert_cancelled(&cancelled, &logs, EARLIER_REASON);
+    let CancelledClear {
+        first,
+        observer,
+        retry,
+        ..
+    } = cancelled;
+
+    h.fake.set_password(CHANGED_PASSWORD);
+    h.clock.advance(retry.duration);
+    retry.fire.send(()).expect("the monitor is waiting");
+    let recorded = eventually(|| async {
+        let state = h.monitor.state();
+        state.paused && !state.held && reason_in(&observer).await == RECORDED_REASON
+    })
+    .await;
+    let retries = fire_pending_sleeps(&h, 3).await;
+    h.clock.advance(Duration::from_secs(3600));
+    let triggered = h.monitor.trigger_cycle();
+    tokio::time::sleep(SETTLE).await;
+    let stored_after_the_trigger = reason_in(&observer).await;
+    let events = h.events().await;
+    drop(first);
+    let restarted = another_monitor(&h);
+    let _second = spawn_run(&restarted);
+    let restarted_held = held(&restarted).await;
+
+    assert!(recorded, "{:?}", h.monitor.state());
+    assert_eq!(retries, 0, "the paused monitor scheduled another cycle");
+    assert_eq!(triggered, Err(TriggerError::Paused));
+    assert_eq!(stored_after_the_trigger, RECORDED_REASON);
+    assert!(
+        events
+            .iter()
+            .any(|event| event.kind == Kind::AccountLoginFailed
+                && event.reference.starts_with("login:")
+                && event.payload.reason == RECORDED_REASON),
+        "{events:?}"
+    );
+    assert!(restarted_held, "the restarted monitor did not hold");
+    assert_eq!(restarted.state().paused_reason, RECORDED_REASON);
+    assert_eq!(reason_in(&observer).await, RECORDED_REASON);
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (1, 1));
 }

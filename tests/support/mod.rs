@@ -6,6 +6,7 @@ pub mod harness;
 pub mod logs;
 pub mod postgres;
 pub mod process;
+pub mod schema;
 
 pub use postgres::{Database, database};
 
@@ -61,6 +62,14 @@ pub async fn migrated_database() -> Option<Database> {
         .expect("join the migration connection")
         .expect("close the migration connection");
     Some(database)
+}
+
+pub async fn orm(url: &str) -> sea_orm::DatabaseConnection {
+    let mut options = sea_orm::ConnectOptions::new(url);
+    options.sqlx_logging(false);
+    sea_orm::Database::connect(options)
+        .await
+        .expect("connect to the test database with SeaORM")
 }
 
 pub fn login_role(role: &str, password: &str) -> String {

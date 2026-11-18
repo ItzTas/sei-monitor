@@ -7,6 +7,7 @@ pub mod event;
 mod golden;
 pub mod gotext;
 pub mod harden;
+pub mod migration;
 pub mod monitor;
 pub mod password;
 #[cfg(test)]

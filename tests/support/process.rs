@@ -11,14 +11,14 @@ use std::time::{Duration, Instant};
 
 use monitor_hub_plugin::proto::{
     CheckRequest, CheckResponse, DescribeRequest, DescribeResponse, Event, EventsRequest,
-    EventsResponse, StatusRequest, StatusResponse,
+    EventsResponse, StatusRequest, StatusResponse, WatchRequest, WatchResponse,
 };
 use monitor_hub_plugin::{MAGIC_COOKIE_KEY, MAGIC_COOKIE_VALUE};
 use serde_json::Value;
 use tonic::client::Grpc;
 use tonic::codegen::http::uri::PathAndQuery;
 use tonic::transport::{Channel, Endpoint};
-use tonic::{Request, Status};
+use tonic::{Request, Status, Streaming};
 use tonic_prost::ProstCodec;
 use tonic_prost::prost::Message;
 
@@ -270,6 +270,21 @@ impl PluginClient {
     pub async fn events(&mut self, after: i64, limit: i32) -> Result<Vec<Event>, Status> {
         let page: EventsResponse = self.call("Events", EventsRequest { after, limit }).await?;
         Ok(page.events)
+    }
+
+    pub async fn watch(&mut self) -> Result<Streaming<WatchResponse>, Status> {
+        self.grpc
+            .ready()
+            .await
+            .map_err(|error| Status::unavailable(error.to_string()))?;
+        self.grpc
+            .server_streaming(
+                Request::new(WatchRequest {}),
+                PathAndQuery::from_static("/monitorhub.plugin.v1.Plugin/Watch"),
+                ProstCodec::<WatchRequest, WatchResponse>::default(),
+            )
+            .await
+            .map(tonic::Response::into_inner)
     }
 
     async fn call<Q, A>(&mut self, method: &'static str, request: Q) -> Result<A, Status>

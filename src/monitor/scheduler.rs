@@ -165,6 +165,7 @@ impl Monitor {
         let mut inner = self.inner();
         inner.state.paused = false;
         inner.state.held = false;
+        self.notifier.status_changed();
     }
 
     fn rejection_on_record(&self) -> Option<String> {
@@ -195,6 +196,7 @@ impl Monitor {
         inner.state.held = true;
         inner.state.paused_reason = reason.to_owned();
         inner.state.next_cycle_at = None;
+        self.notifier.status_changed();
         inner.state.account_id
     }
 
@@ -215,7 +217,9 @@ impl Monitor {
             documents: Vec::new(),
             events: vec![event],
         };
-        self.store.apply_cycle(&changes).await.map(drop)
+        let inserted = self.store.apply_cycle(&changes).await?;
+        self.announce_inserted(&inserted);
+        Ok(())
     }
 
     async fn prepare_until_ready(&self) -> Readiness {
@@ -225,9 +229,12 @@ impl Monitor {
                 return Readiness::Stopped;
             };
             let Err(failure) = prepared else {
-                let mut inner = self.inner();
-                inner.state.prepare_error = None;
-                inner.state.fatal = None;
+                {
+                    let mut inner = self.inner();
+                    inner.state.prepare_error = None;
+                    inner.state.fatal = None;
+                }
+                self.notifier.status_changed();
                 return Readiness::Ready;
             };
             failures = failures.saturating_add(1);
@@ -252,6 +259,7 @@ impl Monitor {
             inner.state.fatal = None;
             inner.state.prepare_error = Some(failure.to_string());
         }
+        self.notifier.status_changed();
         warn!(
             error = failure as &dyn Error,
             retry_in = %go_seconds(wait),
@@ -265,6 +273,7 @@ impl Monitor {
         if previous.as_deref() == Some(text.as_str()) {
             return;
         }
+        self.notifier.status_changed();
         error!(
             error = failure as &dyn Error,
             "sei-monitor cannot monitor SEI with this configuration; trying again with a back-off"
@@ -284,6 +293,7 @@ impl Monitor {
             .ok()
             .and_then(|wait| self.clock.now().checked_add_signed(wait));
         self.inner().state.next_cycle_at = next;
+        self.notifier.status_changed();
     }
 
     async fn pause(&self, cause: &SeiError) {
@@ -345,6 +355,7 @@ impl Monitor {
         if let Some(prepared) = inner.prepared.as_mut() {
             prepared.account.paused_reason = reason.to_owned();
         }
+        self.notifier.status_changed();
         inner.state.account_id
     }
 }
@@ -430,10 +441,17 @@ mod tests {
     use std::sync::Mutex;
 
     use serde::Deserialize;
+    use tokio::time::timeout;
 
     use super::*;
     use crate::golden;
-    use crate::sei::ApiError;
+    use crate::monitor::{MonitorConfig, SystemClock, random_jitter};
+    use crate::password::StaticPassword;
+    use crate::secret::Secret;
+    use crate::sei::{ApiError, Options, REQUEST_TIMEOUT, Target};
+    use crate::store::Store;
+
+    const REASON: &str = "SEI rejected the login";
 
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -478,6 +496,34 @@ mod tests {
             draw
         };
         (limits, jitter)
+    }
+
+    fn monitor() -> Arc<Monitor> {
+        let zone = "America/Boa_Vista".parse().expect("a zone");
+        let config = MonitorConfig {
+            target: Target {
+                sei_url: "http://127.0.0.1:9".to_owned(),
+                api_url: String::new(),
+                org: "SEDEMO".to_owned(),
+                username: "fulano.tal".to_owned(),
+                password: Arc::new(StaticPassword(Secret::new("unused".to_owned()))),
+            },
+            options: Options {
+                user_agent: "sei-monitor/test".to_owned(),
+                zone,
+                timeout: REQUEST_TIMEOUT,
+            },
+            units: Vec::new(),
+            all_units: false,
+            poll_interval: Duration::from_secs(15 * 60),
+            concurrency: 1,
+            return_warning_days: 2,
+            retention_days: 0,
+            zone,
+        };
+        let store = Store::new(&Secret::new("postgres://sei@127.0.0.1:1/sei".to_owned()))
+            .expect("a store that never connects");
+        Monitor::new(config, store, Arc::new(SystemClock), random_jitter())
     }
 
     fn api_error(route: &str, kind: ErrorKind) -> MonitorError {
@@ -594,5 +640,116 @@ mod tests {
         assert_eq!(TriggerError::Paused.to_string(), texts.paused);
         assert_eq!(MonitorError::Paused.to_string(), texts.paused);
         assert_eq!(TriggerError::NotReady.to_string(), texts.not_ready);
+    }
+
+    #[tokio::test]
+    async fn marking_a_pause_and_a_hold_signals_the_status() {
+        let monitor = monitor();
+        let mut signals = monitor.notifier().subscribe();
+        signals.latest_seq();
+
+        monitor.mark_paused(REASON);
+        let paused = timeout(Duration::ZERO, signals.changed()).await.ok();
+        let after_the_pause = monitor.state();
+        monitor.mark_held(REASON);
+        let held = timeout(Duration::ZERO, signals.changed()).await.ok();
+        let after_the_hold = monitor.state();
+
+        assert_eq!(paused, Some(0));
+        assert!(
+            after_the_pause.paused && !after_the_pause.held,
+            "{after_the_pause:?}"
+        );
+        assert_eq!(held, Some(0));
+        assert!(
+            after_the_hold.paused && after_the_hold.held,
+            "{after_the_hold:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn scheduling_the_next_cycle_signals_the_status() {
+        let monitor = monitor();
+        let mut signals = monitor.notifier().subscribe();
+        signals.latest_seq();
+
+        monitor.schedule(Duration::from_secs(60));
+
+        assert_eq!(
+            timeout(Duration::ZERO, signals.changed()).await.ok(),
+            Some(0)
+        );
+        assert!(monitor.state().next_cycle_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn preparation_failures_signal_the_status_once_per_new_text() {
+        let monitor = monitor();
+        let mut signals = monitor.notifier().subscribe();
+        signals.latest_seq();
+        let unreachable = MonitorError::Sei(SeiError::Transport {
+            context: "look for mod-wssei".to_owned(),
+            detail: "connection refused".to_owned(),
+            timed_out: false,
+        });
+        let unknown = MonitorError::Sei(SeiError::OrgNotFound("NOPE".to_owned()));
+        let another = MonitorError::Sei(SeiError::OrgNotFound("OTHER".to_owned()));
+
+        monitor.retry_preparation(&unreachable, Duration::from_secs(30));
+        let retried = timeout(Duration::ZERO, signals.changed()).await.ok();
+        let retrying = monitor.state();
+        monitor.report_configuration(&unknown);
+        let reported = timeout(Duration::ZERO, signals.changed()).await.ok();
+        let failing = monitor.state();
+        monitor.report_configuration(&unknown);
+        let repeated = timeout(Duration::ZERO, signals.changed()).await.ok();
+        monitor.report_configuration(&another);
+        let changed = timeout(Duration::ZERO, signals.changed()).await.ok();
+
+        assert_eq!(retried, Some(0));
+        assert_eq!(retrying.prepare_error, Some(unreachable.to_string()));
+        assert_eq!(reported, Some(0));
+        assert_eq!(failing.fatal, Some(unknown.to_string()));
+        assert_eq!(repeated, None);
+        assert_eq!(changed, Some(0));
+        assert_eq!(monitor.state().fatal, Some(another.to_string()));
+    }
+
+    #[tokio::test]
+    async fn the_end_of_a_hold_signals_the_status() {
+        let monitor = monitor();
+        monitor.mark_held(REASON);
+        let mut signals = monitor.notifier().subscribe();
+        signals.latest_seq();
+
+        monitor
+            .manual
+            .try_send(())
+            .expect("a free slot for the check");
+        let mut manual = monitor
+            .manual_signals
+            .try_lock()
+            .expect("the manual signals");
+        monitor.wait_for_check(&mut manual).await;
+        let ended = timeout(Duration::ZERO, signals.changed()).await.ok();
+
+        assert_eq!(ended, Some(0));
+        let state = monitor.state();
+        assert!(!state.paused && !state.held, "{state:?}");
+    }
+
+    #[tokio::test]
+    async fn a_fatal_report_signals_the_status() {
+        let monitor = monitor();
+        let mut signals = monitor.notifier().subscribe();
+        signals.latest_seq();
+
+        monitor.report_fatal("x");
+
+        assert_eq!(
+            timeout(Duration::ZERO, signals.changed()).await.ok(),
+            Some(0)
+        );
+        assert_eq!(monitor.state().fatal.as_deref(), Some("x"));
     }
 }

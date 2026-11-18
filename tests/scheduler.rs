@@ -4,6 +4,7 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
+use monitor_hub_plugin::Signals;
 use sei_monitor::event::Kind;
 use sei_monitor::monitor::{Clock, Monitor, MonitorError, State, TriggerError};
 use sei_monitor::secret::Secret;
@@ -14,12 +15,13 @@ use tokio_postgres::NoTls;
 use support::clock::PendingSleep;
 use support::fake_sei::{
     FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_LOGIN_PAGE, ROUTE_PROCESSES, ROUTE_VERSION,
-    USERNAME,
+    UNIT_NUPROC, USERNAME,
 };
 use support::harness::{
-    FIFTEEN_MINUTES, Harness, bounded, config, database_store, no_jitter, populate,
+    FIFTEEN_MINUTES, Harness, bounded, config, database_store, no_jitter, populate, process,
 };
 use support::logs::{LoggedEvent, captured, logged};
+use support::{next_signal, pending_signal};
 
 const SETTLE: Duration = Duration::from_millis(100);
 const POLL: Duration = Duration::from_millis(10);
@@ -30,6 +32,10 @@ const RECORDED_REASON: &str = "SEI rejected the login (Usuário ou Senha Inváli
 const PAUSE_WRITE: &str = "UPDATE accounts SET paused_reason%";
 const PROCESSES_READ: &str = "SELECT * FROM processes%";
 const EARLIER_REASON: &str = "SEI rejected the login (in an earlier run)";
+const SIGNALS_TO_READ: usize = 10;
+const QUIET: Duration = Duration::from_millis(500);
+const REFUSE_EVENTS_AT_COMMIT: &str = "CREATE FUNCTION refuse_events() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'refused at commit'; END $$;
+     CREATE CONSTRAINT TRIGGER refuse_at_commit AFTER INSERT ON events DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION refuse_events();";
 
 fn minutes(n: u64) -> Duration {
     Duration::from_secs(n * 60)
@@ -959,4 +965,211 @@ async fn a_rejection_recorded_after_a_cancelled_clear_stays_on_record() {
     assert_eq!(restarted.state().paused_reason, RECORDED_REASON);
     assert_eq!(reason_in(&observer).await, RECORDED_REASON);
     assert_eq!((h.fake.logins(), h.fake.failed_logins()), (1, 1));
+}
+
+async fn signal_until(signals: &mut Signals, mut awaited: impl FnMut(i64) -> bool) -> i64 {
+    for _ in 0..SIGNALS_TO_READ {
+        let seq = next_signal(signals).await;
+        if awaited(seq) {
+            return seq;
+        }
+    }
+    panic!("none of {SIGNALS_TO_READ} signals was the one awaited");
+}
+
+async fn with_a_baseline(store: &Store) -> Harness {
+    let h = Harness::new(store, |_| {});
+    populate(&h.fake);
+    h.prepare().await;
+    h.run_once().await;
+    h.clock.advance(FIFTEEN_MINUTES);
+    h.fake.add_process(UNIT_NUPROC, process(9003, 3, "Ofício"));
+    h
+}
+
+#[tokio::test]
+async fn a_committed_cycle_signals_the_newest_event_id() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = with_a_baseline(&store).await;
+    let mut signals = h.monitor.notifier().subscribe();
+    signals.latest_seq();
+
+    h.run_once().await;
+    let signalled = pending_signal(&mut signals).await;
+
+    let newest = h
+        .events()
+        .await
+        .iter()
+        .map(|event| event.id)
+        .max()
+        .expect("the events of the second cycle");
+    assert_eq!(signalled, Some(newest));
+}
+
+#[tokio::test]
+async fn a_cycle_whose_commit_fails_signals_no_new_id() {
+    let Some((database, store)) = database_store().await else {
+        return;
+    };
+    let h = with_a_baseline(&store).await;
+    admin(&database.url)
+        .await
+        .batch_execute(REFUSE_EVENTS_AT_COMMIT)
+        .await
+        .expect("a trigger that refuses every event at commit");
+    let before = h.events().await;
+    let mut signals = h.monitor.notifier().subscribe();
+    let seen = signals.latest_seq();
+
+    let outcome = bounded(h.monitor.run_once(Trigger::Scheduled)).await;
+
+    assert!(
+        matches!(outcome, Err(MonitorError::Store(_))),
+        "{outcome:?}"
+    );
+    assert_eq!(signals.latest_seq(), seen);
+    assert_eq!(h.events().await, before);
+}
+
+#[tokio::test]
+async fn a_cycle_signals_when_it_starts_and_when_it_ends() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    h.prepare().await;
+    h.fake.stall(ROUTE_PROCESSES);
+    let mut signals = h.monitor.notifier().subscribe();
+    signals.latest_seq();
+
+    let monitor = Arc::clone(&h.monitor);
+    let cycle = tokio::spawn(async move { monitor.run_once(Trigger::Scheduled).await });
+    next_signal(&mut signals).await;
+    let started = h.monitor.state();
+    cycle.abort();
+    let cancelled = cycle.await;
+    next_signal(&mut signals).await;
+    let ended = h.monitor.state();
+
+    assert!(started.running, "{started:?}");
+    assert!(
+        cancelled
+            .as_ref()
+            .is_err_and(|failure| failure.is_cancelled()),
+        "{cancelled:?}"
+    );
+    assert!(!ended.running, "{ended:?}");
+}
+
+#[tokio::test]
+async fn a_rejected_login_signals_the_pause_and_its_event() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    h.fake.set_password(CHANGED_PASSWORD);
+    let mut signals = h.monitor.notifier().subscribe();
+    signals.latest_seq();
+
+    let _run = spawn_run(&h.monitor);
+    let announced = signal_until(&mut signals, |seq| seq > 0).await;
+    let state = h.monitor.state();
+    let events = h.events().await;
+    let retries = fire_pending_sleeps(&h, 3).await;
+
+    let [failed] = &events[..] else {
+        panic!("expected one event: {events:?}");
+    };
+    assert_eq!(failed.kind, Kind::AccountLoginFailed);
+    assert!(failed.reference.starts_with("login:"), "{failed:?}");
+    assert_eq!(announced, failed.id);
+    assert!(state.paused && !state.held, "{state:?}");
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), 1);
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (0, 1));
+    assert_eq!(retries, 0, "the paused monitor scheduled another cycle");
+}
+
+async fn held_harness(store: &Store) -> (Harness, String) {
+    let h = Harness::new(store, |_| {});
+    populate(&h.fake);
+    h.fake.set_password(CHANGED_PASSWORD);
+    let reason = record_rejection(&h).await;
+    (h, reason)
+}
+
+#[tokio::test]
+async fn starting_held_signals_the_hold_and_its_event() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let (h, reason) = held_harness(&store).await;
+    let mut signals = h.monitor.notifier().subscribe();
+    signals.latest_seq();
+
+    let _run = spawn_run(&h.monitor);
+    let announced = signal_until(&mut signals, |seq| seq > 0).await;
+    let state = h.monitor.state();
+    let events = h.events().await;
+
+    let [held] = &events[..] else {
+        panic!("expected one event: {events:?}");
+    };
+    assert_eq!(held.kind, Kind::AccountLoginFailed);
+    assert_eq!(held.reference, "login-held:2026-11-04");
+    assert_eq!(announced, held.id);
+    assert!(state.paused && state.held, "{state:?}");
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), 0);
+    assert_eq!(stored_reason(&h).await, Some(reason));
+}
+
+#[tokio::test]
+async fn a_second_hold_on_the_same_day_signals_the_hold_without_a_new_id() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let (h, reason) = held_harness(&store).await;
+    let mut first_signals = h.monitor.notifier().subscribe();
+    first_signals.latest_seq();
+    let first = spawn_run(&h.monitor);
+    signal_until(&mut first_signals, |seq| seq > 0).await;
+    drop(first);
+    let restarted = another_monitor(&h);
+    let mut signals = restarted.notifier().subscribe();
+    signals.latest_seq();
+
+    let _second = spawn_run(&restarted);
+    signal_until(&mut signals, |_| restarted.state().held).await;
+    let after_the_hold = tokio::time::timeout(QUIET, signals.changed()).await.ok();
+    let latest = signals.latest_seq();
+
+    assert_eq!(after_the_hold, None);
+    assert_eq!(latest, 0);
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), 0);
+    let events = h.events().await;
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(stored_reason(&h).await, Some(reason));
+}
+
+#[tokio::test]
+async fn a_failed_preparation_signals_its_error() {
+    let h = Harness::new(&store_that_never_connects(), |_| {});
+    h.fake.set_module_inactive(true);
+    let mut signals = h.monitor.notifier().subscribe();
+    signals.latest_seq();
+
+    let _run = spawn_run(&h.monitor);
+    next_signal(&mut signals).await;
+    let state = h.monitor.state();
+
+    assert_eq!(
+        state.prepare_error.as_deref(),
+        Some("sei: /versao: Módulo inativo.")
+    );
+    assert_eq!(state.account_id, 0);
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), 0);
 }

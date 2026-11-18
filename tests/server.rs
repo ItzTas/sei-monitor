@@ -30,7 +30,7 @@ use support::harness::{
     FIFTEEN_MINUTES, Harness, activity, bounded, config, database_store, document, no_jitter,
     populate, process, start, store_as, user,
 };
-use support::{database_url_as, login_role};
+use support::{database_url_as, login_role, pending_signal};
 
 const POLL: Duration = Duration::from_millis(10);
 const EVENTUALLY: Duration = Duration::from_secs(10);
@@ -44,6 +44,7 @@ const HUB_AHEAD: &str =
     "the hub is ahead of this database: reset the hub's position for the sei plugin";
 const DB_ROLE: &str = "sei_server_locked_out";
 const DB_PASSWORD: &str = "db-secret-7f3a";
+const FLAPPING_ROLE: &str = "sei_events_flapping";
 
 struct Running(JoinHandle<()>);
 
@@ -943,4 +944,115 @@ async fn a_long_rejection_from_sei_is_cut_in_the_pause_and_in_status() {
     assert_eq!(reason, format!("SEI rejected the login ({cut})"));
     assert_eq!(shown.chars().count(), 500);
     assert!(reason.starts_with(&shown), "{shown}");
+}
+
+#[tokio::test]
+async fn the_end_of_the_first_read_signals_the_events_it_held() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = with_history(&store).await;
+    let boundary = last_issued(&h).await;
+    let plugin = plugin(&h).with_first_read_boundary(boundary);
+    add_one_event(&h).await;
+    let newest = last_issued(&h).await;
+    let all = seqs(&page(&SeiPlugin::new(Arc::clone(&h.monitor), false), 0, 500).await);
+    assert_eq!(all.len(), 7);
+    let mut signals = h.monitor.notifier().subscribe();
+    signals.latest_seq();
+
+    let full = page(&plugin, 0, 2).await;
+    let after_a_full_page = pending_signal(&mut signals).await;
+    let short = page(&plugin, all[1], 500).await;
+    let after_the_short_page = pending_signal(&mut signals).await;
+    let later = page(&plugin, all[5], 500).await;
+    let after_a_later_read = pending_signal(&mut signals).await;
+
+    assert_eq!(seqs(&full), all[..2]);
+    assert_eq!(after_a_full_page, None);
+    assert_eq!(seqs(&short), all[2..6]);
+    assert!(newest > boundary, "{newest} {boundary}");
+    assert_eq!(after_the_short_page, Some(newest));
+    assert_eq!(seqs(&later), all[6..]);
+    assert_eq!(after_a_later_read, None);
+}
+
+#[tokio::test]
+async fn the_hub_falling_ahead_and_back_in_line_signals_the_status() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = with_history(&store).await;
+    let newest = last_issued(&h).await;
+    let plugin = plugin(&h);
+    let mut signals = h.monitor.notifier().subscribe();
+    signals.latest_seq();
+
+    assert_eq!(page(&plugin, newest + 50, 0).await, []);
+    let fell_ahead = pending_signal(&mut signals).await;
+    let ahead = status(&plugin).await;
+    assert_eq!(page(&plugin, newest + 50, 0).await, []);
+    let still_ahead = pending_signal(&mut signals).await;
+    assert_eq!(page(&plugin, newest, 0).await, []);
+    let back_in_line = pending_signal(&mut signals).await;
+    let in_line = status(&plugin).await;
+
+    assert!(fell_ahead.is_some());
+    assert_eq!(ahead.state, i32::from(State::Failing));
+    assert_eq!(ahead.message, HUB_AHEAD);
+    assert_eq!(still_ahead, None);
+    assert!(back_in_line.is_some());
+    assert_eq!(in_line.state, i32::from(State::Idle));
+    assert_eq!(in_line.message, "");
+}
+
+#[tokio::test]
+async fn a_failing_read_of_the_events_and_its_recovery_signal_the_status() {
+    let Some((database, store)) = database_store().await else {
+        return;
+    };
+    let h = with_history(&store).await;
+    let blind = store_as(&database, FLAPPING_ROLE, "SELECT ON events").await;
+    let superuser = admin(&database.url).await;
+    superuser
+        .batch_execute(&format!("GRANT SELECT ON events_id_seq TO {FLAPPING_ROLE}"))
+        .await
+        .expect("let the role read the event counter");
+    let monitor = Monitor::new(
+        config(&h.fake, PASSWORD),
+        blind,
+        h.clock.clone(),
+        no_jitter(),
+    );
+    bounded(monitor.prepare()).await.expect("prepare");
+    let plugin = SeiPlugin::new(Arc::clone(&monitor), false);
+    let mut signals = monitor.notifier().subscribe();
+    signals.latest_seq();
+
+    let failure = events(&plugin, 0, 0)
+        .await
+        .expect_err("events the role cannot read");
+    let failed = pending_signal(&mut signals).await;
+    let failing = status(&plugin).await;
+    events(&plugin, 0, 0)
+        .await
+        .expect_err("events the role still cannot read");
+    let failed_again = pending_signal(&mut signals).await;
+    superuser
+        .batch_execute(&format!("GRANT SELECT ON events TO {FLAPPING_ROLE}"))
+        .await
+        .expect("give the role the events back");
+    let recovered_page = page(&plugin, 0, 0).await;
+    let recovered = pending_signal(&mut signals).await;
+    let readable = status(&plugin).await;
+
+    assert_eq!(failure.code(), Code::Unavailable);
+    assert_eq!(failure.message(), UNAVAILABLE);
+    assert!(failed.is_some());
+    assert_eq!(failing.state, i32::from(State::Failing));
+    assert_eq!(failing.message, UNAVAILABLE);
+    assert_eq!(failed_again, None);
+    assert_eq!(seqs(&recovered_page), ids(&h.events().await));
+    assert!(recovered.is_some());
+    assert_eq!(readable.state, i32::from(State::Idle), "{readable:?}");
 }

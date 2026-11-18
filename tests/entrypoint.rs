@@ -5,10 +5,11 @@ use std::os::unix::fs::PermissionsExt;
 use std::time::{Duration, Instant};
 
 use monitor_hub_plugin::NOT_LAUNCHED_BY_HUB;
-use monitor_hub_plugin::proto::{State, StatusResponse};
+use monitor_hub_plugin::proto::{State, StatusResponse, WatchResponse};
 use monitor_hub_plugin_testkit::{Database, database};
 use serde_json::Value;
 use tokio_postgres::{Client, NoTls};
+use tonic::Streaming;
 
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{AccountKey, Store, WRITER_LOCK_ID, acquire_writer_lock};
@@ -22,7 +23,7 @@ use support::process::{
     COOKIE, PluginClient, RunningPlugin, error_lines, plugin_client, run_to_exit, spawn_plugin,
     terminate,
 };
-use support::{database_url_as, login_role, migrated_database};
+use support::{SIGNAL_WAIT, database_url_as, login_role, migrated_database};
 
 const EXIT_LIMIT: Duration = Duration::from_secs(30);
 const STOP_LIMIT: Duration = Duration::from_secs(2);
@@ -144,6 +145,28 @@ async fn record_rejection(database: &Database, fake: &FakeSei) {
 
 async fn count(client: &Client, query: &str) -> i64 {
     client.query_one(query, &[]).await.expect("count").get(0)
+}
+
+async fn open_watch(
+    plugin: &mut RunningPlugin,
+    client: &mut PluginClient,
+) -> Streaming<WatchResponse> {
+    match client.watch().await {
+        Ok(watch) => watch,
+        Err(status) => plugin.fail(&format!("Watch failed: {status:?}")),
+    }
+}
+
+async fn next_watch_signal(
+    plugin: &mut RunningPlugin,
+    watch: &mut Streaming<WatchResponse>,
+) -> i64 {
+    match tokio::time::timeout(SIGNAL_WAIT, watch.message()).await {
+        Ok(Ok(Some(signal))) => signal.latest_seq,
+        other => plugin.fail(&format!(
+            "no Watch signal within {SIGNAL_WAIT:?}: {other:?}"
+        )),
+    }
 }
 
 #[test]
@@ -745,5 +768,78 @@ async fn the_hubs_first_read_leaves_the_first_cycle_for_the_next_one() {
         "{second:?}"
     );
     drop(calls);
+    stop_cleanly(&mut plugin).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn watch_signals_at_once_with_the_last_event_issued_before_the_start() {
+    let Some(database) = migrated_database().await else {
+        return;
+    };
+    let store = Store::new(&Secret::new(database.url.clone())).expect("store");
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    h.prepare().await;
+    h.run_once().await;
+    h.clock.advance(Duration::from_secs(15 * 60));
+    h.fake.add_process(UNIT_NUPROC, process(9003, 3, "Ofício"));
+    h.run_once().await;
+    let seeded = store
+        .last_issued_seq()
+        .await
+        .expect("the last issued event");
+    assert!(seeded > 0);
+    h.fake.stall(ROUTE_VERSION);
+    h.fake.stall(ROUTE_LOGIN_PAGE);
+    let logins_before = h.fake.calls(ROUTE_LOGIN);
+    let mut plugin = start_plugin(&sei_env(&h.fake, &database.url, PASSWORD));
+    let mut client = plugin_client(&plugin.socket).await;
+
+    let mut watch = open_watch(&mut plugin, &mut client).await;
+    let first = next_watch_signal(&mut plugin, &mut watch).await;
+
+    assert_eq!(first, seeded);
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), logins_before);
+    drop(watch);
+    drop(client);
+    stop_cleanly(&mut plugin).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_rejected_login_reaches_the_hub_as_a_signal() {
+    let Some(database) = migrated_database().await else {
+        return;
+    };
+    let fake = FakeSei::start();
+    populate(&fake);
+    let db = admin(&database.url).await;
+    let issued_before = count(&db, "SELECT COALESCE(max(id), 0) FROM events").await;
+    let mut plugin = start_plugin(&sei_env(&fake, &database.url, "errada"));
+    let mut client = plugin_client(&plugin.socket).await;
+
+    let mut watch = open_watch(&mut plugin, &mut client).await;
+    let deadline = Instant::now() + PATIENCE;
+    let announced = loop {
+        let seq = next_watch_signal(&mut plugin, &mut watch).await;
+        if seq > issued_before {
+            break seq;
+        }
+        if Instant::now() >= deadline {
+            plugin.fail("no Watch signal announced the login failure");
+        }
+    };
+    let recorded = count(
+        &db,
+        "SELECT COALESCE(max(id), 0) FROM events WHERE kind = 'account_login_failed'",
+    )
+    .await;
+    let paused = client.status().await.expect("status");
+
+    assert_eq!(announced, recorded);
+    assert_eq!(paused.state, i32::from(State::Paused), "{paused:?}");
+    assert_eq!(fake.failed_logins(), 1);
+    assert_eq!(fake.calls(ROUTE_LOGIN), 1);
+    drop(watch);
+    drop(client);
     stop_cleanly(&mut plugin).await;
 }

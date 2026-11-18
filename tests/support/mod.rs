@@ -9,12 +9,28 @@ pub mod process;
 pub mod webhook;
 
 use std::io;
+use std::time::Duration;
 
+use monitor_hub_plugin::Signals;
 use monitor_hub_plugin::migrate::up;
 use monitor_hub_plugin_testkit::{Database, database};
 use sei_monitor::config::{Source, load_sei_url};
 use sei_monitor::store::MIGRATIONS;
 use tokio_postgres::NoTls;
+
+pub const SIGNAL_WAIT: Duration = Duration::from_secs(5);
+
+pub async fn next_signal(signals: &mut Signals) -> i64 {
+    tokio::time::timeout(SIGNAL_WAIT, signals.changed())
+        .await
+        .expect("a signal within 5 seconds")
+}
+
+pub async fn pending_signal(signals: &mut Signals) -> Option<i64> {
+    tokio::time::timeout(Duration::ZERO, signals.changed())
+        .await
+        .ok()
+}
 
 pub fn ci() -> bool {
     std::env::var_os("CI").is_some_and(|value| !value.is_empty())

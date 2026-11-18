@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
+use monitor_hub_plugin::Notifier;
 use tokio::sync::{mpsc, watch};
 use tracing::{debug, info, warn};
 
@@ -121,6 +122,7 @@ pub struct Monitor {
     manual: mpsc::Sender<()>,
     manual_signals: tokio::sync::Mutex<mpsc::Receiver<()>>,
     stopping: watch::Sender<bool>,
+    notifier: Notifier,
     inner: Mutex<Inner>,
 }
 
@@ -143,6 +145,7 @@ struct RunningGuard<'a>(&'a Monitor);
 impl Drop for RunningGuard<'_> {
     fn drop(&mut self) {
         self.0.inner().state.running = false;
+        self.0.notifier.status_changed();
     }
 }
 
@@ -174,6 +177,7 @@ impl Monitor {
             manual,
             manual_signals: tokio::sync::Mutex::new(manual_signals),
             stopping: watch::Sender::new(false),
+            notifier: Notifier::new(),
             inner: Mutex::new(Inner {
                 prepared: None,
                 logins: 0,
@@ -196,12 +200,17 @@ impl Monitor {
         &self.config
     }
 
+    pub fn notifier(&self) -> &Notifier {
+        &self.notifier
+    }
+
     pub(crate) fn shut_down(&self) {
         self.stopping.send_replace(true);
     }
 
     pub(crate) fn report_fatal(&self, reason: &str) {
         self.inner().state.fatal = Some(reason.to_owned());
+        self.notifier.status_changed();
     }
 
     pub async fn prepare(&self) -> Result<(), MonitorError> {
@@ -314,7 +323,15 @@ impl Monitor {
         let started = self.clock.now();
         inner.state.running = true;
         inner.state.last_started_at = Some(started);
+        self.notifier.status_changed();
         Ok((prepared, started))
+    }
+
+    fn announce_inserted(&self, inserted: &[Event]) {
+        let Some(newest) = inserted.iter().map(|event| event.id).max() else {
+            return;
+        };
+        self.notifier.notify(newest);
     }
 
     async fn record_failure(&self, run_id: i64, account_id: i64, error: &MonitorError) {
@@ -344,6 +361,7 @@ impl Monitor {
             .ok_or(MonitorError::Canceled)??;
         changes.finished_at = self.clock.now();
         let inserted = self.store.apply_cycle(&changes).await?;
+        self.announce_inserted(&inserted);
         let baseline = changes.baseline;
         self.after_success(account_id, baseline, started).await;
         self.prune(account_id, started).await;

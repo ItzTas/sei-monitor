@@ -63,11 +63,11 @@ impl SeiPlugin {
         self
     }
 
-    async fn read_events(&self, after: i64, limit: i64) -> Result<Vec<Event>, Status> {
+    async fn read_events(&self, after: i64, limit: i64) -> Result<(Vec<Event>, i64), Status> {
         let store = self.monitor.store();
         let last_issued = self.read_or_fail(store.last_issued_seq().await)?;
         if self.hub_is_ahead(after, last_issued) {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), last_issued));
         }
         self.monitor.acknowledge(after);
         let state = self.monitor.state();
@@ -75,19 +75,24 @@ impl SeiPlugin {
             return Err(Status::unavailable(MonitorError::NotReady.to_string()));
         }
         let stored = self.read_or_fail(store.events_after(state.account_id, after, limit).await)?;
-        self.events_failing.store(false, Ordering::SeqCst);
+        if self.events_failing.swap(false, Ordering::SeqCst) {
+            self.monitor.notifier().status_changed();
+        }
         let formatter = self.formatter(&state);
         let boundary = self.active_boundary();
-        Ok(stored
+        let events = stored
             .into_iter()
             .take_while(|stored| boundary.is_none_or(|boundary| stored.id <= boundary))
             .map(|stored| self.event(&formatter, &stored))
-            .collect())
+            .collect();
+        Ok((events, last_issued))
     }
 
     fn read_or_fail<T>(&self, read: Result<T, StoreError>) -> Result<T, Status> {
         read.map_err(|failure| {
-            self.events_failing.store(true, Ordering::SeqCst);
+            if !self.events_failing.swap(true, Ordering::SeqCst) {
+                self.monitor.notifier().status_changed();
+            }
             unavailable(failure)
         })
     }
@@ -95,10 +100,21 @@ impl SeiPlugin {
     fn hub_is_ahead(&self, after: i64, last_issued: i64) -> bool {
         let ahead = after > last_issued;
         let was_ahead = self.hub_ahead.swap(ahead, Ordering::SeqCst);
+        if ahead != was_ahead {
+            self.monitor.notifier().status_changed();
+        }
         if ahead && !was_ahead {
             error!(after, last_issued, "{HUB_AHEAD}");
         }
         ahead
+    }
+
+    fn end_first_read(&self, last_issued: i64) {
+        let was_over = self.first_read_over.swap(true, Ordering::SeqCst);
+        if was_over || self.first_read_boundary.is_none() {
+            return;
+        }
+        self.monitor.notifier().notify(last_issued);
     }
 
     fn active_boundary(&self) -> Option<i64> {
@@ -215,9 +231,9 @@ impl Plugin for SeiPlugin {
     ) -> Result<Response<EventsResponse>, Status> {
         let EventsRequest { after, limit } = request.into_inner();
         let limit = effective_limit(limit);
-        let events = self.read_events(after, limit).await?;
+        let (events, last_issued) = self.read_events(after, limit).await?;
         if i64::try_from(events.len()).unwrap_or(i64::MAX) < limit {
-            self.first_read_over.store(true, Ordering::SeqCst);
+            self.end_first_read(last_issued);
         }
         Ok(Response::new(EventsResponse { events }))
     }

@@ -204,7 +204,7 @@ impl Monitor {
         &self.notifier
     }
 
-    pub(crate) fn shut_down(&self) {
+    pub fn shut_down(&self) {
         self.stopping.send_replace(true);
     }
 

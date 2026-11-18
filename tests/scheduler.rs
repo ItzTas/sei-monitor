@@ -33,7 +33,6 @@ const PAUSE_WRITE: &str = "UPDATE accounts SET paused_reason%";
 const PROCESSES_READ: &str = "SELECT * FROM processes%";
 const EARLIER_REASON: &str = "SEI rejected the login (in an earlier run)";
 const SIGNALS_TO_READ: usize = 10;
-const QUIET: Duration = Duration::from_millis(500);
 const REFUSE_EVENTS_AT_COMMIT: &str = "CREATE FUNCTION refuse_events() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'refused at commit'; END $$;
      CREATE CONSTRAINT TRIGGER refuse_at_commit AFTER INSERT ON events DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION refuse_events();";
 
@@ -1142,12 +1141,14 @@ async fn a_second_hold_on_the_same_day_signals_the_hold_without_a_new_id() {
     let mut signals = restarted.notifier().subscribe();
     signals.latest_seq();
 
-    let _second = spawn_run(&restarted);
+    let mut second = spawn_run(&restarted);
     signal_until(&mut signals, |_| restarted.state().held).await;
-    let after_the_hold = tokio::time::timeout(QUIET, signals.changed()).await.ok();
+    restarted.shut_down();
+    bounded(&mut second.0)
+        .await
+        .expect("the held run ends on shut_down");
     let latest = signals.latest_seq();
 
-    assert_eq!(after_the_hold, None);
     assert_eq!(latest, 0);
     assert_eq!(h.fake.calls(ROUTE_LOGIN), 0);
     let events = h.events().await;

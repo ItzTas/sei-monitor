@@ -985,6 +985,8 @@ async fn the_hub_falling_ahead_and_back_in_line_signals_the_status() {
     let h = with_history(&store).await;
     let newest = last_issued(&h).await;
     let plugin = plugin(&h);
+    h.clock.advance(FIFTEEN_MINUTES);
+    let logins = h.fake.calls(ROUTE_LOGIN);
     let mut signals = h.monitor.notifier().subscribe();
     signals.latest_seq();
 
@@ -1004,6 +1006,8 @@ async fn the_hub_falling_ahead_and_back_in_line_signals_the_status() {
     assert!(back_in_line.is_some());
     assert_eq!(in_line.state, i32::from(State::Idle));
     assert_eq!(in_line.message, "");
+    assert_eq!(h.monitor.trigger_cycle(), Ok(()));
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), logins);
 }
 
 #[tokio::test]
@@ -1026,6 +1030,7 @@ async fn a_failing_read_of_the_events_and_its_recovery_signal_the_status() {
     );
     bounded(monitor.prepare()).await.expect("prepare");
     let plugin = SeiPlugin::new(Arc::clone(&monitor), false);
+    let logins = h.fake.calls(ROUTE_LOGIN);
     let mut signals = monitor.notifier().subscribe();
     signals.latest_seq();
 
@@ -1055,4 +1060,23 @@ async fn a_failing_read_of_the_events_and_its_recovery_signal_the_status() {
     assert_eq!(seqs(&recovered_page), ids(&h.events().await));
     assert!(recovered.is_some());
     assert_eq!(readable.state, i32::from(State::Idle), "{readable:?}");
+    assert_eq!(monitor.trigger_cycle(), Ok(()));
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), logins);
+}
+
+#[tokio::test]
+async fn the_end_of_the_first_read_starts_no_cycle() {
+    let Some((_database, store)) = database_store().await else {
+        return;
+    };
+    let h = with_history(&store).await;
+    let plugin = plugin(&h).with_first_read_boundary(last_issued(&h).await);
+    h.clock.advance(FIFTEEN_MINUTES);
+    let logins = h.fake.calls(ROUTE_LOGIN);
+
+    let short = page(&plugin, 0, 500).await;
+
+    assert!(!short.is_empty());
+    assert_eq!(h.monitor.trigger_cycle(), Ok(()));
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), logins);
 }

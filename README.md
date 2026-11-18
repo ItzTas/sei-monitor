@@ -194,12 +194,15 @@ To resume:
    `last_success_at`. If SEI rejected the password again, it is `paused` with the first message,
    and you start over from step 1.
 
-Once SEI accepts the login of a requested check, the recorded rejection is gone, from the plugin
-and from its database, even when something later in that check fails. The plugin then shows
+Once SEI accepts the login of a requested check, the plugin drops the recorded rejection and
+erases it from its database, even when something later in that check fails. The plugin then shows
 `failing` with the error and tries again on its own after 30 seconds, with the session it already
-has. Only a check whose login got no answer from SEI (an error page, a time-out) leaves the plugin
-held; request another one later. Network errors and SEI outages outside a pause are retried on
-their own: after 30 seconds, then a minute, doubling up to the check interval.
+has. If the database did not take the erase, the plugin writes it again after its next check that
+succeeds. A restart before that finds the rejection still recorded and holds the plugin again,
+without a login; request another check. Only a check whose login got no answer from SEI (an error
+page, a time-out) leaves the plugin held; request another one later. Network errors and SEI
+outages outside a pause are retried on their own: after 30 seconds, then a minute, doubling up to
+the check interval.
 
 ## The hub's first read
 

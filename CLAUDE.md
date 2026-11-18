@@ -265,10 +265,12 @@ login in an earlier run; ...`, and records one `account_login_failed` event with
 `login-held:<UTC date>`, so at most one per day however often it restarts. The hub restarts the
 plugin on its own (after a lost lock, for example), so a restart is not the owner's act and must
 not cost a login. A requested `Check` is the only retry. As soon as SEI accepts its login, the
-reason is cleared in memory and in the database, so a later failure in that cycle follows the
-ordinary back-off with the session it has. A clear that fails is tried again after the next
-successful cycle. Only a check whose login got no verdict (5xx, a time-out, a page that is not the
-API's) goes back to held.
+reason is cleared in memory and its database write starts, so a later failure in that cycle follows
+the ordinary back-off with the session it has. The clear stays pending until that write lands: a
+write that fails, or is cut off because the rest of the cycle failed first, is tried again after
+each successful cycle. A restart before it lands starts held again, without a login. A rejection
+recorded while the clear is pending drops it. Only a check whose login got no verdict (5xx, a
+time-out, a page that is not the API's) goes back to held.
 
 ## Pruning
 

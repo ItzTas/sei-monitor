@@ -720,7 +720,8 @@ async fn a_failed_clear_of_the_rejection_is_tried_again_after_the_next_successfu
 async fn waiting_on(observer: &tokio_postgres::Client, pattern: &str) -> bool {
     let waiting: i64 = observer
         .query_one(
-            "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE $1",
+            "SELECT count(*) FROM pg_stat_activity
+             WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE $1",
             &[&pattern],
         )
         .await

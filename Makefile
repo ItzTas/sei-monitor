@@ -5,7 +5,7 @@ CARGO := $(if $(shell command -v rustup),rustup run $(TOOLCHAIN) cargo,cargo)
 
 check:
 	$(CARGO) fmt --check
-	$(CARGO) clippy --all-targets --all-features -- -D warnings
+	$(CARGO) clippy --locked --all-targets --all-features -- -D warnings
 	$(CARGO) test
 
 test:

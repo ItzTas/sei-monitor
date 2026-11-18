@@ -11,6 +11,7 @@ use sei_monitor::store::{AccountKey, CycleRun, Store, Trigger};
 use tokio::task::JoinHandle;
 use tokio_postgres::NoTls;
 
+use support::clock::PendingSleep;
 use support::fake_sei::{
     FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_LOGIN_PAGE, ROUTE_PROCESSES, ROUTE_VERSION,
     USERNAME,
@@ -27,6 +28,7 @@ const CHANGED_PASSWORD: &str = "changed-by-the-user";
 const REJECTED: &str = "Usuário ou Senha Inválida.";
 const RECORDED_REASON: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
 const PAUSE_WRITE: &str = "UPDATE accounts SET paused_reason%";
+const PROCESSES_READ: &str = "SELECT * FROM processes%";
 
 fn minutes(n: u64) -> Duration {
     Duration::from_secs(n * 60)
@@ -110,16 +112,20 @@ async fn fire_pending_sleeps(h: &Harness, limit: usize) -> usize {
 }
 
 async fn record_rejection(h: &Harness) -> String {
+    record_reason(h, RECORDED_REASON).await;
+    RECORDED_REASON.to_owned()
+}
+
+async fn record_reason(h: &Harness, reason: &str) {
     let account = h
         .store
         .ensure_account(&account_key(h), h.clock.now())
         .await
         .expect("account");
     h.store
-        .set_paused_reason(account.id, RECORDED_REASON)
+        .set_paused_reason(account.id, reason)
         .await
         .expect("record the rejection");
-    RECORDED_REASON.to_owned()
 }
 
 fn another_monitor(h: &Harness) -> Arc<Monitor> {
@@ -774,4 +780,124 @@ async fn a_pause_the_database_did_not_take_is_recorded_once_the_row_is_free() {
     assert_eq!(reason_in(&observer).await, paused.paused_reason);
     assert!(restarted_held, "the restarted monitor did not hold");
     assert_eq!((h.fake.logins(), h.fake.failed_logins()), (0, 1));
+}
+
+struct CancelledClear {
+    first: Running,
+    observer: tokio_postgres::Client,
+    was_held: bool,
+    checked: Result<(), TriggerError>,
+    both_waiting: bool,
+    gave_up: bool,
+    stored: String,
+    failed: State,
+    retry: PendingSleep,
+}
+
+async fn a_check_whose_clear_is_cancelled(h: &Harness, url: &str, reason: &str) -> CancelledClear {
+    record_reason(h, reason).await;
+    let first = spawn_run(&h.monitor);
+    let was_held = held(&h.monitor).await;
+    let observer = admin(url).await;
+    let holder = admin(url).await;
+    holder
+        .batch_execute(
+            "BEGIN; SELECT id FROM accounts FOR NO KEY UPDATE; LOCK TABLE processes IN ACCESS EXCLUSIVE MODE",
+        )
+        .await
+        .expect("hold the account row and the processes table");
+
+    let checked = h.monitor.trigger_cycle();
+    let both_waiting = eventually(|| async {
+        waiting_on(&observer, PAUSE_WRITE).await && waiting_on(&observer, PROCESSES_READ).await
+    })
+    .await;
+    let retry = h.clock.next_sleep().await;
+    let failed = h.monitor.state();
+    let gave_up = eventually(|| async { !waiting_on(&observer, PAUSE_WRITE).await }).await;
+    let stored = reason_in(&observer).await;
+    holder.batch_execute("ROLLBACK").await.expect("release");
+    CancelledClear {
+        first,
+        observer,
+        was_held,
+        checked,
+        both_waiting,
+        gave_up,
+        stored,
+        failed,
+        retry,
+    }
+}
+
+fn assert_cancelled(cancelled: &CancelledClear, logs: &[LoggedEvent], reason: &str) {
+    assert!(cancelled.was_held, "the monitor did not start held");
+    assert_eq!(cancelled.checked, Ok(()));
+    assert!(
+        cancelled.both_waiting && cancelled.gave_up,
+        "the clear and the processes read never ran into the locks"
+    );
+    let failed = &cancelled.failed;
+    assert!(
+        failed
+            .cycle_error
+            .as_deref()
+            .is_some_and(|error| error.contains("lock timeout")),
+        "{failed:?}"
+    );
+    assert_eq!(
+        (failed.paused, failed.held, failed.paused_reason.as_str()),
+        (false, false, "")
+    );
+    assert_eq!(cancelled.retry.duration, Duration::from_secs(30));
+    assert_eq!(cancelled.stored, reason);
+    assert!(
+        messages(logs, "could not clear the pause reason").is_empty(),
+        "the clear failed instead of being cancelled"
+    );
+}
+
+#[tokio::test]
+async fn a_cancelled_clear_of_the_rejection_is_tried_again_after_the_next_successful_cycle() {
+    let Some((database, store)) = database_store().await else {
+        return;
+    };
+    let h = Harness::new(&store, |_| {});
+    populate(&h.fake);
+    let (cancelled, logs) = captured(a_check_whose_clear_is_cancelled(
+        &h,
+        &database.url,
+        RECORDED_REASON,
+    ))
+    .await;
+    assert_cancelled(&cancelled, &logs, RECORDED_REASON);
+    let CancelledClear {
+        first,
+        observer,
+        retry,
+        ..
+    } = cancelled;
+
+    h.clock.advance(retry.duration);
+    retry.fire.send(()).expect("the monitor is waiting");
+    let scheduled = h.clock.next_sleep().await;
+    let stored_after_success = reason_in(&observer).await;
+    let logins = (h.fake.logins(), h.fake.failed_logins());
+    let run = last_run(&h).await;
+    drop(first);
+    let restarted = another_monitor(&h);
+    let _second = spawn_run(&restarted);
+    let restarted_ran = eventually(|| async {
+        let state = restarted.state();
+        state.next_cycle_at.is_some() && !state.paused && !state.held
+    })
+    .await;
+
+    assert_eq!(scheduled.duration, FIFTEEN_MINUTES);
+    assert_eq!((run.trigger, run.error.as_str()), (Trigger::Scheduled, ""));
+    assert_eq!(stored_after_success, "");
+    assert_eq!(logins, (1, 0));
+    assert!(restarted_ran, "{:?}", restarted.state());
+    assert_eq!(reason_in(&observer).await, "");
+    assert_eq!((h.fake.logins(), h.fake.failed_logins()), (2, 0));
 }

@@ -463,14 +463,15 @@ impl Monitor {
             return false;
         }
         inner.state.paused_reason.clear();
+        inner.reason_to_clear = true;
         true
     }
 
     async fn clear_recorded_reason(&self, account_id: i64) {
         let Err(error) = self.store.set_paused_reason(account_id, "").await else {
+            self.inner().reason_to_clear = false;
             return;
         };
-        self.inner().reason_to_clear = true;
         warn!(
             error = &error as &dyn Error,
             "could not clear the pause reason"
@@ -488,7 +489,7 @@ impl Monitor {
         if baseline && let Some(prepared) = inner.prepared.as_mut() {
             prepared.account.baseline_at = Some(started);
         }
-        std::mem::take(&mut inner.reason_to_clear)
+        inner.reason_to_clear
     }
 
     fn elapsed_since(&self, started: DateTime<Utc>) -> String {

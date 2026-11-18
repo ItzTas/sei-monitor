@@ -3,8 +3,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use monitor_hub_plugin_testkit::Database;
 use tokio_postgres::NoTls;
+
+use super::Database;
 
 use sei_monitor::event::{Event, Kind};
 use sei_monitor::monitor::{CycleResult, Jitter, Monitor, MonitorConfig};

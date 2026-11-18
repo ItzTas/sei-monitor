@@ -6,7 +6,6 @@ use std::time::{Duration, Instant};
 
 use monitor_hub_plugin::NOT_LAUNCHED_BY_HUB;
 use monitor_hub_plugin::proto::{State, StatusResponse, WatchResponse};
-use monitor_hub_plugin_testkit::{Database, database};
 use serde_json::Value;
 use tokio_postgres::{Client, NoTls};
 use tonic::Streaming;
@@ -23,7 +22,7 @@ use support::process::{
     COOKIE, PluginClient, RunningPlugin, error_lines, plugin_client, run_to_exit, spawn_plugin,
     terminate,
 };
-use support::{SIGNAL_WAIT, database_url_as, login_role, migrated_database};
+use support::{Database, SIGNAL_WAIT, database, database_url_as, login_role, migrated_database};
 
 const EXIT_LIMIT: Duration = Duration::from_secs(30);
 const STOP_LIMIT: Duration = Duration::from_secs(2);

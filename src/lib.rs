@@ -9,6 +9,9 @@ pub mod gotext;
 pub mod harden;
 pub mod monitor;
 pub mod password;
+#[cfg(test)]
+#[path = "../tests/support/postgres.rs"]
+mod postgres;
 pub mod secret;
 pub mod sei;
 pub mod server;

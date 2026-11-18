@@ -5,7 +5,6 @@ use std::error::Error;
 use std::time::{Duration, Instant};
 
 use chrono::{DateTime, TimeDelta, Utc};
-use monitor_hub_plugin_testkit::database;
 use sei_monitor::event::{Event, Kind, Payload};
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{
@@ -18,7 +17,7 @@ use tokio_postgres::error::SqlState;
 use tokio_postgres::{Client, NoTls};
 
 use support::logs::{LoggedEvent, captured, logged};
-use support::{database_url_as, migrated_database};
+use support::{database, database_url_as, migrated_database};
 
 const PASSWORD: &str = "hunter2";
 const LOCK_TIMEOUT: Duration = Duration::from_secs(5);
@@ -1756,4 +1755,17 @@ async fn the_last_issued_seq_never_goes_back() {
         store.last_issued_seq().await.expect("after pruning"),
         newest
     );
+}
+
+#[tokio::test]
+async fn test_databases_are_reached_over_tcp() {
+    let Some(db) = database().await else {
+        return;
+    };
+    let row = connect(&db.url)
+        .await
+        .query_one("SELECT inet_server_addr() IS NOT NULL", &[])
+        .await
+        .expect("read the server address");
+    assert!(row.get::<_, bool>(0));
 }

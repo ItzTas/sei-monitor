@@ -210,7 +210,7 @@ fn chain_text(error: &(dyn Error + 'static)) -> String {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use monitor_hub_plugin_testkit::database;
+    use crate::postgres::database;
     use tokio_postgres::{Client, Config};
 
     use super::{

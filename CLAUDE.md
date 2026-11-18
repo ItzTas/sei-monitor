@@ -63,9 +63,10 @@ Some tests need tools from outside the crate. When one is missing they print a `
 on stderr and return. When `CI` is set and not empty they panic instead, so CI never passes by
 skipping.
 
-- Postgres: the SDK test kit's `database()` gives each test its own database. It uses
+- Postgres: `tests/support/postgres.rs`'s `database()` gives each test its own database. It uses
   `TEST_DATABASE_URL` when set (the compose Postgres works, see `.env.example`), and otherwise
-  starts a throwaway cluster with `initdb` and `postgres` from `PATH`.
+  starts a throwaway cluster with `initdb` and `postgres` from `PATH`, listening on a local TCP
+  port.
   `tests/support::migrated_database` adds the migrations. With `TEST_DATABASE_URL` every test binary
   shares one server with password authentication, as in CI. So a test that needs a role of its own
   creates it with `support::login_role` (create or alter, with a password) under a name no other

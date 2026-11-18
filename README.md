@@ -430,7 +430,7 @@ The plugin was checked against the Go release's own output. These differences ar
   Postgres on `127.0.0.1:5432` from `compose.yaml`; copy `.env.example` to `.env` first and set
   `POSTGRES_PASSWORD`.
 - The database tests use `TEST_DATABASE_URL` when it is set, and otherwise start a throwaway
-  Postgres from `initdb` and `postgres` on `PATH`. To use the compose Postgres, export
+  Postgres from `initdb` and `postgres` on `PATH`, on a local TCP port. To use the compose Postgres, export
   `TEST_DATABASE_URL` in your shell, with the same password as `POSTGRES_PASSWORD`. The
   conformance test runs the program named by `PLUGIN_CONFORMANCE`, or else installs `plugin-conformance` with `go`.
   With `CI` set, a missing tool fails the tests instead of skipping them.

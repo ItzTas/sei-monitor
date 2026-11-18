@@ -4,14 +4,16 @@ pub mod clock;
 pub mod fake_sei;
 pub mod harness;
 pub mod logs;
+pub mod postgres;
 pub mod process;
+
+pub use postgres::{Database, database};
 
 use std::io;
 use std::time::Duration;
 
 use monitor_hub_plugin::Signals;
 use monitor_hub_plugin::migrate::up;
-use monitor_hub_plugin_testkit::{Database, database};
 use sei_monitor::config::{Source, load_sei_url};
 use sei_monitor::store::MIGRATIONS;
 use tokio_postgres::NoTls;

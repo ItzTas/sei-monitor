@@ -56,6 +56,29 @@ The hub's API shows the plugin in `GET /api/plugins` (state and message) and sta
 last one. The hub's own deploy guide (`docs/deploy.md` in the monitor-hub repository) is the full
 runbook for moving the old service onto the hub.
 
+## How the plugin tells the hub to read
+
+The hub keeps a `Watch` call open to the plugin. The plugin sends a signal on that call when the hub
+should read it, and the hub then reads the plugin's state, and its events when there are new ones.
+The plugin signals when:
+
+- a check starts or ends, or the time of the next check changes;
+- SEI refuses the login, or the plugin starts held by a refusal from an earlier run;
+- a check you requested ends the hold, or SEI gave its login no answer and the plugin is held again;
+- the plugin cannot reach SEI, or does not find the agency or the module, and when it reaches SEI;
+- the hub is ahead of the plugin's database, and when the two agree again;
+- the plugin cannot read its database, and when it can again;
+- the plugin's scheduler stops after an internal error;
+- the plugin records an event;
+- the hub's first read ends (see [The hub's first read](#the-hubs-first-read)).
+
+A signal never contacts SEI and never logs in. The hub answers it by reading what the plugin holds
+in memory and in its database. It never starts a check because of a signal.
+
+When 30 seconds pass without a signal, the plugin sends one anyway, so the hub knows the call is
+alive. If the call drops, the hub reads the plugin every 15 seconds until it opens the call again. A
+hub without `Watch` never opens the call and reads the plugin every 15 seconds.
+
 ## Configuration
 
 | Variable | Default | What it does |
@@ -122,7 +145,10 @@ carries `assigned_to_me` and `activity_by_me` instead of your acronym.
 
 ## Status
 
-The hub polls the plugin every 15 seconds. `GET /api/plugins` shows what the plugin answered:
+The plugin tells the hub when its state changes or it records an event, and the hub reads it right
+away (see [How the plugin tells the hub to read](#how-the-plugin-tells-the-hub-to-read)). The hub
+also reads it every 5 minutes. A hub without `Watch` reads it every 15 seconds instead.
+`GET /api/plugins` shows what the plugin answered:
 
 | State | Message | Meaning |
 |---|---|---|
@@ -168,6 +194,9 @@ nothing is logging in: request a check once the configuration is fixed`, and rec
 once the configuration is fixed`, followed by the same last sentence as the first event. That event
 is recorded at most once per UTC day, however often the plugin restarts.
 
+In both cases the plugin signals the hub, so the `account_login_failed` event and the `paused`
+state reach the hub right away. A hub without `Watch` sees them on its next poll, within 15 seconds.
+
 After a rejected login, a restart alone never logs in again, on purpose. The hub restarts the
 plugin by itself, for example after a lost database connection, and every attempt with a wrong
 password counts toward SEI locking the account. Only a check you request retries the login. With a
@@ -207,12 +236,14 @@ the check interval.
 ## The hub's first read
 
 The first time the hub reads a plugin it does not know, it stores what the plugin already holds as
-a baseline and announces none of it. That read comes on the hub's first poll after the plugin has
-reached SEI.
+a baseline and announces none of it. That read comes right after the plugin has reached SEI,
+because the plugin signals the hub then. A hub without `Watch` makes it on its first poll after
+that.
 
 The plugin's own first check may find changes before that read happens. So the plugin holds back
-everything newer than what it held at start-up until the hub's first read has ended. Those events
-reach the hub on the next poll and are announced as usual.
+everything newer than what it held at start-up until the hub's first read has ended. When that read
+ends, the plugin signals the hub again, and the events it held back reach the hub right away and are
+announced as usual. A hub without `Watch` gets them on its next poll, within 15 seconds.
 
 That hold belongs to one plugin process. If the plugin or the hub restarts after the first check
 recorded events and before the hub logged `baseline complete` for `sei`, the new process counts

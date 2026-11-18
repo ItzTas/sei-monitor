@@ -75,7 +75,12 @@ skipping.
   clone has no tag, so CI checks out the full history. These two tests take about 35 s, because
   they wait for Go's 30 s notification poll.
 - The conformance command for `tests/conformance.rs`: the binary named by `PLUGIN_CONFORMANCE`, or
-  else `go install` of `plugin-conformance` at the SDK's Go tag `sdk-go/v0.4.0`.
+  else `go install` of `plugin-conformance` at the SDK's Go tag `sdk-go/v0.4.0`, which also checks
+  `Watch` on the real binary.
+
+The `Watch` tests subscribe with `Notifier::subscribe` and wait for a signal with a bounded
+`timeout` on `Signals::changed` (`support::next_signal`, 5 s), or look for one without waiting
+(`support::pending_signal`). None of them sleeps to wait for the plugin.
 
 The tests that call the fake SEI fail when `HTTP_PROXY` is set in their environment.
 
@@ -217,12 +222,25 @@ tests/                      one file per area; tests/support/ holds the fake SEI
 - The first read stops at the highest position issued before start-up. Until one `Events` call
   returns a page shorter than its limit, newer events are left out. The hub stores its first read
   of a plugin as a baseline and announces none of it, so this keeps the first cycle's events out of
-  the baseline. They go out on the next read. The limit belongs to one process: a restart before
-  the hub's first read ended lets the new baseline take those events in.
+  the baseline. They go out on the next read: when the first read ends, the plugin calls `notify`
+  with the highest position issued, so a hub with `Watch` reads them at once. The limit belongs to
+  one process: a restart before the hub's first read ended lets the new baseline take those events
+  in.
 - When `after` is above the highest position this database ever issued, the plugin's database was
   reset and the hub's position was not. `Events` then returns nothing and acknowledges nothing,
   logs `the hub is ahead of this database: reset the hub's position for the sei plugin` once, and
   `Status` shows that text until the two agree.
+- The plugin serves `Watch` with the SDK's `serve_with_notifier`. `Monitor` owns the `Notifier`, and
+  start-up sets it to the highest position issued before the handshake. After each committed write
+  that inserted events (a cycle, the `login:` and `login-held:` events) the monitor calls `notify`
+  with the highest inserted id; a write that inserted nothing signals nothing. It calls
+  `status_changed` when what `Status` answers changes: a cycle starts or ends (a cancelled one too),
+  the next check time is set, a preparation fails (an unknown agency or module only when its text
+  changes) or works, the monitor pauses, holds or leaves the hold, the scheduler panics, the hub
+  falls ahead of the database or back in line, and the last `Events` read fails or recovers. The
+  end of the first read calls `notify` with the highest position issued. A signal is a value in a
+  channel inside the process: the hub answers it with `Describe`, `Status` and maybe `Events`, never
+  `Check`, so no signal calls SEI or logs in.
 - A stored event that cannot be read (unknown kind or a payload that does not decode) is skipped
   and logged once at `error` as `skipping a stored event that cannot be read`, with its id and no
   stored value. After 1,024 such ids one summary line replaces the rest. One call walks at most

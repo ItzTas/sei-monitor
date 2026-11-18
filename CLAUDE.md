@@ -94,7 +94,7 @@ CI: `.github/workflows/ci.yml` runs fmt and clippy in one job and `cargo test --
 with a `postgres:18-alpine` service, Go 1.27.2 (`.prototools` pins the same version) and the
 conformance command installed. `.github/workflows/docker.yml` builds the image for amd64 and arm64
 and publishes it to `ghcr.io/itztas/sei-monitor` on every run that is not a pull request. A `v*`
-tag publishes the version tags (`2.0.0` and `2.0`), only the default branch moves `latest`
+tag publishes the version tags (`2.1.0` and `2.1`), only the default branch moves `latest`
 (`flavor: latest=false` keeps the semver rules from moving it too), and every image gets a `sha-`
 tag.
 

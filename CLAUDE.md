@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A monitor-hub plugin. It logs in to SEI through SEI's REST module (`mod-wssei`) with the owner's
 account, lists the processes of the watched units every `POLL_INTERVAL`, and records what changed as
 events in Postgres. The hub reads those events and sends the notifications. The plugin is written in
-Rust on the monitor-hub plugin SDK (`monitor-hub-plugin`, git tag `sdk-rust/v0.1.1`).
+Rust on the monitor-hub plugin SDK (`monitor-hub-plugin`, git tag `sdk-rust/v0.3.0`).
 
 The image does not run on its own. It holds `/plugin/plugin.json` and `/plugin/sei-monitor`, and the
 hub's image build copies that directory in. Release `1.0.0` was a standalone Go service with its own
@@ -75,7 +75,7 @@ skipping.
   clone has no tag, so CI checks out the full history. These two tests take about 35 s, because
   they wait for Go's 30 s notification poll.
 - The conformance command for `tests/conformance.rs`: the binary named by `PLUGIN_CONFORMANCE`, or
-  else `go install` of `plugin-conformance` at the SDK's Go tag `sdk/v0.2.1`.
+  else `go install` of `plugin-conformance` at the SDK's Go tag `sdk-go/v0.4.0`.
 
 The tests that call the fake SEI fail when `HTTP_PROXY` is set in their environment.
 

@@ -205,8 +205,8 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   `PAUSED` (below); the last cycle failed, `FAILING` with its error (the same text as
   `cycle_runs.error`); account not known yet, `FAILING` with `sei-monitor has not reached SEI
   yet[: <error>]`; the database does not answer within 10 s or the last `Events` read failed,
-  `FAILING` with `the database is unavailable`; otherwise `IDLE`. Messages are cut at 500 characters. `last_success_at` is the last cycle run that finished
-  without an error.
+  `FAILING` with `the database is unavailable`; otherwise `IDLE`. Messages are cut at 500
+  characters. `last_success_at` is the last cycle run that finished without an error.
 - `Check` starts a cycle, or refuses with Go's texts: not reached SEI yet, already running, less
   than 5 minutes since the last start, or paused.
 - `Events(after, limit)` returns the events of the current account with an id above `after`, in

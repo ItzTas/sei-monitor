@@ -445,11 +445,8 @@ mod tests {
 
     use super::*;
     use crate::golden;
-    use crate::monitor::{MonitorConfig, SystemClock, random_jitter};
-    use crate::password::StaticPassword;
-    use crate::secret::Secret;
-    use crate::sei::{ApiError, Options, REQUEST_TIMEOUT, Target};
-    use crate::store::Store;
+    use crate::monitor::offline_monitor;
+    use crate::sei::ApiError;
 
     const REASON: &str = "SEI rejected the login";
 
@@ -496,34 +493,6 @@ mod tests {
             draw
         };
         (limits, jitter)
-    }
-
-    fn monitor() -> Arc<Monitor> {
-        let zone = "America/Boa_Vista".parse().expect("a zone");
-        let config = MonitorConfig {
-            target: Target {
-                sei_url: "http://127.0.0.1:9".to_owned(),
-                api_url: String::new(),
-                org: "SEDEMO".to_owned(),
-                username: "fulano.tal".to_owned(),
-                password: Arc::new(StaticPassword(Secret::new("unused".to_owned()))),
-            },
-            options: Options {
-                user_agent: "sei-monitor/test".to_owned(),
-                zone,
-                timeout: REQUEST_TIMEOUT,
-            },
-            units: Vec::new(),
-            all_units: false,
-            poll_interval: Duration::from_secs(15 * 60),
-            concurrency: 1,
-            return_warning_days: 2,
-            retention_days: 0,
-            zone,
-        };
-        let store = Store::new(&Secret::new("postgres://sei@127.0.0.1:1/sei".to_owned()))
-            .expect("a store that never connects");
-        Monitor::new(config, store, Arc::new(SystemClock), random_jitter())
     }
 
     fn api_error(route: &str, kind: ErrorKind) -> MonitorError {
@@ -644,7 +613,7 @@ mod tests {
 
     #[tokio::test]
     async fn marking_a_pause_and_a_hold_signals_the_status() {
-        let monitor = monitor();
+        let monitor = offline_monitor();
         let mut signals = monitor.notifier().subscribe();
         signals.latest_seq();
 
@@ -669,7 +638,7 @@ mod tests {
 
     #[tokio::test]
     async fn scheduling_the_next_cycle_signals_the_status() {
-        let monitor = monitor();
+        let monitor = offline_monitor();
         let mut signals = monitor.notifier().subscribe();
         signals.latest_seq();
 
@@ -684,7 +653,7 @@ mod tests {
 
     #[tokio::test]
     async fn preparation_failures_signal_the_status_once_per_new_text() {
-        let monitor = monitor();
+        let monitor = offline_monitor();
         let mut signals = monitor.notifier().subscribe();
         signals.latest_seq();
         let unreachable = MonitorError::Sei(SeiError::Transport {
@@ -717,7 +686,7 @@ mod tests {
 
     #[tokio::test]
     async fn the_end_of_a_hold_signals_the_status() {
-        let monitor = monitor();
+        let monitor = offline_monitor();
         monitor.mark_held(REASON);
         let mut signals = monitor.notifier().subscribe();
         signals.latest_seq();
@@ -740,7 +709,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_fatal_report_signals_the_status() {
-        let monitor = monitor();
+        let monitor = offline_monitor();
         let mut signals = monitor.notifier().subscribe();
         signals.latest_seq();
 

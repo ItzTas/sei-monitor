@@ -183,43 +183,12 @@ mod tests {
     use tokio::net::TcpListener;
 
     use super::{SCHEDULER_STOPPED, start_up, supervise};
-    use crate::monitor::{Monitor, MonitorConfig, SystemClock, random_jitter};
-    use crate::password::StaticPassword;
+    use crate::monitor::offline_monitor;
     use crate::secret::Secret;
-    use crate::sei::{Options, REQUEST_TIMEOUT, Target};
-    use crate::store::Store;
-
-    fn monitor() -> Arc<Monitor> {
-        let zone = "America/Boa_Vista".parse().expect("a zone");
-        let config = MonitorConfig {
-            target: Target {
-                sei_url: "http://127.0.0.1:9".to_owned(),
-                api_url: String::new(),
-                org: "SEDEMO".to_owned(),
-                username: "fulano.tal".to_owned(),
-                password: Arc::new(StaticPassword(Secret::new("unused".to_owned()))),
-            },
-            options: Options {
-                user_agent: "sei-monitor/test".to_owned(),
-                zone,
-                timeout: REQUEST_TIMEOUT,
-            },
-            units: Vec::new(),
-            all_units: false,
-            poll_interval: Duration::from_secs(15 * 60),
-            concurrency: 1,
-            return_warning_days: 2,
-            retention_days: 0,
-            zone,
-        };
-        let store = Store::new(&Secret::new("postgres://sei@127.0.0.1:1/sei".to_owned()))
-            .expect("a store that never connects");
-        Monitor::new(config, store, Arc::new(SystemClock), random_jitter())
-    }
 
     #[tokio::test]
     async fn a_scheduler_that_panics_leaves_its_failure_for_status() {
-        let monitor = monitor();
+        let monitor = offline_monitor();
 
         supervise(
             Arc::clone(&monitor),
@@ -232,7 +201,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_scheduler_that_returns_leaves_the_state_alone() {
-        let monitor = monitor();
+        let monitor = offline_monitor();
 
         supervise(Arc::clone(&monitor), tokio::spawn(async {})).await;
 

@@ -518,6 +518,36 @@ impl Monitor {
     }
 }
 
+#[cfg(test)]
+pub(crate) fn offline_monitor() -> Arc<Monitor> {
+    let zone = "America/Boa_Vista".parse().expect("a zone");
+    let secret = |text: &str| crate::secret::Secret::new(text.to_owned());
+    let config = MonitorConfig {
+        target: Target {
+            sei_url: "http://127.0.0.1:9".to_owned(),
+            api_url: String::new(),
+            org: "SEDEMO".to_owned(),
+            username: "fulano.tal".to_owned(),
+            password: Arc::new(crate::password::StaticPassword(secret("unused"))),
+        },
+        options: Options {
+            user_agent: "sei-monitor/test".to_owned(),
+            zone,
+            timeout: crate::sei::REQUEST_TIMEOUT,
+        },
+        units: Vec::new(),
+        all_units: false,
+        poll_interval: Duration::from_secs(15 * 60),
+        concurrency: 1,
+        return_warning_days: 2,
+        retention_days: 0,
+        zone,
+    };
+    let store =
+        Store::new(&secret("postgres://sei@127.0.0.1:1/sei")).expect("a store that never connects");
+    Monitor::new(config, store, Arc::new(SystemClock), random_jitter())
+}
+
 pub fn login_failure(error: &SeiError, now: DateTime<Utc>) -> (String, Event) {
     let mut reason = "SEI rejected the login".to_owned();
     if let SeiError::Api(api) = error

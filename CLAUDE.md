@@ -11,8 +11,7 @@ Rust on the monitor-hub plugin SDK (`monitor-hub-plugin`, git tag `sdk-rust/v0.3
 
 The image does not run on its own. It holds `/plugin/plugin.json` and `/plugin/sei-monitor`, and the
 hub's image build copies that directory in. Release `1.0.0` was a standalone Go service with its own
-notifications, feed, API and web page. Its code is gone from the tree. The tag `v1.0.0` stays as the
-reference for the golden vectors, the compatibility tests and the rollback.
+notifications, feed, API and web page. Its code is gone from the tree.
 
 ## Code
 
@@ -71,10 +70,6 @@ skipping.
   shares one server with password authentication, as in CI. So a test that needs a role of its own
   creates it with `support::login_role` (create or alter, with a password) under a name no other
   test uses, and connects with that password.
-- `go`, `git` and the tag `v1.0.0` for `tests/go_compat.rs`. It extracts the Go release with
-  `git archive v1.0.0`, builds it and caches the binary under `target/tmp/go-v1.0.0/`. A shallow
-  clone has no tag, so CI checks out the full history. These two tests take about 35 s, because
-  they wait for Go's 30 s notification poll.
 - The conformance command for `tests/conformance.rs`: the binary named by `PLUGIN_CONFORMANCE`, or
   else `go install` of `plugin-conformance` at the SDK's Go tag `sdk-go/v0.4.0`, which also checks
   `Watch` on the real binary.
@@ -178,7 +173,7 @@ src/
                             back-off (scheduler.rs)
 sql/schema/                 the goose migrations, embedded by store/mod.rs
 tests/                      one file per area; tests/support/ holds the fake SEI, the fake clock,
-                            the process helpers, the Go builder and a fake webhook for Go
+                            the process helpers
 ```
 
 ## Process contract
@@ -329,8 +324,3 @@ Deleting an event also deletes the Go release's `deliveries` rows for it (`ON DE
   timeout, because it runs the migrations.
 - The `deliveries` and `whatsmeow_*` tables belong to the Go release. The plugin never reads or
   writes them.
-
-## Rollback to the Go release
-
-The image `ghcr.io/itztas/sei-monitor:1.0.0` runs the Go release on the same database, with no SQL
-step. The README lists what the switch costs in both directions.

@@ -10,8 +10,7 @@ WhatsApp, the feed). The plugin keeps its data in its own Postgres database and 
 SEI and to that database.
 
 Release `1.0.0` was a standalone service with its own notifications, feed, API and web page. That
-code is gone. Its image, `ghcr.io/itztas/sei-monitor:1.0.0`, is still the way back (see
-[Switching between the Go release and the plugin](#switching-between-the-go-release-and-the-plugin)).
+code is gone (see [Switching from the Go release to the plugin](#switching-from-the-go-release-to-the-plugin)).
 
 ## What it reports
 
@@ -303,12 +302,12 @@ Put `orgs` or `diagnose` in place of `test-login` at the end. When the hub reads
 `SEI__SEI_PASSWORD_FILE` or `SEI__SEI_PASSWORD_CMD`, the command uses the same file or program.
 Ctrl+C stops a command with exit code 130.
 
-## Switching between the Go release and the plugin
+## Switching from the Go release to the plugin
 
-Both programs use the same database and schema, and neither needs a SQL step to take over from the
-other. Neither keeps the other out either: the Go release holds no lock while it runs, and the
-plugin's lock only keeps a second plugin out. Running both at once makes two monitors fight over
-the same account, so stop one completely before starting the other.
+Both programs use the same database and schema, and the plugin needs no SQL step to take over from
+the Go release. The Go release holds no lock while it runs, and the plugin's lock only keeps a
+second plugin out. Running both at once makes two monitors fight over the same account, so stop
+the Go release completely before starting the plugin.
 
 ### Releases and `latest`
 
@@ -317,7 +316,7 @@ the same account, so stop one completely before starting the other.
 `latest` to the plugin. The old production compose file names `ghcr.io/itztas/sei-monitor:latest`
 directly, and the plugin image exits at once when run alone, which `restart: unless-stopped` turns
 into a restart loop with SEI unwatched. So pin the old stack to `ghcr.io/itztas/sei-monitor:1.0.0`
-before the merge, and keep it pinned: the rollback needs that image.
+before the merge.
 
 ### From the Go release to the plugin
 
@@ -332,7 +331,7 @@ before the merge, and keep it pinned: the rollback needs that image.
 
    A notification still pending at the switch is never sent while the plugin runs: the hub's first
    read takes that event as history. If a channel never delivers (an unpaired WhatsApp number, for
-   example), its rows stay pending: pair it, or accept that they go out after a rollback.
+   example), its rows stay pending: pair it first.
 
    In the same database this must return an empty reason:
 
@@ -356,34 +355,6 @@ before the merge, and keep it pinned: the rollback needs that image.
    `baseline complete` for `sei`. The baseline comes on the hub's first poll after the plugin has
    reached SEI. Don't restart the hub before that line (see [The hub's first
    read](#the-hubs-first-read)).
-
-### Back to the Go release
-
-1. Stop the hub completely.
-2. Start `ghcr.io/itztas/sei-monitor:1.0.0` on the same database, with the same `SEI_URL`,
-   `SEI_USERNAME` and `SEI_ORG`. If a pause reason is on record, Go tries the login once at start,
-   as it always did.
-
-What to expect:
-
-- Go announces only what it detects from then on. It never announces an event the plugin stored,
-  even when it detects the same change again, because Go writes a notification row only for the
-  events it inserts itself. Its first notification can take up to 30 seconds after the check that
-  found it.
-- Notifications Go left pending before the switch to the plugin go out right after the rollback,
-  possibly days late. Step 2 above avoids that.
-- When the plugin pruned old events, Go's notification rows for them went too (`ON DELETE
-  CASCADE`), pending ones included. Those are never sent.
-- Notifications the hub had not delivered are not sent by anyone. List them in the hub's database
-  before you stop it.
-- Go logs in once at start even with a pause reason on record, because it has no hold.
-- The plugin adds no table or column. A future migration keeps this way back open only while it
-  leaves alone the tables, columns, constraints and event formats the Go release uses. Go does not
-  refuse a database that holds a migration it does not know, so a breaking change would show up as
-  wrong or failing queries.
-
-Before you come forward to the plugin again, reset the hub's position for `sei`. Otherwise the hub
-announces events Go already announced in between.
 
 ## Security
 
@@ -461,8 +432,7 @@ The plugin was checked against the Go release's own output. These differences ar
 - The database tests use `TEST_DATABASE_URL` when it is set, and otherwise start a throwaway
   Postgres from `initdb` and `postgres` on `PATH`. To use the compose Postgres, export
   `TEST_DATABASE_URL` in your shell, with the same password as `POSTGRES_PASSWORD`. The
-  compatibility tests build the Go release from the tag `v1.0.0` with `go`. The conformance test
-  runs the program named by `PLUGIN_CONFORMANCE`, or else installs `plugin-conformance` with `go`.
+  conformance test runs the program named by `PLUGIN_CONFORMANCE`, or else installs `plugin-conformance` with `go`.
   With `CI` set, a missing tool fails the tests instead of skipping them.
 - `git config core.hooksPath .githooks` turns on the hooks: Conventional Commits messages, and
   `cargo fmt --check` plus the tests before each commit. The hook and `make` run cargo through

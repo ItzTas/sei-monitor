@@ -2,11 +2,9 @@
 
 pub mod clock;
 pub mod fake_sei;
-pub mod go;
 pub mod harness;
 pub mod logs;
 pub mod process;
-pub mod webhook;
 
 use std::io;
 use std::time::Duration;

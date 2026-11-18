@@ -27,6 +27,7 @@ struct Started {
     lock: WriterLock,
     store: Store,
     first_read_boundary: i64,
+    newest_event: i64,
 }
 
 pub async fn run_plugin(config: PluginConfig) -> anyhow::Result<()> {
@@ -37,7 +38,7 @@ pub async fn run_plugin(config: PluginConfig) -> anyhow::Result<()> {
         Arc::new(SystemClock),
         random_jitter(),
     );
-    monitor.notifier().notify(started.first_read_boundary);
+    monitor.notifier().notify(started.newest_event);
     let plugin = SeiPlugin::new(Arc::clone(&monitor), config.full_detail)
         .with_first_read_boundary(started.first_read_boundary);
     serve_until_stopped(started.lock, monitor, plugin).await
@@ -61,17 +62,25 @@ async fn start_up(database_url: &Secret, limit: Duration) -> anyhow::Result<Star
     .await?;
     info!(versions = ?applied, "database migrations applied");
     let store = Store::new(database_url).context("opening the database pool")?;
-    let first_read_boundary = within(
-        deadline,
-        limit,
-        "reading the last issued event",
-        store.last_issued_seq(),
-    )
-    .await?;
+    let (first_read_boundary, newest_event) = tokio::try_join!(
+        within(
+            deadline,
+            limit,
+            "reading the last issued event",
+            store.last_issued_seq(),
+        ),
+        within(
+            deadline,
+            limit,
+            "reading the newest stored event",
+            store.newest_event_id(),
+        ),
+    )?;
     Ok(Started {
         lock,
         store,
         first_read_boundary,
+        newest_event,
     })
 }
 

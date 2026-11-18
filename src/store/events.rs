@@ -20,6 +20,8 @@ const LAST_ISSUED_SEQ: &str = "SELECT GREATEST(
     (SELECT COALESCE(max(id), 0) FROM events)
 )";
 
+const NEWEST_EVENT_ID: &str = "SELECT COALESCE(max(id), 0) FROM events";
+
 const PRUNE_EVENTS_BEFORE: &str =
     "DELETE FROM events WHERE account_id = $1 AND detected_at < $2 AND id <= $3";
 
@@ -110,6 +112,11 @@ impl Store {
 
     pub async fn last_issued_seq(&self) -> Result<i64, StoreError> {
         let row = self.client().await?.query_one(LAST_ISSUED_SEQ, &[]).await?;
+        Ok(row.try_get(0)?)
+    }
+
+    pub async fn newest_event_id(&self) -> Result<i64, StoreError> {
+        let row = self.client().await?.query_one(NEWEST_EVENT_ID, &[]).await?;
         Ok(row.try_get(0)?)
     }
 

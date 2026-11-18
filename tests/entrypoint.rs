@@ -772,7 +772,7 @@ async fn the_hubs_first_read_leaves_the_first_cycle_for_the_next_one() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn watch_signals_at_once_with_the_last_event_issued_before_the_start() {
+async fn watch_signals_at_once_with_the_newest_event_stored_before_the_start() {
     let Some(database) = migrated_database().await else {
         return;
     };
@@ -784,11 +784,23 @@ async fn watch_signals_at_once_with_the_last_event_issued_before_the_start() {
     h.clock.advance(Duration::from_secs(15 * 60));
     h.fake.add_process(UNIT_NUPROC, process(9003, 3, "Ofício"));
     h.run_once().await;
-    let seeded = store
+    let db = admin(&database.url).await;
+    let stored = count(&db, "SELECT COALESCE(max(id), 0) FROM events").await;
+    assert!(stored > 0);
+    db.execute(
+        "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
+         SELECT account_id, kind, procedure_id, ref, occurred_at, detected_at, payload
+         FROM events WHERE id = $1
+         ON CONFLICT (account_id, kind, ref) DO NOTHING",
+        &[&stored],
+    )
+    .await
+    .expect("insert an event that exists");
+    let issued = store
         .last_issued_seq()
         .await
         .expect("the last issued event");
-    assert!(seeded > 0);
+    assert_eq!(issued, stored + 1);
     h.fake.stall(ROUTE_VERSION);
     h.fake.stall(ROUTE_LOGIN_PAGE);
     let logins_before = h.fake.calls(ROUTE_LOGIN);
@@ -798,7 +810,7 @@ async fn watch_signals_at_once_with_the_last_event_issued_before_the_start() {
     let mut watch = open_watch(&mut plugin, &mut client).await;
     let first = next_watch_signal(&mut plugin, &mut watch).await;
 
-    assert_eq!(first, seeded);
+    assert_eq!(first, stored);
     assert_eq!(h.fake.calls(ROUTE_LOGIN), logins_before);
     drop(watch);
     drop(client);

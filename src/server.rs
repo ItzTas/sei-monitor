@@ -109,12 +109,24 @@ impl SeiPlugin {
         ahead
     }
 
-    fn end_first_read(&self, last_issued: i64) {
+    async fn end_first_read(&self, last_issued: i64) {
         let was_over = self.first_read_over.swap(true, Ordering::SeqCst);
         if was_over || self.first_read_boundary.is_none() {
             return;
         }
-        self.monitor.notifier().notify(last_issued);
+        let newest = self.newest_event(last_issued).await;
+        self.monitor.notifier().notify(newest);
+    }
+
+    async fn newest_event(&self, fallback: i64) -> i64 {
+        let read = self.monitor.store().newest_event_id().await;
+        read.unwrap_or_else(|failure| {
+            warn!(
+                error = &failure as &dyn Error,
+                "could not read the newest stored event; signalling the last issued position"
+            );
+            fallback
+        })
     }
 
     fn active_boundary(&self) -> Option<i64> {
@@ -233,7 +245,7 @@ impl Plugin for SeiPlugin {
         let limit = effective_limit(limit);
         let (events, last_issued) = self.read_events(after, limit).await?;
         if i64::try_from(events.len()).unwrap_or(i64::MAX) < limit {
-            self.end_first_read(last_issued);
+            self.end_first_read(last_issued).await;
         }
         Ok(Response::new(EventsResponse { events }))
     }

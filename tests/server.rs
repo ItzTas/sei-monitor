@@ -192,6 +192,20 @@ async fn add_one_event(h: &Harness) {
     assert!(h.run_once().await.events_created > 0);
 }
 
+async fn insert_again(url: &str, id: i64) {
+    admin(url)
+        .await
+        .execute(
+            "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
+             SELECT account_id, kind, procedure_id, ref, occurred_at, detected_at, payload
+             FROM events WHERE id = $1
+             ON CONFLICT (account_id, kind, ref) DO NOTHING",
+            &[&id],
+        )
+        .await
+        .expect("insert an event that exists");
+}
+
 async fn add_one_event_through_another_monitor(h: &Harness) {
     let other = Monitor::new(
         config(&h.fake, PASSWORD),
@@ -964,16 +978,18 @@ async fn a_long_rejection_from_sei_is_cut_in_the_pause_and_in_status() {
 
 #[tokio::test]
 async fn the_end_of_the_first_read_signals_the_events_it_held() {
-    let Some((_database, store)) = database_store().await else {
+    let Some((database, store)) = database_store().await else {
         return;
     };
     let h = with_history(&store).await;
     let boundary = last_issued(&h).await;
     let plugin = plugin(&h).with_first_read_boundary(boundary);
     add_one_event_through_another_monitor(&h).await;
-    let newest = last_issued(&h).await;
     let all = seqs(&page(&SeiPlugin::new(Arc::clone(&h.monitor), false), 0, 500).await);
     assert_eq!(all.len(), 7);
+    let newest = all[6];
+    insert_again(&database.url, newest).await;
+    assert_eq!(last_issued(&h).await, newest + 1);
     let logins = h.fake.calls(ROUTE_LOGIN);
     let mut signals = h.monitor.notifier().subscribe();
     let known = signals.latest_seq();

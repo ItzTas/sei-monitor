@@ -186,9 +186,9 @@ tests/                      one file per area; tests/support/ holds the fake SEI
 - Stdout carries only the handshake line. Logs go to stderr as JSON lines.
 - Start-up reads the configuration, takes the database writer lock (a Postgres advisory lock on its
   own connection), applies the migrations on that connection, opens the pool and reads the highest
-  event position ever issued, all before the handshake. Each connection attempt has 10 s and the
-  whole sequence has 45 s, because the hub kills a plugin that has not answered in 60 s. The plugin
-  does not call SEI before the handshake.
+  event position ever issued and the id of the newest stored event, all before the handshake. Each
+  connection attempt has 10 s and the whole sequence has 45 s, because the hub kills a plugin that
+  has not answered in 60 s. The plugin does not call SEI before the handshake.
 - Exit code 0 is a clean stop (SIGTERM or SIGINT). When the plugin exits 1 because of a
   configuration error, a failed start-up step or a lost writer lock, it writes exactly one JSON
   `fatal` line at `error` level, whose `error` field holds the configuration problems, names the
@@ -223,24 +223,28 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   returns a page shorter than its limit, newer events are left out. The hub stores its first read
   of a plugin as a baseline and announces none of it, so this keeps the first cycle's events out of
   the baseline. They go out on the next read: when the first read ends, the plugin calls `notify`
-  with the highest position issued, so a hub with `Watch` reads them at once. The limit belongs to
-  one process: a restart before the hub's first read ended lets the new baseline take those events
-  in.
+  with the id of the newest stored event, so a hub with `Watch` reads them at once. The limit
+  belongs to one process: a restart before the hub's first read ended lets the new baseline take
+  those events in.
 - When `after` is above the highest position this database ever issued, the plugin's database was
   reset and the hub's position was not. `Events` then returns nothing and acknowledges nothing,
   logs `the hub is ahead of this database: reset the hub's position for the sei plugin` once, and
   `Status` shows that text until the two agree.
 - The plugin serves `Watch` with the SDK's `serve_with_notifier`. `Monitor` owns the `Notifier`, and
-  start-up sets it to the highest position issued before the handshake. After each committed write
-  that inserted events (a cycle, the `login:` and `login-held:` events) the monitor calls `notify`
-  with the highest inserted id; a write that inserted nothing signals nothing. It calls
-  `status_changed` when what `Status` answers changes: a cycle starts or ends (a cancelled one too),
-  the next check time is set, a preparation fails (an unknown agency or module only when its text
-  changes) or works, the monitor pauses, holds or leaves the hold, the scheduler panics, the hub
-  falls ahead of the database or back in line, and the last `Events` read fails or recovers. The
-  end of the first read calls `notify` with the highest position issued. A signal is a value in a
-  channel inside the process: the hub answers it with `Describe`, `Status` and maybe `Events`, never
-  `Check`, so no signal calls SEI or logs in.
+  start-up sets it to the id of the newest stored event. After each committed write that inserted
+  events (a cycle, the `login:` and `login-held:` events) the monitor calls `notify` with the
+  highest inserted id; a write that inserted nothing signals nothing. It calls `status_changed`
+  when what `Status` answers changes: a cycle starts or ends (a cancelled one too), the next check
+  time is set, a preparation fails (an unknown agency or module only when its text changes) or
+  works, the monitor pauses, holds or leaves the hold, the scheduler panics, the hub falls ahead of
+  the database or back in line, and the last `Events` read fails or recovers. The end of the first
+  read calls `notify` with the id of the newest stored event. Signals carry the id of a stored
+  event, never the sequence's own value: an insert that meets the `(account, kind, ref)` conflict
+  still uses up a sequence value, and a signal above every stored event would make the hub read
+  `Events` on every signal until the next event. The first-read boundary and the hub-ahead check
+  keep using the highest position issued. A signal is a value in a channel inside the process: the
+  hub answers it with `Describe`, `Status` and maybe `Events`, never `Check`, so no signal calls SEI
+  or logs in.
 - A stored event that cannot be read (unknown kind or a payload that does not decode) is skipped
   and logged once at `error` as `skipping a stored event that cannot be read`, with its id and no
   stored value. After 1,024 such ids one summary line replaces the rest. One call walks at most

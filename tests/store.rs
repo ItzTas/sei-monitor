@@ -1681,6 +1681,46 @@ async fn past_the_reported_limit_one_line_says_so_and_reads_stay_quiet() {
 }
 
 #[tokio::test]
+async fn the_newest_event_id_is_the_id_of_the_newest_stored_event() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let store = store(&db.url);
+    assert_eq!(store.newest_event_id().await.expect("on a new database"), 0);
+    let account = store
+        .ensure_account(&key(), repo_now())
+        .await
+        .expect("account");
+    let client = connect(&db.url).await;
+    let stored: Vec<i64> = client
+        .query(
+            "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
+             SELECT $1, 'process_left', 1, 'r' || n, $2, $2, '{}'
+             FROM generate_series(1, 3) AS n
+             RETURNING id",
+            &[&account.id, &repo_now()],
+        )
+        .await
+        .expect("insert events")
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+    let newest = *stored.iter().max().expect("three events");
+    client
+        .execute(
+            "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
+             VALUES ($1, 'process_left', 1, 'r1', $2, $2, '{}')
+             ON CONFLICT (account_id, kind, ref) DO NOTHING",
+            &[&account.id, &repo_now()],
+        )
+        .await
+        .expect("insert an event that exists");
+
+    assert_eq!(store.last_issued_seq().await.expect("issued"), newest + 1);
+    assert_eq!(store.newest_event_id().await.expect("stored"), newest);
+}
+
+#[tokio::test]
 async fn the_last_issued_seq_never_goes_back() {
     let Some(db) = migrated_database().await else {
         return;

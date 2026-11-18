@@ -21,7 +21,7 @@ use sei_monitor::event::Kind;
 use sei_monitor::monitor::{Clock, Monitor};
 use sei_monitor::secret::Secret;
 use sei_monitor::server::SeiPlugin;
-use sei_monitor::store::{AccountKey, Store};
+use sei_monitor::store::{AccountKey, Store, Trigger};
 
 use support::fake_sei::{
     FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_PROCESSES, UNIT_NUPROC, USERNAME, process_number,
@@ -190,6 +190,22 @@ async fn add_one_event(h: &Harness) {
     h.clock.advance(FIFTEEN_MINUTES);
     h.fake.add_process(UNIT_NUPROC, process(9004, 4, "Ofício"));
     assert!(h.run_once().await.events_created > 0);
+}
+
+async fn add_one_event_through_another_monitor(h: &Harness) {
+    let other = Monitor::new(
+        config(&h.fake, PASSWORD),
+        h.store.clone(),
+        h.clock.clone(),
+        no_jitter(),
+    );
+    bounded(other.prepare()).await.expect("prepare");
+    h.clock.advance(FIFTEEN_MINUTES);
+    h.fake.add_process(UNIT_NUPROC, process(9004, 4, "Ofício"));
+    let cycle = bounded(other.run_once(Trigger::Scheduled))
+        .await
+        .expect("a cycle of the other monitor");
+    assert!(cycle.events_created > 0);
 }
 
 fn rejected_harness(store: &Store) -> Harness {
@@ -954,12 +970,13 @@ async fn the_end_of_the_first_read_signals_the_events_it_held() {
     let h = with_history(&store).await;
     let boundary = last_issued(&h).await;
     let plugin = plugin(&h).with_first_read_boundary(boundary);
-    add_one_event(&h).await;
+    add_one_event_through_another_monitor(&h).await;
     let newest = last_issued(&h).await;
     let all = seqs(&page(&SeiPlugin::new(Arc::clone(&h.monitor), false), 0, 500).await);
     assert_eq!(all.len(), 7);
+    let logins = h.fake.calls(ROUTE_LOGIN);
     let mut signals = h.monitor.notifier().subscribe();
-    signals.latest_seq();
+    let known = signals.latest_seq();
 
     let full = page(&plugin, 0, 2).await;
     let after_a_full_page = pending_signal(&mut signals).await;
@@ -972,9 +989,11 @@ async fn the_end_of_the_first_read_signals_the_events_it_held() {
     assert_eq!(after_a_full_page, None);
     assert_eq!(seqs(&short), all[2..6]);
     assert!(newest > boundary, "{newest} {boundary}");
+    assert!(known < newest, "{known} {newest}");
     assert_eq!(after_the_short_page, Some(newest));
     assert_eq!(seqs(&later), all[6..]);
     assert_eq!(after_a_later_read, None);
+    assert_eq!(h.fake.calls(ROUTE_LOGIN), logins);
 }
 
 #[tokio::test]

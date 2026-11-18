@@ -67,7 +67,7 @@ The plugin signals when:
 - a check you requested ends the hold, or SEI gave its login no answer and the plugin is held again;
 - the plugin cannot reach SEI, or does not find the agency or the module, and when it reaches SEI;
 - the hub is ahead of the plugin's database, and when the two agree again;
-- the plugin cannot read its database, and when it can again;
+- the hub cannot read the plugin's events, and when it can again;
 - the plugin's scheduler stops after an internal error;
 - the plugin records an event;
 - the hub's first read ends (see [The hub's first read](#the-hubs-first-read)).

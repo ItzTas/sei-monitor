@@ -78,9 +78,10 @@ skipping.
   else `go install` of `plugin-conformance` at the SDK's Go tag `sdk-go/v0.4.0`, which also checks
   `Watch` on the real binary.
 
-The `Watch` tests subscribe with `Notifier::subscribe` and wait for a signal with a bounded
+The signal tests subscribe with `Notifier::subscribe` and wait for a signal with a bounded
 `timeout` on `Signals::changed` (`support::next_signal`, 5 s), or look for one without waiting
-(`support::pending_signal`). None of them sleeps to wait for the plugin.
+(`support::pending_signal`). The process tests read the plugin's gRPC `Watch` stream, each message
+within 5 s. None of them sleeps to wait for the plugin.
 
 The tests that call the fake SEI fail when `HTTP_PROXY` is set in their environment.
 

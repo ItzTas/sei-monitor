@@ -16,8 +16,9 @@ reference for the golden vectors, the compatibility tests and the rollback.
 
 ## Code
 
-- **Do not write comments in the code.** No `//`, `///` or `//!`. Names explain what the code does.
-  Attributes such as `#[cfg(test)]` are not comments.
+- **Comments are short and only where they explain something worth explaining**: a guarantee, a
+  rule that comes from outside the code, a pointer to this file. Write none where the code is
+  obvious, and never one that repeats the code. Attributes such as `#[cfg(test)]` are not comments.
 - **English everywhere**: identifiers, file names, SQL, logs, error messages, event text and docs.
 - Only make `pub` what another module or the integration tests in `tests/` use. Everything else is
   `pub(crate)` or private.

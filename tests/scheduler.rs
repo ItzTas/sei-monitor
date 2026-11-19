@@ -29,6 +29,9 @@ use support::{next_signal, pending_signal};
 const SETTLE: Duration = Duration::from_millis(100);
 const POLL: Duration = Duration::from_millis(10);
 const EVENTUALLY: Duration = Duration::from_secs(10);
+// Two statements queued on one row: the second waits for two locks, each under its own 5 s
+// lock_timeout.
+const TWO_LOCK_WAITS: Duration = Duration::from_secs(2 * 5 + 3);
 const CHANGED_PASSWORD: &str = "changed-by-the-user";
 const REJECTED: &str = "Usuário ou Senha Inválida.";
 const RECORDED_REASON: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
@@ -55,13 +58,17 @@ fn spawn_run(monitor: &Arc<Monitor>) -> Running {
     Running(tokio::spawn(Arc::clone(monitor).run()))
 }
 
-async fn eventually<F: Future<Output = bool>>(mut check: impl FnMut() -> F) -> bool {
+async fn eventually<F: Future<Output = bool>>(check: impl FnMut() -> F) -> bool {
+    within(EVENTUALLY, check).await
+}
+
+async fn within<F: Future<Output = bool>>(limit: Duration, mut check: impl FnMut() -> F) -> bool {
     let polled = async {
         while !check().await {
             tokio::time::sleep(POLL).await;
         }
     };
-    tokio::time::timeout(EVENTUALLY, polled).await.is_ok()
+    tokio::time::timeout(limit, polled).await.is_ok()
 }
 
 async fn observed_waits(h: &Harness, count: usize) -> Vec<Duration> {
@@ -759,7 +766,11 @@ async fn a_pause_the_database_did_not_take_is_recorded_once_the_row_is_free() {
         .await
         .expect("release");
     let write_blocked = eventually(|| waiting_on(&observer, PAUSE_WRITE)).await;
-    let write_failed = eventually(|| async { !waiting_on(&observer, PAUSE_WRITE).await }).await;
+    // The pause write and the event's account lock run together on the same row, either first.
+    let write_failed = within(TWO_LOCK_WAITS, || async {
+        !waiting_on(&observer, PAUSE_WRITE).await
+    })
+    .await;
 
     let retry = h.clock.next_sleep().await;
     let reason_while_held = reason_in(&observer).await;

@@ -764,7 +764,6 @@ async fn a_pause_the_database_did_not_take_is_recorded_once_the_row_is_free() {
         .await
         .expect("release");
     let write_blocked = eventually(|| waiting_on(&observer, PAUSE_WRITE)).await;
-    // The pause write and the event's account lock run together on the same row, either first.
     let write_failed = within(TWO_LOCK_WAITS, || async {
         !waiting_on(&observer, PAUSE_WRITE).await
     })
@@ -827,7 +826,7 @@ impl PasswordSource for PasswordOnRelease {
     }
 }
 
-fn harness_with_a_held_login(store: &Store) -> (Harness, watch::Sender<bool>) {
+fn harness_whose_login_waits(store: &Store) -> (Harness, watch::Sender<bool>) {
     let (release, released) = watch::channel(false);
     let h = Harness::new(store, |config| {
         config.target.password = Arc::new(PasswordOnRelease(released));
@@ -913,7 +912,7 @@ async fn a_cancelled_clear_of_the_rejection_is_tried_again_after_the_next_succes
     let Some((database, store)) = database_store().await else {
         return;
     };
-    let (h, release_login) = harness_with_a_held_login(&store);
+    let (h, release_login) = harness_whose_login_waits(&store);
     populate(&h.fake);
     let (cancelled, logs) = captured(a_check_whose_clear_is_cancelled(
         &h,
@@ -959,7 +958,7 @@ async fn a_rejection_recorded_after_a_cancelled_clear_stays_on_record() {
     let Some((database, store)) = database_store().await else {
         return;
     };
-    let (h, release_login) = harness_with_a_held_login(&store);
+    let (h, release_login) = harness_whose_login_waits(&store);
     populate(&h.fake);
     let (cancelled, logs) = captured(a_check_whose_clear_is_cancelled(
         &h,

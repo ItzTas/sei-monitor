@@ -33,12 +33,23 @@ pub(crate) fn database_options(database_url: &Secret) -> Result<PgConnectOptions
         return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
     }
     let url = Url::parse(address).map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
+    if !names_a_host(&url) {
+        return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
+    }
     let options = PgConnectOptions::from_url(&keys_sqlx_reads(url)?)
         .map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
     if options.get_host().contains(',') {
         return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
     }
     Ok(options.disable_statement_logging().options(KEEPALIVES))
+}
+
+// 2.1 refused an address without a host; sqlx would fall back to PGHOST, a socket or localhost.
+fn names_a_host(url: &Url) -> bool {
+    url.has_host()
+        || url
+            .query_pairs()
+            .any(|(key, _)| key == "host" || key == "hostaddr")
 }
 
 // sqlx logs every query key it does not read, value included, so it only gets the keys it reads.

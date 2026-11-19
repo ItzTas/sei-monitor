@@ -366,6 +366,14 @@ mod tests {
                 5432,
             ),
             ("postgresql://sei:hunter2@db.internal/sei", 5432),
+            (
+                "postgres://sei:hunter2@db.internal/sei?sslnegotiation=postgres&connect_timeout=5&tcp_user_timeout=5&keepalives=1&keepalives_idle=5&keepalives_interval=5&keepalives_retries=3&target_session_attrs=any&channel_binding=disable&load_balance_hosts=disable",
+                5432,
+            ),
+            (
+                "postgres://sei:hunter2@db.internal/sei?options[application_name]=sei",
+                5432,
+            ),
         ];
         for (url, port) in accepted {
             let options = database_options(&Secret::new(url.to_owned()))
@@ -387,6 +395,8 @@ mod tests {
             "postgres://sei:hunter2@h1:5432,h2:5432/sei",
             "mysql://sei:hunter2@db/sei",
             "postgres://sei:hunter2@db/sei?sslmode=sometimes",
+            "postgres://sei:hunter2@db/sei?sslpassword=x",
+            "postgres://sei:hunter2@db/sei?Password=x",
         ];
         for url in refused {
             let error = database_options(&Secret::new(url.to_owned())).err();

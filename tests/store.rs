@@ -212,6 +212,47 @@ async fn an_address_that_is_not_postgres_is_refused() {
 }
 
 #[tokio::test]
+async fn url_query_values_never_reach_the_log() {
+    let value = "s3cr3t-value";
+    let keys = [
+        "sslnegotiation",
+        "connect_timeout",
+        "tcp_user_timeout",
+        "keepalives",
+        "keepalives_idle",
+        "keepalives_interval",
+        "keepalives_retries",
+        "target_session_attrs",
+        "channel_binding",
+        "load_balance_hosts",
+        "sslpassword",
+        "Password",
+        "passfile",
+    ];
+    let address = format!("postgres://sei:{PASSWORD}@db.internal.example:5432/sei");
+
+    let (refusals, logs) = captured(async {
+        keys.iter()
+            .filter_map(|key| {
+                Store::new(&secret(&with_query(&address, &format!("{key}={value}")))).err()
+            })
+            .map(|error| everything_printed(&error))
+            .collect::<Vec<String>>()
+    })
+    .await;
+
+    let leaked: Vec<&LoggedEvent> = logs
+        .iter()
+        .filter(|event| event.iter().any(|(_, logged)| logged.contains(value)))
+        .collect();
+    assert!(leaked.is_empty(), "{leaked:?}");
+    assert!(
+        refusals.iter().all(|printed| !printed.contains(value)),
+        "{refusals:?}"
+    );
+}
+
+#[tokio::test]
 async fn failures_never_show_the_password_or_the_host() {
     let Some(db) = database().await else { return };
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");

@@ -1,6 +1,7 @@
-use std::str::FromStr;
 use std::time::Duration;
 
+// The url crate's type, the one sqlx parses addresses with.
+use reqwest::Url;
 use sea_orm::sqlx::ConnectOptions as _;
 use sea_orm::sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sea_orm::{DatabaseConnection, SqlxPostgresConnector};
@@ -25,15 +26,67 @@ const KEEPALIVES: [(&str, &str); 4] = [
 const POOL_LIMITS: [(&str, &str); 2] = [("statement_timeout", "20000"), ("lock_timeout", "5000")];
 
 pub(crate) fn database_options(database_url: &Secret) -> Result<PgConnectOptions, StoreError> {
-    let url = database_url.reveal();
-    if !SCHEMES.iter().any(|scheme| url.starts_with(scheme)) {
+    let address = database_url.reveal();
+    if !SCHEMES.iter().any(|scheme| address.starts_with(scheme)) {
         return Err(StoreError::InvalidUrl);
     }
-    let options = PgConnectOptions::from_str(url).map_err(|_| StoreError::InvalidUrl)?;
+    let url = Url::parse(address).map_err(|_| StoreError::InvalidUrl)?;
+    let options =
+        PgConnectOptions::from_url(&keys_sqlx_reads(url)?).map_err(|_| StoreError::InvalidUrl)?;
     if options.get_host().contains(',') {
         return Err(StoreError::InvalidUrl);
     }
     Ok(options.disable_statement_logging().options(KEEPALIVES))
+}
+
+// sqlx logs every query key it does not read, value included, so it only gets the keys it reads.
+fn keys_sqlx_reads(mut url: Url) -> Result<Url, StoreError> {
+    let read = [
+        "sslmode",
+        "ssl-mode",
+        "sslrootcert",
+        "ssl-root-cert",
+        "ssl-ca",
+        "sslcert",
+        "ssl-cert",
+        "sslkey",
+        "ssl-key",
+        "statement-cache-capacity",
+        "host",
+        "hostaddr",
+        "port",
+        "dbname",
+        "user",
+        "password",
+        "application_name",
+        "options",
+    ];
+    // 2.1's client took these too; sqlx has no equivalent, so they are left out.
+    let left_out = [
+        "sslnegotiation",
+        "connect_timeout",
+        "tcp_user_timeout",
+        "keepalives",
+        "keepalives_idle",
+        "keepalives_interval",
+        "keepalives_retries",
+        "target_session_attrs",
+        "channel_binding",
+        "load_balance_hosts",
+    ];
+    let read_by_sqlx =
+        |key: &str| read.contains(&key) || (key.starts_with("options[") && key.ends_with(']'));
+    let pairs: Vec<(String, String)> = url.query_pairs().into_owned().collect();
+    let unknown = pairs
+        .iter()
+        .any(|(key, _)| !read_by_sqlx(key) && !left_out.contains(&key.as_str()));
+    if unknown {
+        return Err(StoreError::InvalidUrl);
+    }
+    url.set_query(None);
+    url.query_pairs_mut()
+        .extend_pairs(pairs.iter().filter(|(key, _)| read_by_sqlx(key)));
+    Ok(url)
 }
 
 pub(crate) fn with_pool_limits(options: PgConnectOptions) -> PgConnectOptions {

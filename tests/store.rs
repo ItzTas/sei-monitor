@@ -432,6 +432,50 @@ async fn a_held_account_row_fails_the_call_within_the_lock_timeout() {
         .expect("pause once released");
 }
 
+const OTHER_CLIENTS: &str = "SELECT pid FROM pg_stat_activity
+WHERE datname = current_database() AND backend_type = 'client backend' AND pid <> pg_backend_pid()";
+
+#[tokio::test]
+async fn a_pooled_connection_the_server_ended_is_replaced_before_use() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    pooled
+        .last_cycle_run(1)
+        .await
+        .expect("a read that leaves one pooled connection");
+    let admin = connect(&db.url).await;
+    let ended: Vec<bool> = admin
+        .query(
+            &format!("SELECT pg_terminate_backend(pid) FROM ({OTHER_CLIENTS}) pooled"),
+            &[],
+        )
+        .await
+        .expect("end the pooled connection's backend")
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+    assert_eq!(ended, [true]);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !admin
+        .query(OTHER_CLIENTS, &[])
+        .await
+        .expect("look for the ended backend")
+        .is_empty()
+    {
+        assert!(
+            Instant::now() < deadline,
+            "the ended backend was still running after 5 seconds"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+
+    let run = pooled.last_cycle_run(1).await;
+
+    assert!(run.is_ok(), "{run:?}");
+}
+
 #[tokio::test]
 async fn ensure_account_returns_the_same_account_per_key() {
     let Some(db) = migrated_database().await else {

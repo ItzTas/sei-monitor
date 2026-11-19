@@ -36,10 +36,19 @@ pub(crate) fn database_options(database_url: &Secret) -> Result<PgConnectOptions
     if !names_a_host(&url) {
         return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
     }
-    let options = PgConnectOptions::from_url(&keys_sqlx_reads(url)?)
+    let mut options = PgConnectOptions::from_url(&keys_sqlx_reads(url)?)
         .map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
     if options.get_host().contains(',') {
         return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
+    }
+    // sqlx keeps an IPv6 host's brackets, and the resolver then takes it for a name.
+    let unbracketed = options
+        .get_host()
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .map(str::to_owned);
+    if let Some(address) = unbracketed {
+        options = options.host(&address);
     }
     Ok(options.disable_statement_logging().options(KEEPALIVES))
 }

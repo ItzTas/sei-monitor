@@ -397,6 +397,12 @@ mod tests {
             );
         }
 
+        let ipv6 = database_options(&Secret::new(
+            "postgres://sei:hunter2@[::1]:5433/sei".to_owned(),
+        ))
+        .expect("an IPv6 address");
+        assert_eq!((ipv6.get_host(), ipv6.get_port()), ("::1", 5433));
+
         let refused = [
             "postgres://sei:hunter2@h1,h2/sei",
             "postgres://sei:hunter2@h1:5432,h2:5432/sei",

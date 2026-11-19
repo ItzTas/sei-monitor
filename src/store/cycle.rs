@@ -1,16 +1,23 @@
 use std::collections::HashSet;
 
-use tokio_postgres::{Row, Transaction};
+use sea_orm::sea_query::Expr;
+use sea_orm::{
+    ActiveValue, ColumnTrait, ConnectionTrait, DatabaseTransaction, DbBackend, EntityTrait,
+    FromQueryResult, QueryFilter, QuerySelect, Statement, TransactionTrait, TryInsertResult, Value,
+};
 
 use super::accounts::lock_account;
+use super::entity::{accounts, documents, events, processes};
 use super::records::{CycleChanges, ProcessRow};
 use super::runs::finish_run;
 use super::{Store, StoreError, count};
 use crate::event::{Event, Payload};
 
+// The scheduler tests find this read in pg_stat_activity by its text.
 const LIST_ACCOUNT_PROCESSES: &str =
     "SELECT * FROM processes WHERE account_id = $1 ORDER BY procedure_id";
 
+// Kept as written: the update leaves first_seen_at alone and clears left_at.
 const UPSERT_PROCESS: &str = "INSERT INTO processes (account_id, procedure_id, number, process_type, description, unit_id, unit_acronym,
                        assigned_user, assigned_user_id, return_date, return_overdue, last_activity_id,
                        document_total, first_seen_at, last_seen_at)
@@ -32,33 +39,17 @@ ON CONFLICT (account_id, procedure_id) DO UPDATE SET
     last_seen_at = excluded.last_seen_at,
     left_at = NULL";
 
-const MARK_PROCESS_LEFT: &str = "UPDATE processes SET left_at = $1
-WHERE account_id = $2 AND procedure_id = $3 AND left_at IS NULL";
-
-const LIST_DOCUMENT_IDS: &str =
-    "SELECT document_id FROM documents WHERE account_id = $1 AND procedure_id = $2";
-
-const INSERT_DOCUMENT: &str = "INSERT INTO documents (account_id, document_id, procedure_id, formatted_protocol, document_type, name, first_seen_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (account_id, document_id) DO NOTHING";
-
-const MARK_BASELINE: &str =
-    "UPDATE accounts SET baseline_at = $1 WHERE id = $2 AND baseline_at IS NULL";
-
-const INSERT_EVENT: &str =
-    "INSERT INTO events (account_id, kind, procedure_id, ref, occurred_at, detected_at, payload)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (account_id, kind, ref) DO NOTHING
-RETURNING id";
-
 impl Store {
     pub async fn processes(&self, account_id: i64) -> Result<Vec<ProcessRow>, StoreError> {
-        let rows = self
-            .client()
-            .await?
-            .query(LIST_ACCOUNT_PROCESSES, &[&account_id])
+        let statement = Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            LIST_ACCOUNT_PROCESSES,
+            [account_id.into()],
+        );
+        let rows = processes::Model::find_by_statement(statement)
+            .all(self.connection())
             .await?;
-        Ok(rows.iter().map(process_row).collect::<Result<_, _>>()?)
+        Ok(rows.into_iter().map(ProcessRow::from).collect())
     }
 
     pub async fn document_ids(
@@ -66,20 +57,19 @@ impl Store {
         account_id: i64,
         procedure_id: i64,
     ) -> Result<HashSet<i64>, StoreError> {
-        let rows = self
-            .client()
-            .await?
-            .query(LIST_DOCUMENT_IDS, &[&account_id, &procedure_id])
+        let ids: Vec<i64> = documents::Entity::find()
+            .select_only()
+            .column(documents::Column::DocumentId)
+            .filter(documents::Column::AccountId.eq(account_id))
+            .filter(documents::Column::ProcedureId.eq(procedure_id))
+            .into_tuple()
+            .all(self.connection())
             .await?;
-        Ok(rows
-            .iter()
-            .map(|row| row.try_get("document_id"))
-            .collect::<Result<_, _>>()?)
+        Ok(ids.into_iter().collect())
     }
 
     pub async fn apply_cycle(&self, changes: &CycleChanges) -> Result<Vec<Event>, StoreError> {
-        let mut client = self.client().await?;
-        let transaction = client.transaction().await?;
+        let transaction = self.connection().begin().await?;
         lock_account(&transaction, changes.account_id).await?;
         upsert_processes(&transaction, changes).await?;
         mark_left(&transaction, changes).await?;
@@ -104,90 +94,93 @@ impl Store {
 }
 
 async fn upsert_processes(
-    transaction: &Transaction<'_>,
+    transaction: &DatabaseTransaction,
     changes: &CycleChanges,
 ) -> Result<(), StoreError> {
     for process in &changes.processes {
         let first_seen_at = process.first_seen_at.unwrap_or(changes.now);
-        transaction
-            .execute(
-                UPSERT_PROCESS,
-                &[
-                    &changes.account_id,
-                    &process.procedure_id,
-                    &process.number,
-                    &process.process_type,
-                    &process.description,
-                    &process.unit_id,
-                    &process.unit_acronym,
-                    &process.assigned_user,
-                    &process.assigned_user_id,
-                    &process.return_date,
-                    &process.return_overdue,
-                    &process.last_activity_id,
-                    &process.document_total,
-                    &first_seen_at,
-                    &changes.now,
-                ],
-            )
-            .await?;
+        let values: [Value; 15] = [
+            changes.account_id.into(),
+            process.procedure_id.into(),
+            process.number.as_str().into(),
+            process.process_type.as_str().into(),
+            process.description.as_str().into(),
+            process.unit_id.into(),
+            process.unit_acronym.as_str().into(),
+            process.assigned_user.as_str().into(),
+            process.assigned_user_id.into(),
+            process.return_date.as_str().into(),
+            process.return_overdue.into(),
+            process.last_activity_id.into(),
+            process.document_total.into(),
+            first_seen_at.into(),
+            changes.now.into(),
+        ];
+        let statement = Statement::from_sql_and_values(DbBackend::Postgres, UPSERT_PROCESS, values);
+        transaction.execute_raw(statement).await?;
     }
     Ok(())
 }
 
 async fn mark_left(
-    transaction: &Transaction<'_>,
+    transaction: &DatabaseTransaction,
     changes: &CycleChanges,
 ) -> Result<(), StoreError> {
     for procedure_id in &changes.left {
-        transaction
-            .execute(
-                MARK_PROCESS_LEFT,
-                &[&changes.now, &changes.account_id, procedure_id],
-            )
+        processes::Entity::update_many()
+            .col_expr(processes::Column::LeftAt, Expr::value(changes.now))
+            .filter(processes::Column::AccountId.eq(changes.account_id))
+            .filter(processes::Column::ProcedureId.eq(*procedure_id))
+            .filter(processes::Column::LeftAt.is_null())
+            .exec(transaction)
             .await?;
     }
     Ok(())
 }
 
 async fn insert_documents(
-    transaction: &Transaction<'_>,
+    transaction: &DatabaseTransaction,
     changes: &CycleChanges,
 ) -> Result<(), StoreError> {
     for document in &changes.documents {
-        transaction
-            .execute(
-                INSERT_DOCUMENT,
-                &[
-                    &changes.account_id,
-                    &document.document_id,
-                    &document.procedure_id,
-                    &document.protocol,
-                    &document.document_type,
-                    &document.name,
-                    &changes.now,
-                ],
-            )
+        let row = documents::ActiveModel {
+            account_id: ActiveValue::Set(changes.account_id),
+            document_id: ActiveValue::Set(document.document_id),
+            procedure_id: ActiveValue::Set(document.procedure_id),
+            formatted_protocol: ActiveValue::Set(document.protocol.clone()),
+            document_type: ActiveValue::Set(document.document_type.clone()),
+            name: ActiveValue::Set(document.name.clone()),
+            first_seen_at: ActiveValue::Set(changes.now),
+        };
+        documents::Entity::insert(row)
+            .on_conflict_do_nothing_on([
+                documents::Column::AccountId,
+                documents::Column::DocumentId,
+            ])
+            .exec_without_returning(transaction)
             .await?;
     }
     Ok(())
 }
 
 async fn mark_baseline(
-    transaction: &Transaction<'_>,
+    transaction: &DatabaseTransaction,
     changes: &CycleChanges,
 ) -> Result<(), StoreError> {
     if !changes.baseline {
         return Ok(());
     }
-    transaction
-        .execute(MARK_BASELINE, &[&changes.now, &changes.account_id])
+    accounts::Entity::update_many()
+        .col_expr(accounts::Column::BaselineAt, Expr::value(changes.now))
+        .filter(accounts::Column::Id.eq(changes.account_id))
+        .filter(accounts::Column::BaselineAt.is_null())
+        .exec(transaction)
         .await?;
     Ok(())
 }
 
 async fn insert_events(
-    transaction: &Transaction<'_>,
+    transaction: &DatabaseTransaction,
     changes: &CycleChanges,
 ) -> Result<Vec<Event>, StoreError> {
     let mut inserted = Vec::new();
@@ -201,31 +194,35 @@ async fn insert_events(
 }
 
 async fn insert_event(
-    transaction: &Transaction<'_>,
+    transaction: &DatabaseTransaction,
     changes: &CycleChanges,
     event: &Event,
 ) -> Result<Option<Event>, StoreError> {
     let detected_at = event.detected_at.unwrap_or(changes.now);
     let occurred_at = event.occurred_at.unwrap_or(detected_at);
-    let row = transaction
-        .query_opt(
-            INSERT_EVENT,
-            &[
-                &changes.account_id,
-                &event.kind.as_str(),
-                &event.procedure_id,
-                &event.reference,
-                &occurred_at,
-                &detected_at,
-                &go_json(&event.payload),
-            ],
-        )
+    let row = events::ActiveModel {
+        id: ActiveValue::NotSet,
+        account_id: ActiveValue::Set(changes.account_id),
+        kind: ActiveValue::Set(event.kind.as_str().to_owned()),
+        procedure_id: ActiveValue::Set(event.procedure_id),
+        reference: ActiveValue::Set(event.reference.clone()),
+        occurred_at: ActiveValue::Set(occurred_at),
+        detected_at: ActiveValue::Set(detected_at),
+        payload: ActiveValue::Set(go_json(&event.payload)),
+    };
+    let outcome = events::Entity::insert(row)
+        .on_conflict_do_nothing_on([
+            events::Column::AccountId,
+            events::Column::Kind,
+            events::Column::Reference,
+        ])
+        .exec(transaction)
         .await?;
-    let Some(row) = row else {
+    let TryInsertResult::Inserted(saved) = outcome else {
         return Ok(None);
     };
     Ok(Some(Event {
-        id: row.try_get("id")?,
+        id: saved.last_insert_id,
         account_id: changes.account_id,
         occurred_at: Some(occurred_at),
         detected_at: Some(detected_at),
@@ -251,24 +248,4 @@ fn go_json(payload: &Payload) -> String {
         escaped.push_str(code);
     }
     escaped
-}
-
-fn process_row(row: &Row) -> Result<ProcessRow, tokio_postgres::Error> {
-    Ok(ProcessRow {
-        procedure_id: row.try_get("procedure_id")?,
-        number: row.try_get("number")?,
-        process_type: row.try_get("process_type")?,
-        description: row.try_get("description")?,
-        unit_id: row.try_get("unit_id")?,
-        unit_acronym: row.try_get("unit_acronym")?,
-        assigned_user: row.try_get("assigned_user")?,
-        assigned_user_id: row.try_get("assigned_user_id")?,
-        return_date: row.try_get("return_date")?,
-        return_overdue: row.try_get("return_overdue")?,
-        last_activity_id: row.try_get("last_activity_id")?,
-        document_total: row.try_get("document_total")?,
-        first_seen_at: row.try_get("first_seen_at")?,
-        last_seen_at: row.try_get("last_seen_at")?,
-        left_at: row.try_get("left_at")?,
-    })
 }

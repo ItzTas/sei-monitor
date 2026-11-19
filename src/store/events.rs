@@ -3,17 +3,18 @@ use std::error::Error;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use chrono::{DateTime, Utc};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DbBackend, DbErr, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Statement, TransactionTrait,
+};
 use serde_json::error::Category;
-use tokio_postgres::Row;
 use tracing::error;
 
+use super::entity::events::{Column, Entity as StoredEvents, Model as StoredEvent};
+use super::entity::processes;
 use super::records::Pruned;
 use super::{Store, StoreError, count};
 use crate::event::{Event, Kind, Payload};
-
-const EVENTS_AFTER: &str =
-    "SELECT id, account_id, kind, procedure_id, ref, occurred_at, detected_at, payload
-FROM events WHERE account_id = $1 AND id > $2 ORDER BY id LIMIT $3";
 
 const LAST_ISSUED_SEQ: &str = "SELECT GREATEST(
     (SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM events_id_seq),
@@ -21,12 +22,6 @@ const LAST_ISSUED_SEQ: &str = "SELECT GREATEST(
 )";
 
 const NEWEST_EVENT_ID: &str = "SELECT COALESCE(max(id), 0) FROM events";
-
-const PRUNE_EVENTS_BEFORE: &str =
-    "DELETE FROM events WHERE account_id = $1 AND detected_at < $2 AND id <= $3";
-
-const PRUNE_PROCESSES_LEFT_BEFORE: &str =
-    "DELETE FROM processes WHERE account_id = $1 AND left_at < $2";
 
 const REPORTED_LIMIT: usize = 1024;
 const BATCH: i64 = 1000;
@@ -81,27 +76,31 @@ impl Store {
         after: i64,
         limit: i64,
     ) -> Result<Vec<Event>, StoreError> {
-        let client = self.client().await?;
         let mut events = Vec::new();
         let mut cursor = after;
         let mut walked: u64 = 0;
         loop {
             let wanted = (limit - count(events.len())).max(BATCH);
-            let rows = client
-                .query(EVENTS_AFTER, &[&account_id, &cursor, &wanted])
+            let rows = StoredEvents::find()
+                .filter(Column::AccountId.eq(account_id))
+                .filter(Column::Id.gt(cursor))
+                .order_by_asc(Column::Id)
+                .limit(wanted.unsigned_abs())
+                .all(self.connection())
                 .await?;
-            for row in &rows {
+            let fetched = count(rows.len());
+            for row in rows {
                 if count(events.len()) >= limit {
                     return Ok(events);
                 }
                 walked += 1;
-                cursor = row.try_get("id")?;
-                let Some(event) = self.readable(row, cursor)? else {
+                cursor = row.id;
+                let Some(event) = self.readable(row) else {
                     continue;
                 };
                 events.push(event);
             }
-            if count(rows.len()) < wanted || count(events.len()) >= limit {
+            if fetched < wanted || count(events.len()) >= limit {
                 return Ok(events);
             }
             if walked >= WALK_LIMIT {
@@ -111,13 +110,11 @@ impl Store {
     }
 
     pub async fn last_issued_seq(&self) -> Result<i64, StoreError> {
-        let row = self.client().await?.query_one(LAST_ISSUED_SEQ, &[]).await?;
-        Ok(row.try_get(0)?)
+        self.one_number(LAST_ISSUED_SEQ).await
     }
 
     pub async fn newest_event_id(&self) -> Result<i64, StoreError> {
-        let row = self.client().await?.query_one(NEWEST_EVENT_ID, &[]).await?;
-        Ok(row.try_get(0)?)
+        self.one_number(NEWEST_EVENT_ID).await
     }
 
     pub async fn prune_before(
@@ -126,36 +123,51 @@ impl Store {
         cutoff: DateTime<Utc>,
         acked_seq: i64,
     ) -> Result<Pruned, StoreError> {
-        let mut client = self.client().await?;
-        let transaction = client.transaction().await?;
-        let events = transaction
-            .execute(PRUNE_EVENTS_BEFORE, &[&account_id, &cutoff, &acked_seq])
-            .await?;
-        let processes = transaction
-            .execute(PRUNE_PROCESSES_LEFT_BEFORE, &[&account_id, &cutoff])
-            .await?;
+        let transaction = self.connection().begin().await?;
+        let events = StoredEvents::delete_many()
+            .filter(Column::AccountId.eq(account_id))
+            .filter(Column::DetectedAt.lt(cutoff))
+            .filter(Column::Id.lte(acked_seq))
+            .exec(&transaction)
+            .await?
+            .rows_affected;
+        let processes = processes::Entity::delete_many()
+            .filter(processes::Column::AccountId.eq(account_id))
+            .filter(processes::Column::LeftAt.lt(cutoff))
+            .exec(&transaction)
+            .await?
+            .rows_affected;
         transaction.commit().await?;
         Ok(Pruned { events, processes })
     }
 
-    fn readable(&self, row: &Row, id: i64) -> Result<Option<Event>, StoreError> {
-        let (kind, payload) = match decode(row.try_get("kind")?, row.try_get("payload")?) {
+    async fn one_number(&self, query: &str) -> Result<i64, StoreError> {
+        let row = self
+            .connection()
+            .query_one_raw(Statement::from_string(DbBackend::Postgres, query))
+            .await?
+            .ok_or_else(|| DbErr::RecordNotFound(query.to_owned()))?;
+        Ok(row.try_get_by_index(0)?)
+    }
+
+    fn readable(&self, row: StoredEvent) -> Option<Event> {
+        let (kind, payload) = match decode(&row.kind, &row.payload) {
             Ok(decoded) => decoded,
             Err(unreadable) => {
-                self.skip(id, &unreadable);
-                return Ok(None);
+                self.skip(row.id, &unreadable);
+                return None;
             }
         };
-        Ok(Some(Event {
-            id,
-            account_id: row.try_get("account_id")?,
+        Some(Event {
+            id: row.id,
+            account_id: row.account_id,
             kind,
-            procedure_id: row.try_get("procedure_id")?,
-            reference: row.try_get("ref")?,
-            occurred_at: Some(row.try_get("occurred_at")?),
-            detected_at: Some(row.try_get("detected_at")?),
+            procedure_id: row.procedure_id,
+            reference: row.reference,
+            occurred_at: Some(row.occurred_at),
+            detected_at: Some(row.detected_at),
             payload,
-        }))
+        })
     }
 
     fn skip(&self, event_id: i64, unreadable: &Unreadable) {

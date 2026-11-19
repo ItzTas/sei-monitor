@@ -1,18 +1,23 @@
 mod accounts;
+mod connection;
 mod cycle;
+mod entity;
 mod events;
 mod records;
 mod runs;
 
 use std::error::Error;
+use std::fmt;
 use std::time::Duration;
 
-use deadpool_postgres::{Manager, Pool, PoolError, Runtime, TimeoutType};
 use monitor_hub_plugin::migrate::{MigrateError, Migration, up};
+use sea_orm::sqlx::postgres::{PgDatabaseError, PgSeverity};
+use sea_orm::{ConnAcquireErr, DatabaseConnection, DbErr, RuntimeErr};
 use tokio::task::{JoinError, JoinHandle};
 use tokio_postgres::{Client, Config, NoTls};
 
 use crate::secret::Secret;
+use connection::{CONNECT_TIMEOUT, database_options, pool, with_pool_limits};
 use events::Skipped;
 
 pub use records::{
@@ -35,9 +40,6 @@ pub const MIGRATIONS: &[Migration] = &[
 
 pub const WRITER_LOCK_ID: i64 = 0x7365_692d_6d6f_6e69;
 
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-const POOL_SIZE: usize = 10;
-const POOL_LIMITS: &str = "-c statement_timeout=20000 -c lock_timeout=5000";
 const KEEPALIVES_IDLE: Duration = Duration::from_secs(30);
 const KEEPALIVES_INTERVAL: Duration = Duration::from_secs(10);
 const KEEPALIVES_RETRIES: u32 = 3;
@@ -55,15 +57,107 @@ pub enum StoreError {
     AccountNotFound,
     #[error("the database did not answer in time: {0}")]
     Timeout(&'static str),
+    #[error("db error")]
+    Server(#[source] ServerError),
     #[error(transparent)]
-    Pool(PoolError),
+    Database(DbErr),
     #[error(transparent)]
-    Database(#[from] tokio_postgres::Error),
+    LockConnection(#[from] tokio_postgres::Error),
     #[error(transparent)]
     Migrate(#[from] MigrateError),
     #[error("too many stored events cannot be read: {0} rows read")]
     TooManyUnreadableEvents(u64),
 }
+
+impl StoreError {
+    pub fn sql_state(&self) -> Option<&str> {
+        let StoreError::Server(error) = self else {
+            return None;
+        };
+        Some(error.code())
+    }
+}
+
+impl From<DbErr> for StoreError {
+    fn from(error: DbErr) -> StoreError {
+        if matches!(error, DbErr::ConnectionAcquire(ConnAcquireErr::Timeout)) {
+            return StoreError::Timeout("getting a connection");
+        }
+        match server_error(&error) {
+            Some(server) => StoreError::Server(server),
+            None => StoreError::Database(error),
+        }
+    }
+}
+
+fn server_error(error: &DbErr) -> Option<ServerError> {
+    let (DbErr::Exec(RuntimeErr::SqlxError(error))
+    | DbErr::Query(RuntimeErr::SqlxError(error))
+    | DbErr::Conn(RuntimeErr::SqlxError(error))) = error
+    else {
+        return None;
+    };
+    let error = error
+        .as_database_error()?
+        .try_downcast_ref::<PgDatabaseError>()?;
+    Some(ServerError {
+        severity: severity_name(error.severity()).to_owned(),
+        code: error.code().to_owned(),
+        message: error.message().to_owned(),
+        detail: error.detail().map(str::to_owned),
+        hint: error.hint().map(str::to_owned),
+    })
+}
+
+fn severity_name(severity: PgSeverity) -> &'static str {
+    let names = [
+        (PgSeverity::Panic, "PANIC"),
+        (PgSeverity::Fatal, "FATAL"),
+        (PgSeverity::Error, "ERROR"),
+        (PgSeverity::Warning, "WARNING"),
+        (PgSeverity::Notice, "NOTICE"),
+        (PgSeverity::Debug, "DEBUG"),
+        (PgSeverity::Info, "INFO"),
+        (PgSeverity::Log, "LOG"),
+    ];
+    names
+        .into_iter()
+        .find(|(known, _)| *known == severity)
+        .map(|(_, name)| name)
+        .expect("every Postgres severity has a name")
+}
+
+/// An error the Postgres server answered with. It prints as `tokio-postgres` printed one, so
+/// `Status` and `cycle_runs.error` keep showing `db error: ERROR: <message>`.
+#[derive(Debug, Clone)]
+pub struct ServerError {
+    severity: String,
+    code: String,
+    message: String,
+    detail: Option<String>,
+    hint: Option<String>,
+}
+
+impl ServerError {
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+}
+
+impl fmt::Display for ServerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.severity, self.message)?;
+        if let Some(detail) = &self.detail {
+            write!(f, "\nDETAIL: {detail}")?;
+        }
+        if let Some(hint) = &self.hint {
+            write!(f, "\nHINT: {hint}")?;
+        }
+        Ok(())
+    }
+}
+
+impl Error for ServerError {}
 
 pub struct WriterLock {
     client: Client,
@@ -116,47 +210,26 @@ impl WriterLock {
 
 #[derive(Clone)]
 pub struct Store {
-    pool: Pool,
+    connection: DatabaseConnection,
     skipped: Skipped,
 }
 
 impl Store {
     pub fn new(database_url: &Secret) -> Result<Store, StoreError> {
-        let manager = Manager::new(pool_config(database_url)?, NoTls);
-        let pool = Pool::builder(manager)
-            .max_size(POOL_SIZE)
-            .runtime(Runtime::Tokio1)
-            .create_timeout(Some(CONNECT_TIMEOUT))
-            .wait_timeout(Some(CONNECT_TIMEOUT))
-            .build()
-            .expect("the pool has a runtime for its timeouts");
+        let options = with_pool_limits(database_options(database_url)?);
         Ok(Store {
-            pool,
+            connection: pool(options),
             skipped: Skipped::default(),
         })
     }
 
-    async fn client(&self) -> Result<deadpool_postgres::Client, StoreError> {
-        self.pool.get().await.map_err(pool_error)
+    fn connection(&self) -> &DatabaseConnection {
+        &self.connection
     }
 }
 
 fn count(total: usize) -> i64 {
     i64::try_from(total).unwrap_or(i64::MAX)
-}
-
-fn pool_config(database_url: &Secret) -> Result<Config, StoreError> {
-    let mut config = lock_config(database_url)?;
-    let options = after_existing(config.get_options(), POOL_LIMITS);
-    config.options(options);
-    Ok(config)
-}
-
-fn after_existing(existing: Option<&str>, settings: &str) -> String {
-    let Some(existing) = existing.filter(|options| !options.trim().is_empty()) else {
-        return settings.to_owned();
-    };
-    format!("{existing} {settings}")
 }
 
 fn lock_config(database_url: &Secret) -> Result<Config, StoreError> {
@@ -171,17 +244,6 @@ fn lock_config(database_url: &Secret) -> Result<Config, StoreError> {
         .keepalives_retries(KEEPALIVES_RETRIES)
         .tcp_user_timeout(TCP_USER_TIMEOUT);
     Ok(config)
-}
-
-fn pool_error(error: PoolError) -> StoreError {
-    let PoolError::Timeout(kind) = error else {
-        return StoreError::Pool(error);
-    };
-    StoreError::Timeout(match kind {
-        TimeoutType::Wait => "waiting for a free connection",
-        TimeoutType::Create => "opening a connection",
-        TimeoutType::Recycle => "checking a pooled connection",
-    })
 }
 
 fn reason_for(ended: Result<Result<(), tokio_postgres::Error>, JoinError>) -> String {
@@ -211,12 +273,11 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use crate::postgres::database;
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, TransactionTrait};
     use tokio_postgres::{Client, Config};
 
-    use super::{
-        CONNECT_TIMEOUT, POOL_SIZE, Store, StoreError, acquire_writer_lock, lock_config,
-        pool_config,
-    };
+    use super::connection::{CONNECT_TIMEOUT, POOL_SIZE, database_options, with_pool_limits};
+    use super::{Store, StoreError, acquire_writer_lock, lock_config};
     use crate::secret::Secret;
 
     const URL: &str = "postgres://sei:hunter2@db.internal:5432/sei";
@@ -233,6 +294,19 @@ mod tests {
             .await
             .expect("show")
             .get(0)
+    }
+
+    async fn shown(connection: &DatabaseConnection, setting: &str) -> String {
+        connection
+            .query_one_raw(Statement::from_string(
+                DbBackend::Postgres,
+                format!("SHOW {setting}"),
+            ))
+            .await
+            .expect("show")
+            .expect("a row")
+            .try_get_by_index(0)
+            .expect("a setting")
     }
 
     fn assert_keepalives(config: &Config) {
@@ -256,12 +330,13 @@ mod tests {
             "options=-c%20statement_timeout%3D1&keepalives=0&keepalives_idle=5&keepalives_interval=1&keepalives_retries=9&tcp_user_timeout=1",
         );
 
-        let pool = pool_config(&url).expect("pool config");
+        let pool = with_pool_limits(database_options(&url).expect("pool options"));
         assert_eq!(
             pool.get_options(),
-            Some("-c statement_timeout=1 -c statement_timeout=20000 -c lock_timeout=5000")
+            Some(
+                "-c statement_timeout=1 -c tcp_keepalives_idle=30 -c tcp_keepalives_interval=10 -c tcp_keepalives_count=3 -c tcp_user_timeout=60000 -c statement_timeout=20000 -c lock_timeout=5000"
+            )
         );
-        assert_keepalives(&pool);
 
         let lock = lock_config(&url).expect("lock config");
         assert_eq!(lock.get_options(), Some("-c statement_timeout=1"));
@@ -272,8 +347,47 @@ mod tests {
         assert_keepalives(&plain);
     }
 
+    #[test]
+    fn database_options_accept_only_the_documented_forms() {
+        let accepted = [
+            (
+                "postgres://sei:hunter2@db.internal:5432/sei?sslmode=disable",
+                5432,
+            ),
+            ("postgresql://sei:hunter2@db.internal/sei", 5432),
+        ];
+        for (url, port) in accepted {
+            let options = database_options(&Secret::new(url.to_owned()))
+                .unwrap_or_else(|error| panic!("{url}: {error}"));
+            assert_eq!(
+                (
+                    options.get_host(),
+                    options.get_port(),
+                    options.get_username(),
+                    options.get_database()
+                ),
+                ("db.internal", port, "sei", Some("sei")),
+                "{url}"
+            );
+        }
+
+        let refused = [
+            "postgres://sei:hunter2@h1,h2/sei",
+            "postgres://sei:hunter2@h1:5432,h2:5432/sei",
+            "mysql://sei:hunter2@db/sei",
+            "postgres://sei:hunter2@db/sei?sslmode=sometimes",
+        ];
+        for url in refused {
+            let error = database_options(&Secret::new(url.to_owned())).err();
+            assert!(
+                matches!(error, Some(StoreError::InvalidUrl)),
+                "{url}: {error:?}"
+            );
+        }
+    }
+
     #[tokio::test]
-    async fn pool_and_lock_connections_carry_their_limits() {
+    async fn pool_connections_carry_their_limits_and_keepalives() {
         let Some(db) = database().await else { return };
         let url = with_query(
             &db.url,
@@ -281,10 +395,24 @@ mod tests {
         );
 
         let store = Store::new(&url).expect("store");
-        let pooled = store.client().await.expect("pooled connection");
-        assert_eq!(show(&pooled, "statement_timeout").await, "20s");
-        assert_eq!(show(&pooled, "lock_timeout").await, "5s");
-        assert_eq!(show(&pooled, "application_name").await, "sei_test");
+
+        let expected = [
+            ("statement_timeout", "20s"),
+            ("lock_timeout", "5s"),
+            ("application_name", "sei_test"),
+            ("tcp_keepalives_idle", "30"),
+            ("tcp_keepalives_interval", "10"),
+            ("tcp_keepalives_count", "3"),
+            ("tcp_user_timeout", "60000"),
+        ];
+        for (setting, value) in expected {
+            assert_eq!(shown(store.connection(), setting).await, value, "{setting}");
+        }
+    }
+
+    #[tokio::test]
+    async fn pool_and_lock_connections_carry_their_limits() {
+        let Some(db) = database().await else { return };
 
         let lock = acquire_writer_lock(&Secret::new(db.url.clone()))
             .await
@@ -294,12 +422,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_full_pool_times_out_waiting_for_a_free_connection() {
+    async fn a_full_pool_times_out_getting_a_connection() {
         let Some(db) = database().await else { return };
         let store = Store::new(&Secret::new(db.url.clone())).expect("store");
         let mut held = Vec::new();
         for _ in 0..POOL_SIZE {
-            held.push(store.client().await.expect("pooled connection"));
+            held.push(
+                store
+                    .connection()
+                    .begin()
+                    .await
+                    .expect("a pooled connection"),
+            );
         }
 
         let started = Instant::now();
@@ -313,11 +447,15 @@ mod tests {
             started.elapsed()
         );
         assert!(
-            matches!(error, StoreError::Timeout("waiting for a free connection")),
+            matches!(error, StoreError::Timeout("getting a connection")),
             "{error:?}"
         );
 
         held.pop();
-        held.push(store.client().await.expect("the released connection"));
+        let released = tokio::time::timeout(SLACK, store.connection().begin())
+            .await
+            .expect("the released connection came back in time")
+            .expect("the released connection");
+        held.push(released);
     }
 }

@@ -14,7 +14,6 @@ bytes = "1.12.1"
 chrono = { version = "=0.4.45", default-features = false }
 chrono-tz = { version = "=0.10.4", default-features = false }
 clap = { version = "4.6.7", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage"] }
-deadpool-postgres = { version = "0.14.2", default-features = false, features = ["rt_tokio_1"] }
 encoding_rs = "0.8.42"
 futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
 html5ever = "0.40.1"

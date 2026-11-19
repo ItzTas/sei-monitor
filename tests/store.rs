@@ -13,7 +13,6 @@ use sei_monitor::store::{
 };
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
-use tokio_postgres::error::SqlState;
 use tokio_postgres::{Client, NoTls};
 
 use support::logs::{LoggedEvent, captured, logged};
@@ -93,6 +92,11 @@ fn host_of(url: &str) -> &str {
 fn with_database(url: &str, name: &str) -> String {
     let (scheme, authority, query) = split_url(url);
     format!("{scheme}://{authority}/{name}?{query}")
+}
+
+fn with_query(url: &str, parameter: &str) -> String {
+    let separator = if url.contains('?') { '&' } else { '?' };
+    format!("{url}{separator}{parameter}")
 }
 
 fn assert_hides_the_login(error: &StoreError, url: &str) {
@@ -227,28 +231,53 @@ async fn failures_never_show_the_password_or_the_host() {
     assert!(matches!(error, StoreError::InvalidUrl), "{error:?}");
     assert_hides_the_login(&error, &invalid);
 
-    let unreachable = [
-        format!("postgres://sei:{PASSWORD}@127.0.0.1:{closed_port}/sei"),
+    let closed = format!("postgres://sei:{PASSWORD}@127.0.0.1:{closed_port}/sei");
+    let refused = [
         database_url_as(&db.url, "intruder", PASSWORD),
         with_database(
             &database_url_as(&db.url, "postgres", PASSWORD),
             "no_such_database",
         ),
     ];
-    for url in &unreachable {
+    for url in [&closed, &refused[0], &refused[1]] {
         let Err(error) = acquire_writer_lock(&secret(url)).await else {
             panic!("a lock through a failing connection")
         };
-        assert!(matches!(error, StoreError::Database(_)), "{error:?}");
+        assert!(matches!(error, StoreError::LockConnection(_)), "{error:?}");
         assert_hides_the_login(&error, url);
+    }
 
+    let error = tokio::time::timeout(
+        Duration::from_secs(10) + SLACK,
+        store(&closed).last_cycle_run(1),
+    )
+    .await
+    .expect("a closed port held the call past its connect limit")
+    .expect_err("a closed port answered");
+    assert!(matches!(error, StoreError::Timeout(_)), "{error:?}");
+    assert_hides_the_login(&error, &closed);
+    for url in &refused {
         let error = store(url)
             .last_cycle_run(1)
             .await
-            .expect_err("a failing connection answered");
-        assert!(matches!(error, StoreError::Pool(_)), "{error:?}");
+            .expect_err("a refused connection answered");
+        assert!(matches!(error, StoreError::Server(_)), "{error:?}");
         assert_hides_the_login(&error, url);
     }
+}
+
+#[tokio::test]
+async fn a_url_that_requires_tls_is_refused_at_once() {
+    let Some(db) = database().await else { return };
+    let url = with_query(&db.url, "sslmode=require");
+
+    let error = tokio::time::timeout(Duration::from_secs(2), store(&url).last_cycle_run(1))
+        .await
+        .expect("a URL that requires TLS was not refused within 2 seconds")
+        .expect_err("a connection without TLS answered");
+
+    assert!(matches!(error, StoreError::Database(_)), "{error:?}");
+    assert_hides_the_login(&error, &url);
 }
 
 #[tokio::test]
@@ -282,7 +311,7 @@ async fn a_silent_server_times_out_naming_the_step() {
     );
     assert_eq!(
         run.to_string(),
-        "the database did not answer in time: opening a connection"
+        "the database did not answer in time: getting a connection"
     );
     for error in [&lock, &run] {
         assert!(matches!(error, StoreError::Timeout(_)), "{error:?}");
@@ -380,10 +409,9 @@ async fn a_held_account_row_fails_the_call_within_the_lock_timeout() {
     .expect("the held row stopped the call within the lock timeout")
     .expect_err("the row is held");
     assert!(started.elapsed() >= LOCK_TIMEOUT, "{:?}", started.elapsed());
-    let StoreError::Database(cause) = &error else {
-        panic!("{error:?}")
-    };
-    assert_eq!(cause.code(), Some(&SqlState::LOCK_NOT_AVAILABLE));
+    assert!(matches!(error, StoreError::Server(_)), "{error:?}");
+    assert_eq!(error.sql_state(), Some("55P03"));
+    assert_eq!(error.to_string(), "db error");
 
     let started = Instant::now();
     let last = pooled
@@ -1010,10 +1038,8 @@ async fn apply_cycle_is_all_or_nothing() {
         .await
         .expect_err("a document of an unknown process was accepted");
 
-    let StoreError::Database(cause) = &error else {
-        panic!("{error:?}")
-    };
-    assert_eq!(cause.code(), Some(&SqlState::FOREIGN_KEY_VIOLATION));
+    assert!(matches!(error, StoreError::Server(_)), "{error:?}");
+    assert_eq!(error.sql_state(), Some("23503"));
     let client = connect(&db.url).await;
     assert_eq!(
         count(

@@ -1,18 +1,20 @@
 use chrono::{DateTime, Utc};
-use tokio_postgres::{Row, Transaction};
+use sea_orm::sea_query::Expr;
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseTransaction, DbBackend, DbErr, EntityTrait, QueryFilter,
+    QueryOrder, Select, Statement, TransactionTrait,
+};
 
+use super::entity::cycle_runs;
 use super::records::{CycleRun, Trigger};
 use super::{Store, StoreError};
 
 const KEPT_RUNS_PER_ACCOUNT: i64 = 1000;
 
+// The scheduler tests find this insert in pg_stat_activity by its text.
 const START_CYCLE_RUN: &str = r#"INSERT INTO cycle_runs (account_id, "trigger", started_at)
 VALUES ($1, $2, $3)
 RETURNING id"#;
-
-const FINISH_CYCLE_RUN: &str = "UPDATE cycle_runs
-SET finished_at = $1, error = $2, processes_seen = $3, events_created = $4
-WHERE id = $5 AND account_id = $6";
 
 const PRUNE_CYCLE_RUNS: &str = "DELETE FROM cycle_runs AS runs
 WHERE runs.account_id = $1 AND runs.id <= (
@@ -22,13 +24,6 @@ WHERE runs.account_id = $1 AND runs.id <= (
     LIMIT 1 OFFSET $2::bigint
 )";
 
-const GET_LAST_CYCLE_RUN: &str =
-    "SELECT * FROM cycle_runs WHERE account_id = $1 ORDER BY id DESC LIMIT 1";
-
-const GET_LAST_SUCCESSFUL_CYCLE_RUN: &str = "SELECT * FROM cycle_runs
-WHERE account_id = $1 AND error = '' AND finished_at IS NOT NULL
-ORDER BY id DESC LIMIT 1";
-
 impl Store {
     pub async fn start_cycle_run(
         &self,
@@ -36,15 +31,21 @@ impl Store {
         trigger: Trigger,
         started_at: DateTime<Utc>,
     ) -> Result<i64, StoreError> {
+        let statement = Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            START_CYCLE_RUN,
+            [
+                account_id.into(),
+                trigger.as_str().into(),
+                started_at.into(),
+            ],
+        );
         let row = self
-            .client()
+            .connection()
+            .query_one_raw(statement)
             .await?
-            .query_one(
-                START_CYCLE_RUN,
-                &[&account_id, &trigger.as_str(), &started_at],
-            )
-            .await?;
-        Ok(row.try_get("id")?)
+            .ok_or(DbErr::RecordNotInserted)?;
+        Ok(row.try_get("", "id")?)
     }
 
     pub async fn finish_cycle_run(
@@ -54,40 +55,42 @@ impl Store {
         finished_at: DateTime<Utc>,
         error: &str,
     ) -> Result<(), StoreError> {
-        let mut client = self.client().await?;
-        let transaction = client.transaction().await?;
+        let transaction = self.connection().begin().await?;
         finish_run(&transaction, run_id, account_id, finished_at, error, 0, 0).await?;
         transaction.commit().await?;
         Ok(())
     }
 
     pub async fn last_cycle_run(&self, account_id: i64) -> Result<Option<CycleRun>, StoreError> {
-        self.one_run(GET_LAST_CYCLE_RUN, account_id).await
+        self.one_run(cycle_runs::Entity::find(), account_id).await
     }
 
     pub async fn last_successful_cycle_run(
         &self,
         account_id: i64,
     ) -> Result<Option<CycleRun>, StoreError> {
-        self.one_run(GET_LAST_SUCCESSFUL_CYCLE_RUN, account_id)
-            .await
+        let successful = cycle_runs::Entity::find()
+            .filter(cycle_runs::Column::Error.eq(""))
+            .filter(cycle_runs::Column::FinishedAt.is_not_null());
+        self.one_run(successful, account_id).await
     }
 
-    async fn one_run(&self, query: &str, account_id: i64) -> Result<Option<CycleRun>, StoreError> {
-        let row = self
-            .client()
-            .await?
-            .query_opt(query, &[&account_id])
+    async fn one_run(
+        &self,
+        runs: Select<cycle_runs::Entity>,
+        account_id: i64,
+    ) -> Result<Option<CycleRun>, StoreError> {
+        let run = runs
+            .filter(cycle_runs::Column::AccountId.eq(account_id))
+            .order_by_desc(cycle_runs::Column::Id)
+            .one(self.connection())
             .await?;
-        let Some(row) = row else {
-            return Ok(None);
-        };
-        Ok(Some(cycle_run(&row)?))
+        Ok(run.map(CycleRun::from))
     }
 }
 
 pub(super) async fn finish_run(
-    transaction: &Transaction<'_>,
+    transaction: &DatabaseTransaction,
     run_id: i64,
     account_id: i64,
     finished_at: DateTime<Utc>,
@@ -95,34 +98,26 @@ pub(super) async fn finish_run(
     processes_seen: i64,
     events_created: i64,
 ) -> Result<(), StoreError> {
-    transaction
-        .execute(
-            FINISH_CYCLE_RUN,
-            &[
-                &finished_at,
-                &error,
-                &processes_seen,
-                &events_created,
-                &run_id,
-                &account_id,
-            ],
+    cycle_runs::Entity::update_many()
+        .col_expr(cycle_runs::Column::FinishedAt, Expr::value(finished_at))
+        .col_expr(cycle_runs::Column::Error, Expr::value(error))
+        .col_expr(
+            cycle_runs::Column::ProcessesSeen,
+            Expr::value(processes_seen),
         )
+        .col_expr(
+            cycle_runs::Column::EventsCreated,
+            Expr::value(events_created),
+        )
+        .filter(cycle_runs::Column::Id.eq(run_id))
+        .filter(cycle_runs::Column::AccountId.eq(account_id))
+        .exec(transaction)
         .await?;
-    transaction
-        .execute(PRUNE_CYCLE_RUNS, &[&account_id, &KEPT_RUNS_PER_ACCOUNT])
-        .await?;
+    let prune = Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        PRUNE_CYCLE_RUNS,
+        [account_id.into(), KEPT_RUNS_PER_ACCOUNT.into()],
+    );
+    transaction.execute_raw(prune).await?;
     Ok(())
-}
-
-fn cycle_run(row: &Row) -> Result<CycleRun, tokio_postgres::Error> {
-    Ok(CycleRun {
-        id: row.try_get("id")?,
-        account_id: row.try_get("account_id")?,
-        trigger: row.try_get("trigger")?,
-        started_at: row.try_get("started_at")?,
-        finished_at: row.try_get("finished_at")?,
-        error: row.try_get("error")?,
-        processes_seen: row.try_get("processes_seen")?,
-        events_created: row.try_get("events_created")?,
-    })
 }

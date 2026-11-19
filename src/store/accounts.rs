@@ -1,21 +1,25 @@
 use chrono::{DateTime, Utc};
-use tokio_postgres::{Row, Transaction};
+use sea_orm::sea_query::Expr;
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseTransaction, DbBackend, EntityTrait, FromQueryResult,
+    QueryFilter, Statement,
+};
 
+use super::entity::accounts;
 use super::records::{Account, AccountInfo, AccountKey};
 use super::{Store, StoreError};
 
+// DO UPDATE instead of DO NOTHING so RETURNING also gives back an account that already exists.
 const ENSURE_ACCOUNT: &str = "INSERT INTO accounts (sei_base_url, username, org_id, created_at)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (sei_base_url, username, org_id) DO UPDATE SET username = excluded.username
 RETURNING *";
 
+// The scheduler tests find the pause write in pg_stat_activity by this text.
 const SET_PAUSED_REASON: &str = "UPDATE accounts SET paused_reason = $1 WHERE id = $2";
 
+// Every cycle of an account takes this row lock first, so events get their ids in commit order.
 const LOCK_ACCOUNT: &str = "SELECT id FROM accounts WHERE id = $1 FOR NO KEY UPDATE";
-
-const UPDATE_ACCOUNT_INFO: &str = "UPDATE accounts
-SET org_acronym = $1, sei_version = $2, wssei_version = $3
-WHERE id = $4";
 
 impl Store {
     pub async fn ensure_account(
@@ -23,24 +27,31 @@ impl Store {
         key: &AccountKey,
         now: DateTime<Utc>,
     ) -> Result<Account, StoreError> {
-        let row = self
-            .client()
+        let statement = Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            ENSURE_ACCOUNT,
+            [
+                key.sei_base_url.as_str().into(),
+                key.username.as_str().into(),
+                key.org_id.into(),
+                now.into(),
+            ],
+        );
+        let account = accounts::Model::find_by_statement(statement)
+            .one(self.connection())
             .await?
-            .query_one(
-                ENSURE_ACCOUNT,
-                &[&key.sei_base_url, &key.username, &key.org_id, &now],
-            )
-            .await?;
-        Ok(account(&row)?)
+            .ok_or(StoreError::AccountNotFound)?;
+        Ok(account.into())
     }
 
     pub async fn set_paused_reason(&self, account_id: i64, reason: &str) -> Result<(), StoreError> {
-        let updated = self
-            .client()
-            .await?
-            .execute(SET_PAUSED_REASON, &[&reason, &account_id])
-            .await?;
-        if updated == 0 {
+        let statement = Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            SET_PAUSED_REASON,
+            [reason.into(), account_id.into()],
+        );
+        let updated = self.connection().execute_raw(statement).await?;
+        if updated.rows_affected() == 0 {
             return Err(StoreError::AccountNotFound);
         }
         Ok(())
@@ -51,45 +62,32 @@ impl Store {
         account_id: i64,
         info: &AccountInfo,
     ) -> Result<(), StoreError> {
-        self.client()
-            .await?
-            .execute(
-                UPDATE_ACCOUNT_INFO,
-                &[
-                    &info.org_acronym,
-                    &info.sei_version,
-                    &info.wssei_version,
-                    &account_id,
-                ],
+        accounts::Entity::update_many()
+            .col_expr(
+                accounts::Column::OrgAcronym,
+                Expr::value(info.org_acronym.as_str()),
             )
+            .col_expr(
+                accounts::Column::SeiVersion,
+                Expr::value(info.sei_version.as_str()),
+            )
+            .col_expr(
+                accounts::Column::WsseiVersion,
+                Expr::value(info.wssei_version.as_str()),
+            )
+            .filter(accounts::Column::Id.eq(account_id))
+            .exec(self.connection())
             .await?;
         Ok(())
     }
 }
 
 pub(super) async fn lock_account(
-    transaction: &Transaction<'_>,
+    transaction: &DatabaseTransaction,
     account_id: i64,
 ) -> Result<(), StoreError> {
-    transaction.execute(LOCK_ACCOUNT, &[&account_id]).await?;
+    let statement =
+        Statement::from_sql_and_values(DbBackend::Postgres, LOCK_ACCOUNT, [account_id.into()]);
+    transaction.execute_raw(statement).await?;
     Ok(())
-}
-
-fn account(row: &Row) -> Result<Account, tokio_postgres::Error> {
-    Ok(Account {
-        id: row.try_get("id")?,
-        key: AccountKey {
-            sei_base_url: row.try_get("sei_base_url")?,
-            username: row.try_get("username")?,
-            org_id: row.try_get("org_id")?,
-        },
-        created_at: row.try_get("created_at")?,
-        baseline_at: row.try_get("baseline_at")?,
-        paused_reason: row.try_get("paused_reason")?,
-        info: AccountInfo {
-            org_acronym: row.try_get("org_acronym")?,
-            sei_version: row.try_get("sei_version")?,
-            wssei_version: row.try_get("wssei_version")?,
-        },
-    })
 }

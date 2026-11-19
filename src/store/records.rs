@@ -1,8 +1,7 @@
-use std::error::Error;
-
 use chrono::{DateTime, Utc};
-use tokio_postgres::types::{FromSql, Type};
+use sea_orm::{DeriveActiveEnum, EnumIter};
 
+use super::entity::{accounts, cycle_runs, processes};
 use crate::event::Event;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -29,34 +28,21 @@ pub struct Account {
     pub info: AccountInfo,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+#[sea_orm(rs_type = "String", db_type = "Text")]
 pub enum Trigger {
+    #[sea_orm(string_value = "scheduled")]
     Scheduled,
+    #[sea_orm(string_value = "manual")]
     Manual,
 }
 
 impl Trigger {
-    const ALL: [Trigger; 2] = [Trigger::Scheduled, Trigger::Manual];
-
     pub fn as_str(self) -> &'static str {
         match self {
             Trigger::Scheduled => "scheduled",
             Trigger::Manual => "manual",
         }
-    }
-}
-
-impl<'a> FromSql<'a> for Trigger {
-    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Trigger, Box<dyn Error + Sync + Send>> {
-        let text = <&str as FromSql>::from_sql(ty, raw)?;
-        Trigger::ALL
-            .into_iter()
-            .find(|trigger| trigger.as_str() == text)
-            .ok_or_else(|| format!("unknown cycle trigger {text:?}").into())
-    }
-
-    fn accepts(ty: &Type) -> bool {
-        <&str as FromSql>::accepts(ty)
     }
 }
 
@@ -117,4 +103,62 @@ pub struct CycleChanges {
 pub struct Pruned {
     pub events: u64,
     pub processes: u64,
+}
+
+impl From<accounts::Model> for Account {
+    fn from(row: accounts::Model) -> Account {
+        Account {
+            id: row.id,
+            key: AccountKey {
+                sei_base_url: row.sei_base_url,
+                username: row.username,
+                org_id: row.org_id,
+            },
+            created_at: row.created_at,
+            baseline_at: row.baseline_at,
+            paused_reason: row.paused_reason,
+            info: AccountInfo {
+                org_acronym: row.org_acronym,
+                sei_version: row.sei_version,
+                wssei_version: row.wssei_version,
+            },
+        }
+    }
+}
+
+impl From<processes::Model> for ProcessRow {
+    fn from(row: processes::Model) -> ProcessRow {
+        ProcessRow {
+            procedure_id: row.procedure_id,
+            number: row.number,
+            process_type: row.process_type,
+            description: row.description,
+            unit_id: row.unit_id,
+            unit_acronym: row.unit_acronym,
+            assigned_user: row.assigned_user,
+            assigned_user_id: row.assigned_user_id,
+            return_date: row.return_date,
+            return_overdue: row.return_overdue,
+            last_activity_id: row.last_activity_id,
+            document_total: row.document_total,
+            first_seen_at: Some(row.first_seen_at),
+            last_seen_at: Some(row.last_seen_at),
+            left_at: row.left_at,
+        }
+    }
+}
+
+impl From<cycle_runs::Model> for CycleRun {
+    fn from(row: cycle_runs::Model) -> CycleRun {
+        CycleRun {
+            id: row.id,
+            account_id: row.account_id,
+            trigger: row.trigger,
+            started_at: row.started_at,
+            finished_at: row.finished_at,
+            error: row.error,
+            processes_seen: row.processes_seen,
+            events_created: row.events_created,
+        }
+    }
 }

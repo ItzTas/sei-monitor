@@ -16,7 +16,7 @@ use tokio::task::JoinHandle;
 use tokio_postgres::{Client, NoTls};
 
 use support::logs::{LoggedEvent, captured, logged};
-use support::{database, database_url_as, migrated_database};
+use support::{database, database_url_as, migrated_database, next_signal, pending_signal};
 
 const PASSWORD: &str = "hunter2";
 const LOCK_TIMEOUT: Duration = Duration::from_secs(5);
@@ -1337,6 +1337,67 @@ async fn prune_before_keeps_events_the_hub_has_not_read() {
     );
     assert_eq!(all_events(&pooled, account.id).await, before[1..].to_vec());
     assert_eq!(procedure_ids(&pooled, account.id).await, vec![9001]);
+}
+
+const REFUSE_EVENTS_AT_COMMIT: &str = "CREATE FUNCTION refuse_events() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'refused at commit'; END $$;
+     CREATE CONSTRAINT TRIGGER refuse_at_commit AFTER INSERT ON events DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION refuse_events();";
+
+#[tokio::test]
+async fn apply_cycle_signals_the_newest_id_it_committed() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    let mut signals = pooled.notifier().subscribe();
+    signals.latest_seq();
+    let changes = CycleChanges {
+        events: vec![
+            event(Kind::ProcessEntered, 9001, "9001:1"),
+            event(Kind::ActivityAdded, 9001, "50003"),
+        ],
+        ..cycle(account.id, repo_now())
+    };
+
+    let inserted = apply(&pooled, changes.clone()).await;
+    let signalled = next_signal(&mut signals).await;
+    let again = apply(&pooled, changes).await;
+    let after_the_conflict = pending_signal(&mut signals).await;
+
+    assert_eq!(inserted.len(), 2, "{inserted:?}");
+    assert_eq!(Some(signalled), inserted.iter().map(|event| event.id).max());
+    assert_eq!(again, Vec::new());
+    assert_eq!(after_the_conflict, None);
+}
+
+#[tokio::test]
+async fn an_apply_cycle_refused_at_commit_signals_nothing() {
+    let Some(db) = migrated_database().await else {
+        return;
+    };
+    let pooled = store(&db.url);
+    let account = account(&pooled).await;
+    apply(&pooled, readable(account.id, "committed")).await;
+    connect(&db.url)
+        .await
+        .batch_execute(REFUSE_EVENTS_AT_COMMIT)
+        .await
+        .expect("a trigger that refuses every event at commit");
+    let before = all_events(&pooled, account.id).await;
+    let mut signals = pooled.notifier().subscribe();
+    let seen = signals.latest_seq();
+
+    let outcome = pooled
+        .apply_cycle(&readable(account.id, "refused"))
+        .await
+        .expect_err("a cycle refused at commit");
+    let signalled = pending_signal(&mut signals).await;
+
+    assert!(matches!(outcome, StoreError::Server(_)), "{outcome:?}");
+    assert_eq!(outcome.sql_state(), Some("P0001"));
+    assert_eq!(signalled, None);
+    assert_eq!(signals.latest_seq(), seen);
+    assert_eq!(all_events(&pooled, account.id).await, before);
 }
 
 const LOCK_WAITERS: &str = "SELECT count(*) FROM pg_stat_activity

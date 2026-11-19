@@ -168,16 +168,18 @@ impl Monitor {
             ..config
         };
         let (manual, manual_signals) = mpsc::channel(1);
+        // The store signals this monitor's hub, even when another monitor holds a clone of it.
+        let notifier = Notifier::new();
         Arc::new(Monitor {
             config,
-            store,
+            store: store.with_notifier(notifier.clone()),
             clock,
             jitter,
             acked: AtomicI64::new(0),
             manual,
             manual_signals: tokio::sync::Mutex::new(manual_signals),
             stopping: watch::Sender::new(false),
-            notifier: Notifier::new(),
+            notifier,
             inner: Mutex::new(Inner {
                 prepared: None,
                 logins: 0,
@@ -327,13 +329,6 @@ impl Monitor {
         Ok((prepared, started))
     }
 
-    fn announce_inserted(&self, inserted: &[Event]) {
-        let Some(newest) = inserted.iter().map(|event| event.id).max() else {
-            return;
-        };
-        self.notifier.notify(newest);
-    }
-
     async fn record_failure(&self, run_id: i64, account_id: i64, error: &MonitorError) {
         let text = error_text(error);
         let finished = self
@@ -361,7 +356,6 @@ impl Monitor {
             .ok_or(MonitorError::Canceled)??;
         changes.finished_at = self.clock.now();
         let inserted = self.store.apply_cycle(&changes).await?;
-        self.announce_inserted(&inserted);
         let baseline = changes.baseline;
         self.after_success(account_id, baseline, started).await;
         self.prune(account_id, started).await;

@@ -10,6 +10,7 @@ use std::error::Error;
 use std::fmt;
 use std::time::Duration;
 
+use monitor_hub_plugin::Notifier;
 use monitor_hub_plugin::migrate::{MigrateError, Migration, up};
 use sea_orm::sqlx::postgres::{PgDatabaseError, PgSeverity};
 use sea_orm::{ConnAcquireErr, DatabaseConnection, DbErr, RuntimeErr};
@@ -211,6 +212,7 @@ impl WriterLock {
 #[derive(Clone)]
 pub struct Store {
     connection: DatabaseConnection,
+    notifier: Notifier,
     skipped: Skipped,
 }
 
@@ -219,8 +221,17 @@ impl Store {
         let options = with_pool_limits(database_options(database_url)?);
         Ok(Store {
             connection: pool(options),
+            notifier: Notifier::new(),
             skipped: Skipped::default(),
         })
+    }
+
+    pub(crate) fn with_notifier(self, notifier: Notifier) -> Store {
+        Store { notifier, ..self }
+    }
+
+    pub fn notifier(&self) -> &Notifier {
+        &self.notifier
     }
 
     fn connection(&self) -> &DatabaseConnection {

@@ -217,8 +217,7 @@ impl Monitor {
             documents: Vec::new(),
             events: vec![event],
         };
-        let inserted = self.store.apply_cycle(&changes).await?;
-        self.announce_inserted(&inserted);
+        self.store.apply_cycle(&changes).await?;
         Ok(())
     }
 

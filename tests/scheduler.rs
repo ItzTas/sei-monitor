@@ -18,13 +18,13 @@ use tokio_postgres::NoTls;
 use support::clock::PendingSleep;
 use support::fake_sei::{
     FakeSei, ORG_ID, PASSWORD, ROUTE_LOGIN, ROUTE_LOGIN_PAGE, ROUTE_PROCESSES, ROUTE_VERSION,
-    UNIT_NUPROC, USERNAME,
+    USERNAME,
 };
 use support::harness::{
-    FIFTEEN_MINUTES, Harness, bounded, config, database_store, no_jitter, populate, process,
+    FIFTEEN_MINUTES, Harness, bounded, config, database_store, no_jitter, populate,
 };
 use support::logs::{LoggedEvent, captured, logged};
-use support::{next_signal, pending_signal};
+use support::next_signal;
 
 const SETTLE: Duration = Duration::from_millis(100);
 const POLL: Duration = Duration::from_millis(10);
@@ -39,8 +39,6 @@ const PAUSE_WRITE: &str = "UPDATE accounts SET paused_reason%";
 const PROCESSES_READ: &str = "SELECT * FROM processes%";
 const EARLIER_REASON: &str = "SEI rejected the login (in an earlier run)";
 const SIGNALS_TO_READ: usize = 10;
-const REFUSE_EVENTS_AT_COMMIT: &str = "CREATE FUNCTION refuse_events() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'refused at commit'; END $$;
-     CREATE CONSTRAINT TRIGGER refuse_at_commit AFTER INSERT ON events DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION refuse_events();";
 
 fn minutes(n: u64) -> Duration {
     Duration::from_secs(n * 60)
@@ -1023,63 +1021,6 @@ async fn signal_until(signals: &mut Signals, mut awaited: impl FnMut(i64) -> boo
         }
     }
     panic!("none of {SIGNALS_TO_READ} signals was the one awaited");
-}
-
-async fn with_a_baseline(store: &Store) -> Harness {
-    let h = Harness::new(store, |_| {});
-    populate(&h.fake);
-    h.prepare().await;
-    h.run_once().await;
-    h.clock.advance(FIFTEEN_MINUTES);
-    h.fake.add_process(UNIT_NUPROC, process(9003, 3, "Ofício"));
-    h
-}
-
-#[tokio::test]
-async fn a_committed_cycle_signals_the_newest_event_id() {
-    let Some((_database, store)) = database_store().await else {
-        return;
-    };
-    let h = with_a_baseline(&store).await;
-    let mut signals = h.monitor.notifier().subscribe();
-    signals.latest_seq();
-
-    h.run_once().await;
-    let signalled = pending_signal(&mut signals).await;
-
-    let newest = h
-        .events()
-        .await
-        .iter()
-        .map(|event| event.id)
-        .max()
-        .expect("the events of the second cycle");
-    assert_eq!(signalled, Some(newest));
-}
-
-#[tokio::test]
-async fn a_cycle_whose_commit_fails_signals_no_new_id() {
-    let Some((database, store)) = database_store().await else {
-        return;
-    };
-    let h = with_a_baseline(&store).await;
-    admin(&database.url)
-        .await
-        .batch_execute(REFUSE_EVENTS_AT_COMMIT)
-        .await
-        .expect("a trigger that refuses every event at commit");
-    let before = h.events().await;
-    let mut signals = h.monitor.notifier().subscribe();
-    let seen = signals.latest_seq();
-
-    let outcome = bounded(h.monitor.run_once(Trigger::Scheduled)).await;
-
-    assert!(
-        matches!(outcome, Err(MonitorError::Store(_))),
-        "{outcome:?}"
-    );
-    assert_eq!(signals.latest_seq(), seen);
-    assert_eq!(h.events().await, before);
 }
 
 #[tokio::test]

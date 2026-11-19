@@ -89,6 +89,11 @@ impl Store {
             .await?;
         }
         transaction.commit().await?;
+        // Only after the commit: the hub answers a signal by reading Events, and the signal
+        // carries a stored id, never a sequence value an insert lost to a conflict.
+        if let Some(newest) = inserted.iter().map(|event| event.id).max() {
+            self.notifier().notify(newest);
+        }
         Ok(inserted)
     }
 }

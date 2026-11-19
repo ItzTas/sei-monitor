@@ -1,5 +1,6 @@
 mod support;
 
+use std::fs;
 use std::future::Future;
 use std::os::unix::fs::PermissionsExt;
 use std::time::{Duration, Instant};
@@ -19,8 +20,8 @@ use support::fake_sei::{
 };
 use support::harness::{Harness, populate, process, start};
 use support::process::{
-    COOKIE, PluginClient, RunningPlugin, error_lines, plugin_client, run_to_exit, spawn_plugin,
-    terminate,
+    COOKIE, PluginClient, RunningPlugin, ShortTempDir, error_lines, plugin_client, run_to_exit,
+    spawn_plugin, terminate,
 };
 use support::{Database, SIGNAL_WAIT, database, database_url_as, login_role, migrated_database};
 
@@ -38,6 +39,7 @@ const HELD: &str = "nothing is logging in: request a check once the configuratio
 const PAUSED_HERE: &str = "restart the plugin with the configuration fixed, then request a check";
 const DB_ROLE: &str = "sei_entrypoint_secrets";
 const DB_PASSWORD: &str = "db-secret-7f3a";
+const PGPASS_MARKER: &str = "pgpass-line-3c9d";
 
 async fn admin(url: &str) -> Client {
     let (client, connection) = tokio_postgres::connect(url, NoTls)
@@ -257,6 +259,35 @@ async fn second_process_refuses_to_start() {
     assert!(!migrated, "the second process migrated the database");
     assert_eq!(fake.calls(ROUTE_LOGIN), 0);
     assert_eq!(fake.calls(ROUTE_VERSION), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_database_url_without_a_password_stops_before_reading_pgpass() {
+    let Some(database) = database().await else {
+        return;
+    };
+    let mut url = reqwest::Url::parse(&database.url).expect("the test database's URL");
+    url.set_password(None).expect("drop the password");
+    let files = ShortTempDir::new();
+    let pgpass = files.path().join("pgpass");
+    // One field short, so sqlx would log the whole line as malformed.
+    fs::write(&pgpass, format!("*:*:*:{PGPASS_MARKER}\n")).expect("write the pgpass file");
+    fs::set_permissions(&pgpass, fs::Permissions::from_mode(0o600))
+        .expect("make the pgpass file private");
+    let fake = FakeSei::start();
+    let mut env = sei_env(&fake, url.as_str(), PASSWORD);
+    with(
+        &mut env,
+        "PGPASSFILE",
+        pgpass.to_str().expect("a UTF-8 path"),
+    );
+    let mut args = vec![COOKIE];
+    args.extend(borrowed(&env));
+
+    let exited = run_to_exit(&["plugin"], &args, EXIT_LIMIT);
+
+    assert_eq!(exited.status.code(), Some(1), "{}", exited.stderr);
+    assert!(!exited.stderr.contains(PGPASS_MARKER), "{}", exited.stderr);
 }
 
 #[tokio::test(flavor = "multi_thread")]

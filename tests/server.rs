@@ -236,8 +236,10 @@ fn ids(h_events: &[sei_monitor::event::Event]) -> Vec<i64> {
 
 #[tokio::test]
 async fn describe_names_the_plugin_and_its_kinds() {
-    let store = Store::new(&Secret::new("postgres://sei@127.0.0.1:1/sei".to_owned()))
-        .expect("a store that never connects");
+    let store = Store::new(&Secret::new(
+        "postgres://sei:unused@127.0.0.1:1/sei".to_owned(),
+    ))
+    .expect("a store that never connects");
     let h = Harness::new(&store, |_| {});
 
     let described = plugin(&h)

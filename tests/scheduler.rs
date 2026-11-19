@@ -160,8 +160,10 @@ async fn held(monitor: &Monitor) -> bool {
 }
 
 fn store_that_never_connects() -> Store {
-    Store::new(&Secret::new("postgres://sei@127.0.0.1:1/sei".to_owned()))
-        .expect("a store that never connects")
+    Store::new(&Secret::new(
+        "postgres://sei:unused@127.0.0.1:1/sei".to_owned(),
+    ))
+    .expect("a store that never connects")
 }
 
 fn messages<'a>(logs: &'a [LoggedEvent], message: &str) -> Vec<&'a LoggedEvent> {

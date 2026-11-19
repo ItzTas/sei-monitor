@@ -537,8 +537,8 @@ pub(crate) fn offline_monitor() -> Arc<Monitor> {
         retention_days: 0,
         zone,
     };
-    let store =
-        Store::new(&secret("postgres://sei@127.0.0.1:1/sei")).expect("a store that never connects");
+    let store = Store::new(&secret("postgres://sei:unused@127.0.0.1:1/sei"))
+        .expect("a store that never connects");
     Monitor::new(config, store, Arc::new(SystemClock), random_jitter())
 }
 

@@ -380,7 +380,11 @@ mod tests {
                 "postgres://sei:hunter2@db.internal/sei?channel_binding=prefer",
                 5432,
             ),
-            ("postgres:///sei?host=db.internal&user=sei", 5432),
+            (
+                "postgres:///sei?host=db.internal&user=sei&password=hunter2",
+                5432,
+            ),
+            ("postgres://sei@db.internal/sei?password=hunter2", 5432),
         ];
         for (url, port) in accepted {
             let options = database_options(&Secret::new(url.to_owned()))
@@ -414,6 +418,9 @@ mod tests {
             "postgres://sei:hunter2@/sei",
             "postgres://sei:hunter2@:5432/sei",
             "postgresql:///sei?user=sei",
+            "postgres://sei@db.internal/sei",
+            "postgres://sei:@db.internal/sei",
+            "postgres:///sei?host=db.internal&user=sei",
         ];
         for url in refused {
             let error = database_options(&Secret::new(url.to_owned())).err();

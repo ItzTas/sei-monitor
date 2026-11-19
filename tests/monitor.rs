@@ -72,8 +72,10 @@ fn single_process(fake: &FakeSei) {
 async fn state_knows_the_user_acronym_before_the_first_login() {
     let fake = FakeSei::start();
     let monitor_config = config(&fake, PASSWORD);
-    let store = Store::new(&Secret::new("postgres://sei@127.0.0.1:1/sei".to_owned()))
-        .expect("a store that never connects");
+    let store = Store::new(&Secret::new(
+        "postgres://sei:unused@127.0.0.1:1/sei".to_owned(),
+    ))
+    .expect("a store that never connects");
     let harness = Harness::with(fake, store, monitor_config);
 
     assert_eq!(

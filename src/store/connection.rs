@@ -33,7 +33,7 @@ pub(crate) fn database_options(database_url: &Secret) -> Result<PgConnectOptions
         return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
     }
     let url = Url::parse(address).map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
-    if !names_a_host(&url) {
+    if !names_a_host(&url) || !names_a_password(&url) {
         return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
     }
     let mut options = PgConnectOptions::from_url(&keys_sqlx_reads(url)?)
@@ -59,6 +59,12 @@ fn names_a_host(url: &Url) -> bool {
         || url
             .query_pairs()
             .any(|(key, _)| key == "host" || key == "hostaddr")
+}
+
+// sqlx reads PGPASSWORD or a pgpass file, and logs a malformed pgpass line whole, only when the
+// address has no password.
+fn names_a_password(url: &Url) -> bool {
+    url.password().is_some() || url.query_pairs().any(|(key, _)| key == "password")
 }
 
 // sqlx logs every query key it does not read, value included, so it only gets the keys it reads.

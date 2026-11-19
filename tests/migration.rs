@@ -399,6 +399,36 @@ async fn an_object_that_depends_on_a_go_table_stops_the_drop() {
 }
 
 #[tokio::test]
+async fn a_whatsmeow_table_with_a_dependent_view_is_named_and_nothing_is_dropped() {
+    let Some(db) = database().await else { return };
+    let client = admin(&db.url).await;
+    goose_era_database(&client, &[1, 2], &[1, 2]).await;
+    whatsmeow_tables(&client).await;
+    client
+        .batch_execute("CREATE VIEW paired AS SELECT jid FROM whatsmeow_device")
+        .await
+        .expect("create a view over whatsmeow_device");
+
+    let error = migrate(&db.url)
+        .await
+        .expect_err("the drop went through a dependent view");
+
+    assert!(
+        error
+            .to_string()
+            .contains("view paired depends on table whatsmeow_device"),
+        "{error}"
+    );
+    assert_eq!(recorded_migrations(&client).await, [GOOSE_SCHEMA]);
+    for table in WHATSMEOW_TABLES
+        .into_iter()
+        .chain(["deliveries", "goose_db_version"])
+    {
+        assert!(exists(&client, table).await, "{table} is gone");
+    }
+}
+
+#[tokio::test]
 async fn every_whatsmeow_table_goes_and_nothing_else() {
     let Some(db) = database().await else { return };
     let client = admin(&db.url).await;

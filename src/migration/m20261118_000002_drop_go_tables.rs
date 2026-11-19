@@ -1,4 +1,5 @@
-use sea_orm::{ConnectionTrait, DbBackend, DeriveMigrationName, Statement};
+use sea_orm::sqlx::postgres::PgDatabaseError;
+use sea_orm::{ConnectionTrait, DbBackend, DeriveMigrationName, RuntimeErr, Statement};
 use sea_orm_migration::{DbErr, MigrationTrait, SchemaManager, async_trait};
 
 const CURRENT_SCHEMA: &str = "SELECT quote_ident(current_schema())";
@@ -28,17 +29,33 @@ impl MigrationTrait for Migration {
         // resolve through search_path to another schema's table.
         // No CASCADE, so an object outside these tables that depends on one of them stops the
         // drop and the transaction undoes it. The whatsmeow tables share a statement because
-        // their foreign keys point at each other; the other two get their own so an error names
-        // the table.
+        // their foreign keys point at each other, so a refusal there names its table only in
+        // Postgres's detail, which with_detail adds; the other two get their own statements.
         let mut drop = format!(
             "DROP TABLE IF EXISTS {schema}.deliveries; DROP TABLE IF EXISTS {schema}.goose_db_version;"
         );
         if !tables.is_empty() {
             drop.push_str(&format!(" DROP TABLE IF EXISTS {};", tables.join(", ")));
         }
-        db.execute_unprepared(&drop).await?;
+        db.execute_unprepared(&drop).await.map_err(with_detail)?;
         Ok(())
     }
+}
+
+fn with_detail(error: DbErr) -> DbErr {
+    let DbErr::Exec(RuntimeErr::SqlxError(sqlx)) = &error else {
+        return error;
+    };
+    let Some(database) = sqlx
+        .as_database_error()
+        .and_then(|database| database.try_downcast_ref::<PgDatabaseError>())
+    else {
+        return error;
+    };
+    let Some(detail) = database.detail() else {
+        return error;
+    };
+    DbErr::Migration(format!("{}: {detail}", database.message()))
 }
 
 fn statement(sql: &str) -> Statement {

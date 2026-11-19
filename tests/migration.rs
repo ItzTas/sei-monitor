@@ -405,8 +405,15 @@ async fn every_whatsmeow_table_goes_and_nothing_else() {
     goose_era_database(&client, &[1, 2], &[1, 2]).await;
     seed_rows(&client, true).await;
     whatsmeow_tables(&client).await;
+    client
+        .batch_execute(r#"CREATE TABLE "whatsmeow_Odd""Name" (id INTEGER)"#)
+        .await
+        .expect("create a whatsmeow table whose name needs quoting");
     let tables = table_names(&client).await;
-    for table in WHATSMEOW_TABLES {
+    for table in WHATSMEOW_TABLES
+        .into_iter()
+        .chain([r#"whatsmeow_Odd"Name"#])
+    {
         assert!(tables.iter().any(|name| name == table), "{table} missing");
     }
     let events = rows(&client, "events").await;
@@ -497,4 +504,42 @@ async fn running_the_migrations_again_changes_nothing() {
     assert_eq!(first.len(), 2, "{first:?}");
     assert_eq!(again, first);
     assert_eq!(table_names(&client).await, TODAYS_TABLES);
+}
+
+#[tokio::test]
+async fn go_tables_in_another_schema_on_the_search_path_are_left_alone() {
+    let Some(db) = database().await else { return };
+    let setup = admin(&db.url).await;
+    goose_era_database(&setup, &[], &[1, 2]).await;
+    setup
+        .batch_execute(
+            "CREATE TABLE deliveries (event_id BIGINT, channel TEXT);
+             INSERT INTO deliveries VALUES (7, 'email');
+             CREATE TABLE whatsmeow_device (jid TEXT PRIMARY KEY);
+             INSERT INTO whatsmeow_device VALUES ('another-application');
+             CREATE SCHEMA sei;
+             DO $$ BEGIN EXECUTE format('ALTER DATABASE %I SET search_path = sei, public',
+             current_database()); END $$",
+        )
+        .await
+        .expect("set up another application's tables in public");
+    let public = ["deliveries", "goose_db_version", "whatsmeow_device"]
+        .map(|table| format!("public.{table}"));
+    let before = join_all(public.iter().map(|table| rows(&setup, table))).await;
+    assert!(before.iter().all(|rows| !rows.is_empty()), "{before:?}");
+
+    migrate(&db.url).await.expect("migrate");
+
+    let client = admin(&db.url).await;
+    let schema: String = client
+        .query_one("SELECT current_schema()::text", &[])
+        .await
+        .expect("read the current schema")
+        .get(0);
+    assert_eq!(schema, "sei");
+    assert_eq!(table_names(&client).await, TODAYS_TABLES);
+    assert_eq!(
+        join_all(public.iter().map(|table| rows(&client, table))).await,
+        before
+    );
 }

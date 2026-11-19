@@ -12,6 +12,8 @@ use crate::secret::Secret;
 pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub(crate) const POOL_SIZE: u32 = 10;
 
+pub(super) const NOT_A_POSTGRES_ADDRESS: &str = "DATABASE_URL is not a valid Postgres address";
+
 const SCHEMES: [&str; 2] = ["postgres://", "postgresql://"];
 
 // sqlx has no client-side keepalive, so the server is asked to probe the connection instead,
@@ -28,13 +30,13 @@ const POOL_LIMITS: [(&str, &str); 2] = [("statement_timeout", "20000"), ("lock_t
 pub(crate) fn database_options(database_url: &Secret) -> Result<PgConnectOptions, StoreError> {
     let address = database_url.reveal();
     if !SCHEMES.iter().any(|scheme| address.starts_with(scheme)) {
-        return Err(StoreError::InvalidUrl);
+        return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
     }
-    let url = Url::parse(address).map_err(|_| StoreError::InvalidUrl)?;
-    let options =
-        PgConnectOptions::from_url(&keys_sqlx_reads(url)?).map_err(|_| StoreError::InvalidUrl)?;
+    let url = Url::parse(address).map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
+    let options = PgConnectOptions::from_url(&keys_sqlx_reads(url)?)
+        .map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
     if options.get_host().contains(',') {
-        return Err(StoreError::InvalidUrl);
+        return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
     }
     Ok(options.disable_statement_logging().options(KEEPALIVES))
 }
@@ -81,7 +83,35 @@ fn keys_sqlx_reads(mut url: Url) -> Result<Url, StoreError> {
         .iter()
         .any(|(key, _)| !read_by_sqlx(key) && !left_out.contains(&key.as_str()));
     if unknown {
-        return Err(StoreError::InvalidUrl);
+        return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
+    }
+    // sqlx cannot honour other values of these; left out, they would connect without what was
+    // asked for.
+    let honoured_only_as = [
+        (
+            "channel_binding",
+            &["disable", "prefer"][..],
+            "DATABASE_URL's channel_binding needs TLS, and the plugin connects without TLS",
+        ),
+        (
+            "sslnegotiation",
+            &["postgres"][..],
+            "DATABASE_URL's sslnegotiation needs TLS, and the plugin connects without TLS",
+        ),
+        (
+            "target_session_attrs",
+            &["any"][..],
+            "DATABASE_URL's target_session_attrs needs a session check the plugin does not run",
+        ),
+    ];
+    let not_honoured = pairs.iter().find_map(|(key, value)| {
+        honoured_only_as
+            .iter()
+            .find(|(name, values, _)| name == key && !values.contains(&value.as_str()))
+            .map(|(_, _, refusal)| *refusal)
+    });
+    if let Some(refusal) = not_honoured {
+        return Err(StoreError::InvalidUrl(refusal));
     }
     url.set_query(None);
     url.query_pairs_mut()

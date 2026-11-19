@@ -201,7 +201,7 @@ async fn an_address_that_is_not_postgres_is_refused() {
     };
 
     for error in [&store_error, &lock_error] {
-        assert!(matches!(error, StoreError::InvalidUrl), "{error:?}");
+        assert!(matches!(error, StoreError::InvalidUrl(_)), "{error:?}");
         assert_eq!(
             error.to_string(),
             "DATABASE_URL is not a valid Postgres address"
@@ -264,12 +264,12 @@ async fn failures_never_show_the_password_or_the_host() {
     let Err(error) = Store::new(&secret(&invalid)) else {
         panic!("the store accepted an invalid address")
     };
-    assert!(matches!(error, StoreError::InvalidUrl), "{error:?}");
+    assert!(matches!(error, StoreError::InvalidUrl(_)), "{error:?}");
     assert_hides_the_login(&error, &invalid);
     let Err(error) = acquire_writer_lock(&secret(&invalid)).await else {
         panic!("the lock accepted an invalid address")
     };
-    assert!(matches!(error, StoreError::InvalidUrl), "{error:?}");
+    assert!(matches!(error, StoreError::InvalidUrl(_)), "{error:?}");
     assert_hides_the_login(&error, &invalid);
 
     let closed = format!("postgres://sei:{PASSWORD}@127.0.0.1:{closed_port}/sei");

@@ -18,7 +18,9 @@ use tokio::task::{JoinError, JoinHandle};
 use tokio_postgres::{Client, Config, NoTls};
 
 use crate::secret::Secret;
-use connection::{CONNECT_TIMEOUT, database_options, pool, with_pool_limits};
+use connection::{
+    CONNECT_TIMEOUT, NOT_A_POSTGRES_ADDRESS, database_options, pool, with_pool_limits,
+};
 use events::Skipped;
 
 pub use records::{
@@ -50,8 +52,8 @@ const TRY_WRITER_LOCK: &str = "SELECT pg_try_advisory_lock($1)";
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
-    #[error("DATABASE_URL is not a valid Postgres address")]
-    InvalidUrl,
+    #[error("{0}")]
+    InvalidUrl(&'static str),
     #[error("another sei-monitor process holds the database lock")]
     Locked,
     #[error("monitor: account not found")]
@@ -247,7 +249,7 @@ fn lock_config(database_url: &Secret) -> Result<Config, StoreError> {
     let mut config: Config = database_url
         .reveal()
         .parse()
-        .map_err(|_| StoreError::InvalidUrl)?;
+        .map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
     config
         .keepalives(true)
         .keepalives_idle(KEEPALIVES_IDLE)
@@ -374,6 +376,10 @@ mod tests {
                 "postgres://sei:hunter2@db.internal/sei?options[application_name]=sei",
                 5432,
             ),
+            (
+                "postgres://sei:hunter2@db.internal/sei?channel_binding=prefer",
+                5432,
+            ),
         ];
         for (url, port) in accepted {
             let options = database_options(&Secret::new(url.to_owned()))
@@ -401,9 +407,33 @@ mod tests {
         for url in refused {
             let error = database_options(&Secret::new(url.to_owned())).err();
             assert!(
-                matches!(error, Some(StoreError::InvalidUrl)),
+                matches!(error, Some(StoreError::InvalidUrl(_))),
                 "{url}: {error:?}"
             );
+            assert_eq!(
+                error.map(|error| error.to_string()).as_deref(),
+                Some("DATABASE_URL is not a valid Postgres address"),
+                "{url}"
+            );
+        }
+
+        let not_honoured = [
+            ("channel_binding", "require"),
+            ("channel_binding", "sometimes"),
+            ("sslnegotiation", "direct"),
+            ("target_session_attrs", "read-write"),
+            ("target_session_attrs", "read-only"),
+        ];
+        for (key, value) in not_honoured {
+            let error = database_options(&with_query(URL, &format!("{key}={value}"))).err();
+            assert!(
+                matches!(error, Some(StoreError::InvalidUrl(_))),
+                "{key}={value}: {error:?}"
+            );
+            let text = error.map(|error| error.to_string()).unwrap_or_default();
+            assert!(text.starts_with("DATABASE_URL's "), "{text}");
+            assert!(text.contains(key), "{text}");
+            assert!(!text.contains(value), "{text}");
         }
     }
 

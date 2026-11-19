@@ -1349,23 +1349,28 @@ async fn apply_cycle_signals_the_newest_id_it_committed() {
     };
     let pooled = store(&db.url);
     let account = account(&pooled).await;
+    apply(&pooled, readable(account.id, "earlier")).await;
     let mut signals = pooled.notifier().subscribe();
     signals.latest_seq();
     let changes = CycleChanges {
         events: vec![
             event(Kind::ProcessEntered, 9001, "9001:1"),
             event(Kind::ActivityAdded, 9001, "50003"),
+            // Meets the stored event's key: no row, but its insert spends a sequence value.
+            event(Kind::ActivityAdded, 9001, "earlier"),
         ],
         ..cycle(account.id, repo_now())
     };
 
     let inserted = apply(&pooled, changes.clone()).await;
     let signalled = next_signal(&mut signals).await;
+    let issued = pooled.last_issued_seq().await.expect("the last issued seq");
     let again = apply(&pooled, changes).await;
     let after_the_conflict = pending_signal(&mut signals).await;
 
     assert_eq!(inserted.len(), 2, "{inserted:?}");
     assert_eq!(Some(signalled), inserted.iter().map(|event| event.id).max());
+    assert_eq!(issued, signalled + 1);
     assert_eq!(again, Vec::new());
     assert_eq!(after_the_conflict, None);
 }

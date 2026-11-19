@@ -1,14 +1,17 @@
 mod support;
 
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
 use monitor_hub_plugin::Signals;
 use sei_monitor::event::Kind;
 use sei_monitor::monitor::{Clock, Monitor, MonitorError, State, TriggerError};
+use sei_monitor::password::{PasswordCommandError, PasswordSource};
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{AccountKey, CycleRun, Store, Trigger};
+use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tokio_postgres::NoTls;
 
@@ -801,7 +804,36 @@ struct CancelledClear {
     retry: PendingSleep,
 }
 
-async fn a_check_whose_clear_is_cancelled(h: &Harness, url: &str, reason: &str) -> CancelledClear {
+struct PasswordOnRelease(watch::Receiver<bool>);
+
+impl PasswordSource for PasswordOnRelease {
+    fn password(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<Secret, PasswordCommandError>> + Send + '_>> {
+        let mut released = self.0.clone();
+        Box::pin(async move {
+            let _ = released.wait_for(|released| *released).await;
+            Ok(Secret::new(PASSWORD.to_owned()))
+        })
+    }
+}
+
+fn harness_with_a_held_login(store: &Store) -> (Harness, watch::Sender<bool>) {
+    let (release, released) = watch::channel(false);
+    let h = Harness::new(store, |config| {
+        config.target.password = Arc::new(PasswordOnRelease(released));
+    });
+    (h, release)
+}
+
+// The check's login waits until the processes read is blocked, so that read's lock timeout
+// ends the cycle before the clear's own does, however fast the pool hands out connections.
+async fn a_check_whose_clear_is_cancelled(
+    h: &Harness,
+    url: &str,
+    reason: &str,
+    release_login: &watch::Sender<bool>,
+) -> CancelledClear {
     record_reason(h, reason).await;
     let first = spawn_run(&h.monitor);
     let was_held = held(&h.monitor).await;
@@ -815,10 +847,13 @@ async fn a_check_whose_clear_is_cancelled(h: &Harness, url: &str, reason: &str) 
         .expect("hold the account row and the processes table");
 
     let checked = h.monitor.trigger_cycle();
-    let both_waiting = eventually(|| async {
-        waiting_on(&observer, PAUSE_WRITE).await && waiting_on(&observer, PROCESSES_READ).await
-    })
-    .await;
+    let read_waiting = eventually(|| waiting_on(&observer, PROCESSES_READ)).await;
+    release_login.send_replace(true);
+    let both_waiting = read_waiting
+        && eventually(|| async {
+            waiting_on(&observer, PAUSE_WRITE).await && waiting_on(&observer, PROCESSES_READ).await
+        })
+        .await;
     let retry = h.clock.next_sleep().await;
     let failed = h.monitor.state();
     let gave_up = eventually(|| async { !waiting_on(&observer, PAUSE_WRITE).await }).await;
@@ -869,12 +904,13 @@ async fn a_cancelled_clear_of_the_rejection_is_tried_again_after_the_next_succes
     let Some((database, store)) = database_store().await else {
         return;
     };
-    let h = Harness::new(&store, |_| {});
+    let (h, release_login) = harness_with_a_held_login(&store);
     populate(&h.fake);
     let (cancelled, logs) = captured(a_check_whose_clear_is_cancelled(
         &h,
         &database.url,
         RECORDED_REASON,
+        &release_login,
     ))
     .await;
     assert_cancelled(&cancelled, &logs, RECORDED_REASON);
@@ -914,12 +950,13 @@ async fn a_rejection_recorded_after_a_cancelled_clear_stays_on_record() {
     let Some((database, store)) = database_store().await else {
         return;
     };
-    let h = Harness::new(&store, |_| {});
+    let (h, release_login) = harness_with_a_held_login(&store);
     populate(&h.fake);
     let (cancelled, logs) = captured(a_check_whose_clear_is_cancelled(
         &h,
         &database.url,
         EARLIER_REASON,
+        &release_login,
     ))
     .await;
     assert_cancelled(&cancelled, &logs, EARLIER_REASON);

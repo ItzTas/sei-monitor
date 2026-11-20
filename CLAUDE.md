@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # sei-monitor
 
-A monitor-hub plugin. It logs in to SEI through SEI's REST module (`mod-wssei`) with the owner's
+A monitor for monitor-hub. It logs in to SEI through SEI's REST module (`mod-wssei`) with the owner's
 account, lists the processes of the watched units every `POLL_INTERVAL`, and records what changed as
-events in Postgres. The hub reads those events and sends the notifications. The plugin is written in
-Rust on the monitor-hub plugin SDK (`monitor-hub-plugin`, git tag `sdk-rust/v0.3.0`).
+events in Postgres. The hub reads those events and sends the notifications. The monitor is written in
+Rust on the monitor-hub SDK (`monitor-hub-sdk`, git tag `sdk-rust/v0.4.0`).
 
-The image does not run on its own. It holds `/plugin/plugin.json` and `/plugin/sei-monitor`, and the
+The image does not run on its own. It holds `/monitor/monitor.json` and `/monitor/sei-monitor`, and the
 hub's image build copies that directory in. Release `1.0.0` was a standalone Go service with its own
 notifications, feed, API and web page. Its code is gone from the tree.
 
@@ -32,7 +32,7 @@ notifications, feed, API and web page. Its code is gone from the tree.
   into the binary (`chrono-tz`). Nothing reads `TZ` or the local zone.
 - The SEI password, the session token and `DATABASE_URL` never appear in a log, an error, a gRPC
   message, an event, command output or a `Debug` output. They live in `Secret` (prints
-  `[redacted]`, zeroed on drop), and `PluginConfig`, `SeiConfig`, `Credentials` and `Store` do not
+  `[redacted]`, zeroed on drop), and `Config`, `SeiConfig`, `Credentials` and `Store` do not
   derive `Debug`.
 - Code that calls SEI concurrently drops the pending calls at the first error and never spawns a
   detached task for a SEI call. Each wrong password costs one rejected login, and enough of them
@@ -57,6 +57,22 @@ Conventional Commits. The hook and the `Makefile` run cargo with `rustup run <ch
 `rust-toolchain.toml` when `rustup` is installed. A cargo from the system package ignores that file,
 and under another standard library `gotext::tests::case_mappings_match_go_for_every_char` fails.
 
+## Dependencies
+
+- `sea-orm` and `sea-orm-migration` are pinned with `=` at 2.0.4, with default features off.
+  sqlx gets no TLS feature: `cargo tree -e features -i sqlx-core | grep -c _tls` stays 0.
+- After any change to `Cargo.toml`, set these back with `cargo update -p <crate> --precise
+  <version>`: `sqlx` 0.9.0, `nix` 0.31.3, `uuid` 1.29.0, `winnow` 1.0.4, `toml_edit`
+  0.25.17+spec-1.1.0, `toml_datetime` 1.1.2+spec-1.1.0, `regex` 1.13.1, `regex-automata` 0.4.18
+  and `regex-syntax` 0.8.11. Check on crates.io that each new lock entry is at least two weeks
+  old, and move a newer one back with `--precise`.
+- `libsqlite3-sys` is in `Cargo.lock` and never compiled, and so are `sqlx-sqlite`, `sqlx-mysql`
+  and the `arrow-*` crates. The sqlx features that sea-orm's defaults turn on carry weak
+  `sqlx-sqlite?/...` edges, and cargo keeps the packages those edges name in the lock
+  (cargo#10801). `cargo tree -i libsqlite3-sys --target all -e all` prints nothing. An audit that
+  reads the lock still reports RUSTSEC-2026-0459 against `libsqlite3-sys` 0.37.0; look again when
+  sqlx 0.9.1 is two weeks old, after 2026-12-02.
+
 ## Tests
 
 Some tests need tools from outside the crate. When one is missing they print a `skipping:` notice
@@ -78,18 +94,18 @@ skipping.
   tables) and compares the catalog and the rows before and after.
 - `tests/support/proxy.rs` is a TCP proxy that stops forwarding when told to. Two lock tests in
   `tests/store.rs` use it and wait out the whole 30 s loss limit, so that binary takes about 33 s.
-- The conformance command for `tests/conformance.rs`: the binary named by `PLUGIN_CONFORMANCE`, or
-  else `go install` of `plugin-conformance` at the SDK's Go tag `sdk-go/v0.4.0`, which also checks
+- The conformance command for `tests/conformance.rs`: the binary named by `MONITOR_CONFORMANCE`, or
+  else `go install` of `monitor-conformance` at the SDK's Go tag `sdk-go/v0.6.0`, which also checks
   `Watch` on the real binary.
 
 The signal tests subscribe with `Notifier::subscribe` and wait for a signal with a bounded
 `timeout` on `Signals::changed` (`support::next_signal`, 5 s), or look for one without waiting
-(`support::pending_signal`). The process tests read the plugin's gRPC `Watch` stream, each message
-within 5 s. None of them sleeps to wait for the plugin.
+(`support::pending_signal`). The process tests read the monitor's gRPC `Watch` stream, each message
+within 5 s. None of them sleeps to wait for the monitor.
 
 The tests that call the fake SEI fail when `HTTP_PROXY` is set in their environment.
 
-The SDK refuses Unix socket paths longer than 100 bytes. The tests that start the plugin put its
+The SDK refuses Unix socket paths longer than 100 bytes. The tests that start the monitor put its
 socket in a short directory under the system temporary directory, so a long `TMPDIR` breaks them.
 
 No test talks to a real SEI. `tests/support/fake_sei.rs` and its modules are a port of the Go
@@ -123,8 +139,8 @@ test that reads the list prints the command that regenerates it.
 ## Configuration
 
 Under monitor-hub, set these on the hub with the `SEI__` prefix (`SEI__SEI_URL` and so on). The hub
-removes the prefix before it starts the plugin. The plugin reads only its environment, never a
-`.env`. `config::PluginConfig::load` collects every problem and reports them together, with Go's
+removes the prefix before it starts the monitor. The monitor reads only its environment, never a
+`.env`. `config::Config::load` collects every problem and reports them together, with Go's
 texts, and never shows a secret value.
 
 - `DATABASE_URL` (required, secret, or `DATABASE_URL_FILE`): the Postgres address, as
@@ -137,19 +153,19 @@ texts, and never shows a secret value.
     Without a password in the URL, sqlx would read `PGPASSWORD`, `PGPASSFILE` or `~/.pgpass`, and
     it logs a malformed `.pgpass` line whole at `warn`. A line missing a field, such as
     `*:*:*:secret`, puts the password where sqlx expects the user name, so the log would show it.
-    With the refusal in place, the plugin never uses `PGPASSWORD` and never reads a `.pgpass` file.
+    With the refusal in place, the monitor never uses `PGPASSWORD` and never reads a `.pgpass` file.
     A database that trusts the role still needs a password in the URL, and Postgres ignores it.
   - Whatever else the URL leaves out, sqlx takes from the `PG*` variables (`PGPORT`, `PGUSER`,
     `PGDATABASE`, `PGOPTIONS`, `PGSSLMODE` and the rest), then the user from the system account.
     Under the hub the `PG*` variables only arrive when set as `SEI__PG*`.
-  - The plugin connects without TLS. `sslmode=disable`, `allow` and `prefer` connect in plain
+  - The monitor connects without TLS. `sslmode=disable`, `allow` and `prefer` connect in plain
     text; `require`, `verify-ca` and `verify-full` fail at once.
   - These are refused with `DATABASE_URL is not a valid Postgres address`, which never repeats the
     address: several hosts (`h1,h2`), a URL with no host (unless a non-empty `host` or `hostaddr`
-    query key names one), and any query key the plugin does not know. sqlx would log an unknown
+    query key names one), and any query key the monitor does not know. sqlx would log an unknown
     key together with its value, and that value can be a secret (`sslpassword`, a misspelled
     `Password`). When a URL has neither a host nor a password, the host is the one reported.
-  - The plugin passes on the query keys sqlx reads: `sslmode`, `options` and `options[<setting>]`,
+  - The monitor passes on the query keys sqlx reads: `sslmode`, `options` and `options[<setting>]`,
     `application_name`, `host`, `hostaddr`, `port`, `dbname`, `user`, `password`, the certificate
     keys (`sslrootcert`, `sslcert`, `sslkey`, their dashed forms and `ssl-ca`) and
     `statement-cache-capacity`. Key names are case sensitive.
@@ -158,7 +174,7 @@ texts, and never shows a secret value.
     `keepalives_retries` and `load_balance_hosts`, plus `channel_binding=disable` or `prefer`,
     `sslnegotiation=postgres` and `target_session_attrs=any`. Any other value of those last three
     stops the start with a message that names the key and never its value: `channel_binding` and
-    `sslnegotiation` need TLS, and `target_session_attrs` needs a session check the plugin does not
+    `sslnegotiation` need TLS, and `target_session_attrs` needs a session check the monitor does not
     run.
   - An IPv6 host goes in brackets: `postgres://user:password@[::1]:5432/database`.
 - `SEI_URL` (required): the SEI address without `/sei`. https, or http for localhost only.
@@ -174,7 +190,7 @@ texts, and never shows a secret value.
   `RETURN_WARNING_DAYS + 2` unless 0), `NOTIFICATION_DETAIL` (`minimal` or `full`), `LOG_LEVEL`
   (`info`).
 
-The hub also passes `PATH`, `TZ`, `TMPDIR` and `MONITOR_HUB_DATA_DIR`. The plugin ignores `TZ` and
+The hub also passes `PATH`, `TZ`, `TMPDIR` and `MONITOR_HUB_DATA_DIR`. The monitor ignores `TZ` and
 the data directory and keeps all its state in Postgres. Apart from the program of
 `SEI_PASSWORD_CMD`, it runs no external program.
 
@@ -185,11 +201,11 @@ src/
 ├── main.rs                 hardens the process, parses the arguments, builds the runtime, exit code
 ├── lib.rs                  module declarations only
 ├── harden.rs               RLIMIT_CORE 0, PR_SET_DUMPABLE 0, umask 077
-├── app.rs                  plugin start-up: writer lock, migrations, store, monitor, serve, shutdown
-├── server.rs               SeiPlugin: Describe, Status, Check and Events
+├── app.rs                  monitor start-up: writer lock, migrations, store, monitor, serve, shutdown
+├── server.rs               SeiMonitor: Describe, Status, Check and Events
 ├── cli/                    clap commands and exit codes (mod.rs), orgs and test-login
 │                           (commands.rs), diagnose (diagnose.rs)
-├── config/                 Source, ConfigError, SeiConfig, PluginConfig (mod.rs); the problem
+├── config/                 Source, ConfigError, SeiConfig, Config (mod.rs); the problem
 │                           collector (reader.rs); SEI_URL and SEI_API_URL as Go's net/url parses
 │                           them (url.rs, url/); the PATH lookup for SEI_PASSWORD_CMD (lookpath.rs)
 ├── gotext.rs               Go's text rules: quoting, EqualFold, Fields, case tables, Atoi, capped
@@ -226,7 +242,7 @@ tests/                      one file per area; tests/support/ holds the fake SEI
 
 ## Process contract
 
-- The hub starts `sei-monitor plugin` with its cookie variable. Started any other way, or with no
+- The hub starts `sei-monitor monitor` with its cookie variable. Started any other way, or with no
   command, the binary prints the SDK's `NOT_LAUNCHED_BY_HUB` text on stderr and exits 1.
 - Stdout carries only the handshake line. Logs go to stderr as JSON lines.
 - Start-up reads the configuration, takes the database writer lock (a Postgres advisory lock on a
@@ -235,14 +251,14 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   all before the handshake. Taking the lock has 10 s, and sqlx retries a refused connection within
   them, so a database that refuses connections stops the start after 10 s with `taking the
   database writer lock: the database did not answer in time: taking the writer lock`. The whole
-  sequence has 45 s, because the hub kills a plugin that has not answered in 60 s. The plugin does
+  sequence has 45 s, because the hub kills a monitor that has not answered in 60 s. The monitor does
   not call SEI before the handshake.
-- Exit code 0 is a clean stop (SIGTERM or SIGINT). When the plugin exits 1 because of a
+- Exit code 0 is a clean stop (SIGTERM or SIGINT). When the monitor exits 1 because of a
   configuration error, a failed start-up step or a lost writer lock, it writes exactly one JSON
   `fatal` line at `error` level, whose `error` field holds the configuration problems, names the
   start-up step that failed, or starts with `the database lock was lost`. A run outside the hub and
   a failure to start logging or the runtime also exit 1, without a `fatal` line. The hub restarts
-  the plugin with a back-off.
+  the monitor with a back-off.
 - After the handshake the process exits only on a signal, a lost writer lock or an error of the
   SDK's `serve` (a `fatal` line and exit 1). An unknown agency or module, a failing cycle, a
   rejected login and a panic in the scheduler leave it running, with the reason in `Status`,
@@ -256,7 +272,7 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   the database lock`, migrates nothing and does not call SEI.
 - On SIGTERM the running cycle is cancelled at once and recorded as `context canceled`. The SDK
   drains the server for at most 1 s.
-- `Describe` names the plugin `sei` (`SEI`) with eight kinds. `account_login_failed` and
+- `Describe` names the monitor `sei` (`SEI`) with eight kinds. `account_login_failed` and
   `return_overdue` are urgent, the rest are info.
 - `Status`, first match wins: hub ahead (below), `FAILING`; an unknown agency or module while
   preparing, or a panicked scheduler, `FAILING` with the text; a cycle running, `CHECKING`; paused,
@@ -277,31 +293,32 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   to 10 s to answer, under the hub's 30 s limit per call. A cycle takes about 20 s and shows
   `CHECKING` until it ends, because starting its cycle run waits those 10 s and recording its
   failure waits 10 s more. `Status` then shows `the database did not answer in time: getting a
-  connection`. A server that stops ends the lock's connection too, and the plugin exits 1 within
+  connection`. A server that stops ends the lock's connection too, and the monitor exits 1 within
   about a second.
 - The first read stops at the highest position issued before start-up. Until one `Events` call
   returns a page shorter than its limit, newer events are left out. The hub stores its first read
-  of a plugin as a baseline and announces none of it, so this keeps the first cycle's events out of
-  the baseline. They go out on the next read: when the first read ends, the plugin calls `notify`
-  with the id of the newest stored event, so a hub with `Watch` reads them at once. The limit
+  of a monitor as a baseline and announces none of it, so this keeps the first cycle's events out of
+  the baseline. They go out on the next read: when the first read ends, the monitor calls
+  `events_recorded` with the id of the newest stored event, so the hub reads them at once. The limit
   belongs to one process: a restart before the hub's first read ended lets the new baseline take
   those events in.
-- When `after` is above the highest position this database ever issued, the plugin's database was
+- When `after` is above the highest position this database ever issued, the monitor's database was
   reset and the hub's position was not. `Events` then returns nothing and acknowledges nothing,
-  logs `the hub is ahead of this database: reset the hub's position for the sei plugin` once, and
+  logs `the hub is ahead of this database: reset the hub's position for the sei monitor` once, and
   `Status` shows that text until the two agree.
-- The plugin serves `Watch` with the SDK's `serve_with_notifier`. `Monitor` owns the `Notifier` and
-  hands a clone to its `Store`, and start-up sets it to the id of the newest stored event.
-  `Store::apply_cycle` writes every event (a cycle's, and the `login:` and `login-held:` ones), and
-  right after a commit that inserted events it calls `notify` with the highest inserted id. A
-  failed commit, or a write that inserted nothing, signals nothing. The monitor calls
-  `status_changed` when what `Status` answers changes: a cycle starts or ends (a cancelled one
-  too), the next check time is set, a preparation fails (an unknown agency or module only when its
-  text changes) or works, the monitor pauses, holds or leaves the hold, the scheduler panics, the
-  hub falls ahead of the database or back in line, and the last `Events` read fails or recovers.
-  The end of the first read calls `notify` with the id of the newest stored event. Signals carry
-  the id of a stored event, never the sequence's own value: an insert that meets the `(account,
-  kind, ref)` conflict still uses up a sequence value, and a signal above every stored event would
+- The monitor serves `Watch` with the SDK's `serve`, given the `Notifier`. `Monitor` owns the
+  `Notifier` and hands a clone to its `Store`, and start-up sets it to the id of the newest stored
+  event. `Store::apply_cycle` writes every event (a cycle's, and the `login:` and `login-held:`
+  ones), and right after a commit that inserted events it calls `events_recorded` with the highest
+  inserted id. A failed commit, or a write that inserted nothing, signals nothing. The monitor
+  calls `status_changed` when what `Status` answers changes: the next check time is set, a
+  preparation fails (an unknown agency or module only when its text changes) or works, the monitor
+  pauses, holds or leaves the hold, the scheduler panics, the hub falls ahead of the database or
+  back in line, and the last `Events` read fails or recovers. A cycle's start and end signal
+  through `status_scope`, which the `RunningGuard` holds, so a cancelled cycle signals its end too.
+  The end of the first read calls `events_recorded` with the id of the newest stored event. Signals
+  carry the id of a stored event, never the sequence's own value: an insert that meets the
+  `(account, kind, ref)` conflict still uses up a sequence value, and a signal above every stored event would
   make the hub read `Events` on every signal until the next event. The first-read boundary and the
   hub-ahead check keep using the highest position issued. A signal is a value in a channel inside
   the process: the hub answers it with `Describe`, `Status` and maybe `Events`, never `Check`, so
@@ -346,7 +363,7 @@ with the back-off until it lands or the process stops, without calling SEI.
 A process that starts with a reason on record is held: it does not log in, logs `SEI rejected the
 login in an earlier run; ...`, and records one `account_login_failed` event with ref
 `login-held:<UTC date>`, so at most one per day however often it restarts. The hub restarts the
-plugin on its own (after a lost lock, for example), so a restart is not the owner's act and must
+monitor on its own (after a lost lock, for example), so a restart is not the owner's act and must
 not cost a login. A requested `Check` is the only retry. As soon as SEI accepts its login, the
 reason is cleared in memory and its database write starts, so a later failure in that cycle follows
 the ordinary back-off with the session it has. The clear stays pending until that write lands: a
@@ -368,7 +385,7 @@ Two locks guard the events:
 
 ## Persistence
 
-- The plugin reaches Postgres through SeaORM on sqlx. The tables are hand-written entities in
+- The monitor reaches Postgres through SeaORM on sqlx. The tables are hand-written entities in
   `src/store/entity/`. The migrations are `sea-orm-migration` modules in `src/migration/`, run in
   the order of `Migrator::migrations`, and `seaql_migrations` records the ones applied.
 - The first migration, `m20261118_000001_goose_schema`, adopts the schema that goose built for 2.1
@@ -388,12 +405,12 @@ Two locks guard the events:
   new `goose_db_version` table with one version-0 row, which 2.2 ignores and never drops, because
   the drop migration is already recorded. Drop it by hand.
 - **Upgrading from 2.1.** The first 2.2 start creates `seaql_migrations` and drops the Go tables.
-  The plugin's role therefore needs `CREATE` on the current schema and must own those tables,
+  The monitor's role therefore needs `CREATE` on the current schema and must own those tables,
   which 2.1 never needed after its own first start. Without `CREATE` the start fails with
   `applying the database migrations: db error: ERROR: permission denied for schema public`, and
   without ownership with `... must be owner of table deliveries`. Either way it changes nothing,
   but under the hub it becomes a restart loop. No try gets as far as calling SEI. Before the first
-  2.2 start, run these as the plugin's role:
+  2.2 start, run these as the monitor's role:
 
   ```sql
   SELECT has_schema_privilege(current_user, current_schema(), 'CREATE');
@@ -402,9 +419,11 @@ Two locks guard the events:
     AND (tablename IN ('deliveries', 'goose_db_version') OR starts_with(tablename, 'whatsmeow_'));
   ```
 
-  The first must return `t`, and every row of the second must show the plugin's role as
-  `tableowner`. Later starts need only the rights on the tables and on `events_id_seq` that 2.1
-  needed. Take a `pg_dump` of the database before that start, because once 2.2 has run, 2.1 cannot
+  The first must return `t`, and every row of the second must show the monitor's role as
+  `tableowner`. Later starts need the rights on the tables and on `events_id_seq` that 2.1 needed,
+  and `SELECT` on `seaql_migrations`. Without that, the start reads the migrations as pending,
+  tries to create the table and fails with the same `permission denied for schema public`, which
+  points at the wrong right. It happens when another role ran the first 2.2 start: grant it. Take a `pg_dump` of the database before that start, because once 2.2 has run, 2.1 cannot
   use the database again. A login rejection that 2.1 recorded still holds the first 2.2 start,
   which makes no login.
 - A schema change is a new module in `src/migration/` and a new entry at the end of
@@ -420,7 +439,7 @@ Two locks guard the events:
 - The SQL lives in the store (`src/store/`) and in the migrations (`src/migration/`, which reads
   `sql/schema/`). Nothing inserts an event outside `Store::apply_cycle`, which locks the account
   row first (`FOR NO KEY UPDATE`), so the order of ids is the order of the commits. Events are
-  stored once per `(account, kind, ref)`, so a changed `ref` format lets an event the plugin
+  stored once per `(account, kind, ref)`, so a changed `ref` format lets an event the monitor
   detects again be stored and announced a second time. Never insert explicit ids: the columns are
   `GENERATED ALWAYS AS IDENTITY`.
 - Most queries go through SeaORM's query builder. These keep 2.1's SQL text and run as raw
@@ -451,8 +470,8 @@ Two locks guard the events:
   30 s to answer checks in `pg_locks` that this connection still holds the lock. sqlx pings the
   connection each time it goes back to that pool, with no limit of its own, so the wait for the
   connection gets the same 30 s. The limit is that long because a false loss stops the process,
-  and the restart logs in to SEI unless a recorded rejection holds it. The plugin gives up on a
-  silent connection after about 30.5 s, and the server frees a vanished plugin's lock only after
+  and the restart logs in to SEI unless a recorded rejection holds it. The monitor gives up on a
+  silent connection after about 30.5 s, and the server frees a vanished monitor's lock only after
   about 60 s, so the lock cannot pass to a second copy while the first could still write.
 
 The database layer adds these lines to the log. None carries the address or a password.
@@ -460,10 +479,13 @@ The database layer adds these lines to the log. None carries the address or a pa
 - At start-up, when a migration is pending, sea-orm-migration logs `Applying all pending
   migrations`, then `Applying migration '<name>'` and `Migration '<name>' has been applied` for
   each one it runs. Those lines show even when a later migration fails and the run records
-  nothing. The plugin then logs `database migrations applied` with the names it applied. On a
+  nothing. The monitor then logs `database migrations applied` with the names it applied. On a
   restart that line comes alone, with `[]`. Postgres's notices, such as the migration table's
   `already exists, skipping`, stay out because of `client_min_messages=warning`; warnings and
   errors still show.
+- `ping on idle connection returned error` (`info`, sqlx) appears each time the pool replaces a
+  connection the server closed while it was idle (`idle_session_timeout`, a server restart,
+  `pg_terminate_backend`). There is one line per replaced connection, and it has no address.
 - `there is no transaction in progress` (`warn`, `sqlx::postgres::notice`) follows a commit that
   Postgres refused, because SeaORM sends a `ROLLBACK` after it.
 - `error occurred while testing the connection on-release` (`warn`) appears when a call is

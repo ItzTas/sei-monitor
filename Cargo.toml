@@ -18,7 +18,7 @@ encoding_rs = "0.8.42"
 futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
 html5ever = "0.40.1"
 libc = "0.2.191"
-monitor-hub-plugin = { git = "https://github.com/ItzTas/monitor-hub", tag = "sdk-rust/v0.3.0", features = ["postgres"] }
+monitor-hub-plugin = { git = "https://github.com/ItzTas/monitor-hub", tag = "sdk-rust/v0.3.0" }
 prost-types = "0.14.4"
 rand = "0.10.3"
 reqwest = { version = "0.13.5", default-features = false, features = ["gzip", "rustls"] }
@@ -29,7 +29,6 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["io-util", "macros", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
-tokio-postgres = { version = "0.7.18", features = ["with-chrono-0_4"] }
 tonic = { version = "0.14.8", default-features = false, features = ["codegen"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 unicode-normalization = "=0.1.25"
@@ -43,5 +42,6 @@ base64 = "0.23.1"
 flate2 = "1.1.10"
 monitor-hub-plugin-testkit = { git = "https://github.com/ItzTas/monitor-hub", tag = "sdk-rust/v0.3.0" }
 tokio = { version = "1.54.1", features = ["net", "rt", "sync"] }
+tokio-postgres = { version = "0.7.18", features = ["with-chrono-0_4"] }
 tonic = { version = "0.14.8", default-features = false, features = ["channel"] }
 tonic-prost = { version = "0.14.8", default-features = false }

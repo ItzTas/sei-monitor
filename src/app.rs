@@ -14,12 +14,11 @@ use crate::monitor::{Monitor, MonitorConfig, SystemClock, random_jitter};
 use crate::secret::Secret;
 use crate::sei::{Options, REQUEST_TIMEOUT, Target};
 use crate::server::SeiPlugin;
-use crate::store::{Store, WriterLock, acquire_writer_lock};
+use crate::store::{LOCK_LOST, Store, WriterLock, acquire_writer_lock};
 use crate::version::user_agent;
 
 const START_UP_LIMIT: Duration = Duration::from_secs(45);
 const CYCLE_CLOSE_LIMIT: Duration = Duration::from_millis(500);
-const LOCK_LOST: &str = "the database lock was lost";
 const LISTENING: &str = "listening for SIGTERM and SIGINT";
 const SCHEDULER_STOPPED: &str = "the monitor stopped after an internal error; see the plugin log";
 
@@ -46,7 +45,7 @@ pub async fn run_plugin(config: PluginConfig) -> anyhow::Result<()> {
 
 async fn start_up(database_url: &Secret, limit: Duration) -> anyhow::Result<Started> {
     let deadline = Instant::now() + limit;
-    let mut lock = within(
+    let lock = within(
         deadline,
         limit,
         "taking the database writer lock",
@@ -60,7 +59,7 @@ async fn start_up(database_url: &Secret, limit: Duration) -> anyhow::Result<Star
         lock.migrate(),
     )
     .await?;
-    info!(versions = ?applied, "database migrations applied");
+    info!(migrations = ?applied, "database migrations applied");
     let store = Store::new(database_url).context("opening the database pool")?;
     let (first_read_boundary, newest_event) = tokio::try_join!(
         within(

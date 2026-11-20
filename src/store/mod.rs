@@ -3,52 +3,29 @@ mod connection;
 mod cycle;
 mod entity;
 mod events;
+mod lock;
 mod records;
 mod runs;
 
 use std::error::Error;
 use std::fmt;
-use std::time::Duration;
 
 use monitor_hub_plugin::Notifier;
-use monitor_hub_plugin::migrate::{MigrateError, Migration, up};
 use sea_orm::sqlx::postgres::{PgDatabaseError, PgSeverity};
 use sea_orm::{ConnAcquireErr, DatabaseConnection, DbErr, RuntimeErr};
-use tokio::task::{JoinError, JoinHandle};
-use tokio_postgres::{Client, Config, NoTls};
 
 use crate::secret::Secret;
-use connection::{
-    CONNECT_TIMEOUT, NOT_A_POSTGRES_ADDRESS, database_options, pool, with_pool_limits,
-};
+use connection::{database_options, pool, with_pool_limits};
 use events::Skipped;
+pub(crate) use lock::LOCK_LOST;
+pub use lock::{
+    LOCK_CHECK_EVERY, LOCK_CHECK_LIMIT, WRITER_LOCK_ID, WriterLock, acquire_writer_lock,
+};
 
 pub use records::{
     Account, AccountInfo, AccountKey, CycleChanges, CycleRun, DocumentRow, ProcessRow, Pruned,
     Trigger,
 };
-
-pub const MIGRATIONS: &[Migration] = &[
-    Migration {
-        version: 1,
-        name: "00001_initial.sql",
-        sql: include_str!("../../sql/schema/00001_initial.sql"),
-    },
-    Migration {
-        version: 2,
-        name: "00002_cycle_runs.sql",
-        sql: include_str!("../../sql/schema/00002_cycle_runs.sql"),
-    },
-];
-
-pub const WRITER_LOCK_ID: i64 = 0x7365_692d_6d6f_6e69;
-
-const KEEPALIVES_IDLE: Duration = Duration::from_secs(30);
-const KEEPALIVES_INTERVAL: Duration = Duration::from_secs(10);
-const KEEPALIVES_RETRIES: u32 = 3;
-const TCP_USER_TIMEOUT: Duration = Duration::from_secs(60);
-
-const TRY_WRITER_LOCK: &str = "SELECT pg_try_advisory_lock($1)";
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -64,10 +41,10 @@ pub enum StoreError {
     Server(#[source] ServerError),
     #[error(transparent)]
     Database(DbErr),
-    #[error(transparent)]
-    LockConnection(#[from] tokio_postgres::Error),
-    #[error(transparent)]
-    Migrate(#[from] MigrateError),
+    #[error("{LOCK_LOST}: {0}")]
+    LockLost(String),
+    #[error("{0}")]
+    Migration(String),
     #[error("too many stored events cannot be read: {0} rows read")]
     TooManyUnreadableEvents(u64),
 }
@@ -162,55 +139,6 @@ impl fmt::Display for ServerError {
 
 impl Error for ServerError {}
 
-pub struct WriterLock {
-    client: Client,
-    connection: Option<JoinHandle<Result<(), tokio_postgres::Error>>>,
-    close_reason: Option<String>,
-}
-
-pub async fn acquire_writer_lock(database_url: &Secret) -> Result<WriterLock, StoreError> {
-    let config = lock_config(database_url)?;
-    tokio::time::timeout(CONNECT_TIMEOUT, take_writer_lock(&config))
-        .await
-        .map_err(|_| StoreError::Timeout("taking the writer lock"))?
-}
-
-async fn take_writer_lock(config: &Config) -> Result<WriterLock, StoreError> {
-    let (client, connection) = config.connect(NoTls).await?;
-    let connection = tokio::spawn(connection);
-    let locked: bool = client
-        .query_one(TRY_WRITER_LOCK, &[&WRITER_LOCK_ID])
-        .await?
-        .try_get(0)?;
-    if !locked {
-        return Err(StoreError::Locked);
-    }
-    Ok(WriterLock {
-        client,
-        connection: Some(connection),
-        close_reason: None,
-    })
-}
-
-impl WriterLock {
-    pub async fn migrate(&mut self) -> Result<Vec<i64>, StoreError> {
-        Ok(up(&mut self.client, MIGRATIONS).await?)
-    }
-
-    pub async fn closed(&mut self) {
-        let Some(connection) = self.connection.as_mut() else {
-            return;
-        };
-        let ended = connection.await;
-        self.connection = None;
-        self.close_reason = Some(reason_for(ended));
-    }
-
-    pub fn close_reason(&self) -> Option<String> {
-        self.close_reason.clone()
-    }
-}
-
 #[derive(Clone)]
 pub struct Store {
     connection: DatabaseConnection,
@@ -245,28 +173,6 @@ fn count(total: usize) -> i64 {
     i64::try_from(total).unwrap_or(i64::MAX)
 }
 
-fn lock_config(database_url: &Secret) -> Result<Config, StoreError> {
-    let mut config: Config = database_url
-        .reveal()
-        .parse()
-        .map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
-    config
-        .keepalives(true)
-        .keepalives_idle(KEEPALIVES_IDLE)
-        .keepalives_interval(KEEPALIVES_INTERVAL)
-        .keepalives_retries(KEEPALIVES_RETRIES)
-        .tcp_user_timeout(TCP_USER_TIMEOUT);
-    Ok(config)
-}
-
-fn reason_for(ended: Result<Result<(), tokio_postgres::Error>, JoinError>) -> String {
-    match ended {
-        Ok(Ok(())) => "the connection closed".to_owned(),
-        Ok(Err(error)) => chain_text(&error),
-        Err(error) => chain_text(&error),
-    }
-}
-
 fn chain_text(error: &(dyn Error + 'static)) -> String {
     let mut text = error.to_string();
     let mut cause = error.source();
@@ -287,10 +193,10 @@ mod tests {
 
     use crate::postgres::database;
     use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, TransactionTrait};
-    use tokio_postgres::{Client, Config};
 
     use super::connection::{CONNECT_TIMEOUT, POOL_SIZE, database_options, with_pool_limits};
-    use super::{Store, StoreError, acquire_writer_lock, lock_config};
+    use super::lock::connect_options;
+    use super::{Store, StoreError};
     use crate::secret::Secret;
 
     const URL: &str = "postgres://sei:hunter2@db.internal:5432/sei";
@@ -299,14 +205,6 @@ mod tests {
     fn with_query(url: &str, parameter: &str) -> Secret {
         let separator = if url.contains('?') { '&' } else { '?' };
         Secret::new(format!("{url}{separator}{parameter}"))
-    }
-
-    async fn show(client: &Client, setting: &str) -> String {
-        client
-            .query_one(&format!("SHOW {setting}"), &[])
-            .await
-            .expect("show")
-            .get(0)
     }
 
     async fn shown(connection: &DatabaseConnection, setting: &str) -> String {
@@ -320,20 +218,6 @@ mod tests {
             .expect("a row")
             .try_get_by_index(0)
             .expect("a setting")
-    }
-
-    fn assert_keepalives(config: &Config) {
-        assert!(config.get_keepalives());
-        assert_eq!(config.get_keepalives_idle(), Duration::from_secs(30));
-        assert_eq!(
-            config.get_keepalives_interval(),
-            Some(Duration::from_secs(10))
-        );
-        assert_eq!(config.get_keepalives_retries(), Some(3));
-        assert_eq!(
-            config.get_tcp_user_timeout(),
-            Some(&Duration::from_secs(60))
-        );
     }
 
     #[test]
@@ -351,13 +235,21 @@ mod tests {
             )
         );
 
-        let lock = lock_config(&url).expect("lock config");
-        assert_eq!(lock.get_options(), Some("-c statement_timeout=1"));
-        assert_keepalives(&lock);
+        let lock = connect_options(&url).expect("lock options");
+        assert_eq!(
+            lock.get_options(),
+            Some(
+                "-c statement_timeout=1 -c tcp_keepalives_idle=30 -c tcp_keepalives_interval=10 -c tcp_keepalives_count=3 -c tcp_user_timeout=60000 -c client_min_messages=warning"
+            )
+        );
 
-        let plain = lock_config(&Secret::new(URL.to_owned())).expect("lock config");
-        assert_eq!(plain.get_options(), None);
-        assert_keepalives(&plain);
+        let plain = connect_options(&Secret::new(URL.to_owned())).expect("lock options");
+        assert_eq!(
+            plain.get_options(),
+            Some(
+                "-c tcp_keepalives_idle=30 -c tcp_keepalives_interval=10 -c tcp_keepalives_count=3 -c tcp_user_timeout=60000 -c client_min_messages=warning"
+            )
+        );
     }
 
     #[test]
@@ -477,17 +369,6 @@ mod tests {
         for (setting, value) in expected {
             assert_eq!(shown(store.connection(), setting).await, value, "{setting}");
         }
-    }
-
-    #[tokio::test]
-    async fn pool_and_lock_connections_carry_their_limits() {
-        let Some(db) = database().await else { return };
-
-        let lock = acquire_writer_lock(&Secret::new(db.url.clone()))
-            .await
-            .expect("lock");
-        assert_eq!(show(&lock.client, "statement_timeout").await, "0");
-        assert_eq!(show(&lock.client, "lock_timeout").await, "0");
     }
 
     #[tokio::test]

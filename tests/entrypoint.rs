@@ -11,6 +11,7 @@ use serde_json::Value;
 use tokio_postgres::{Client, NoTls};
 use tonic::Streaming;
 
+use sei_monitor::migration::{DROP_GO_TABLES, GOOSE_SCHEMA};
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{AccountKey, Store, WRITER_LOCK_ID, acquire_writer_lock};
 
@@ -23,6 +24,7 @@ use support::process::{
     COOKIE, PluginClient, RunningPlugin, ShortTempDir, error_lines, plugin_client, run_to_exit,
     spawn_plugin, terminate,
 };
+use support::schema::goose_era_database;
 use support::{Database, SIGNAL_WAIT, database, database_url_as, login_role, migrated_database};
 
 const EXIT_LIMIT: Duration = Duration::from_secs(30);
@@ -40,6 +42,8 @@ const PAUSED_HERE: &str = "restart the plugin with the configuration fixed, then
 const DB_ROLE: &str = "sei_entrypoint_secrets";
 const DB_PASSWORD: &str = "db-secret-7f3a";
 const PGPASS_MARKER: &str = "pgpass-line-3c9d";
+const HELD_EVENTS: &str =
+    "SELECT count(*) FROM events WHERE kind = 'account_login_failed' AND ref LIKE 'login-held:%'";
 
 async fn admin(url: &str) -> Client {
     let (client, connection) = tokio_postgres::connect(url, NoTls)
@@ -251,12 +255,15 @@ async fn second_process_refuses_to_start() {
         exited.stderr
     );
     assert!(!exited.stderr.contains(&database.url), "{}", exited.stderr);
-    let migrated: bool = client
-        .query_one("SELECT to_regclass('goose_db_version') IS NOT NULL", &[])
+    let untouched: bool = client
+        .query_one(
+            "SELECT to_regclass('seaql_migrations') IS NULL AND to_regclass('accounts') IS NULL",
+            &[],
+        )
         .await
-        .expect("look for the migration table")
+        .expect("look for the migrated tables")
         .get(0);
-    assert!(!migrated, "the second process migrated the database");
+    assert!(untouched, "the second process migrated the database");
     assert_eq!(fake.calls(ROUTE_LOGIN), 0);
     assert_eq!(fake.calls(ROUTE_VERSION), 0);
 }
@@ -288,6 +295,12 @@ async fn a_database_url_without_a_password_stops_before_reading_pgpass() {
 
     assert_eq!(exited.status.code(), Some(1), "{}", exited.stderr);
     assert!(!exited.stderr.contains(PGPASS_MARKER), "{}", exited.stderr);
+    assert_eq!(
+        single_error(&exited.stderr)["error"],
+        "taking the database writer lock: DATABASE_URL is not a valid Postgres address",
+        "{}",
+        exited.stderr
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -379,6 +392,74 @@ async fn a_recorded_rejection_holds_across_restarts_until_a_check() {
     assert_eq!(count(&client_db, "SELECT count(*) FROM accounts").await, 1);
     drop(client);
     stop_cleanly(&mut plugin).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_rejection_recorded_before_the_switch_holds_the_first_start() {
+    let Some(database) = database().await else {
+        return;
+    };
+    let client = admin(&database.url).await;
+    goose_era_database(&client, &[1, 2], &[1, 2]).await;
+    let fake = FakeSei::start();
+    populate(&fake);
+    fake.set_password("changed-by-the-user");
+    record_rejection(&database, &fake).await;
+    let mut plugin = start_plugin(&sei_env(&fake, &database.url, PASSWORD));
+    let started = Instant::now();
+    let mut plugin_client = plugin_client(&plugin.socket).await;
+
+    let held = status_where(
+        &mut plugin,
+        &mut plugin_client,
+        "the plugin holds",
+        |status| status.state == i32::from(State::Paused),
+    )
+    .await;
+    let client = &client;
+    until(&mut plugin, "the hold's event is stored", || async move {
+        (count(client, HELD_EVENTS).await == 1).then_some(())
+    })
+    .await;
+    tokio::time::sleep(STAY_UP.saturating_sub(started.elapsed())).await;
+    assert!(plugin.still_running(), "{}", plugin.stderr_text());
+    assert_eq!((fake.logins(), fake.failed_logins()), (0, 0));
+    drop(plugin_client);
+    stop_cleanly(&mut plugin).await;
+
+    assert_eq!(held.message, format!("{REJECTED}; {HELD}"));
+    let reason: String = client
+        .query_one("SELECT paused_reason FROM accounts", &[])
+        .await
+        .expect("the stored reason")
+        .get(0);
+    assert_eq!(reason, REJECTED);
+    assert_eq!(
+        count(
+            client,
+            "SELECT count(*) FROM events WHERE kind = 'account_login_failed'"
+        )
+        .await,
+        1
+    );
+    assert_eq!(count(client, HELD_EVENTS).await, 1);
+    let migrations: Vec<String> = client
+        .query("SELECT version FROM seaql_migrations ORDER BY version", &[])
+        .await
+        .expect("read seaql_migrations")
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+    assert_eq!(migrations, [GOOSE_SCHEMA, DROP_GO_TABLES]);
+    let go_tables_gone: bool = client
+        .query_one(
+            "SELECT to_regclass('goose_db_version') IS NULL AND to_regclass('deliveries') IS NULL",
+            &[],
+        )
+        .await
+        .expect("look for the Go-era tables")
+        .get(0);
+    assert!(go_tables_gone);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -636,7 +717,7 @@ async fn losing_the_database_lock_exits_1() {
     };
     let text = fatal["error"].as_str().expect("an error field");
     assert!(
-        text.starts_with("the database lock was lost: ") && text.contains("terminating connection"),
+        text.starts_with("the database lock was lost: the lock's connection"),
         "{stderr}"
     );
     assert!(!plugin.socket.exists(), "{}", plugin.socket.display());

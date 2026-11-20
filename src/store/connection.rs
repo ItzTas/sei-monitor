@@ -12,7 +12,7 @@ use crate::secret::Secret;
 pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub(crate) const POOL_SIZE: u32 = 10;
 
-pub(super) const NOT_A_POSTGRES_ADDRESS: &str = "DATABASE_URL is not a valid Postgres address";
+const NOT_A_POSTGRES_ADDRESS: &str = "DATABASE_URL is not a valid Postgres address";
 
 const SCHEMES: [&str; 2] = ["postgres://", "postgresql://"];
 

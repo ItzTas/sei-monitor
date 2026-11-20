@@ -115,7 +115,7 @@ CI: `.github/workflows/ci.yml` runs fmt and clippy in one job and `cargo test --
 with a `postgres:18-alpine` service, Go 1.27.2 (`.prototools` pins the same version) and the
 conformance command installed. `.github/workflows/docker.yml` builds the image for amd64 and arm64
 and publishes it to `ghcr.io/itztas/sei-monitor` on every run that is not a pull request. A `v*`
-tag publishes the version tags (`2.2.0` and `2.2`), only the default branch moves `latest`
+tag publishes the version tags (`2.3.0` and `2.3`), only the default branch moves `latest`
 (`flavor: latest=false` keeps the semver rules from moving it too), and every image gets a `sha-`
 tag.
 
@@ -423,8 +423,9 @@ Two locks guard the events:
   `tableowner`. Later starts need the rights on the tables and on `events_id_seq` that 2.1 needed,
   and `SELECT` on `seaql_migrations`. Without that, the start reads the migrations as pending,
   tries to create the table and fails with the same `permission denied for schema public`, which
-  points at the wrong right. It happens when another role ran the first 2.2 start: grant it. Take a `pg_dump` of the database before that start, because once 2.2 has run, 2.1 cannot
-  use the database again. A login rejection that 2.1 recorded still holds the first 2.2 start,
+  points at the wrong right. It happens when another role ran the first 2.2 start: grant it.
+  Take a `pg_dump` of the database before that start, because once 2.2 has run, 2.1 cannot use
+  the database again. A login rejection that 2.1 recorded still holds the first 2.2 start,
   which makes no login.
 - A schema change is a new module in `src/migration/` and a new entry at the end of
   `Migrator::migrations`. **Never edit a migration that already exists, nor the files in

@@ -21,8 +21,8 @@ use support::fake_sei::{
 };
 use support::harness::{Harness, populate, process, start};
 use support::process::{
-    COOKIE, PluginClient, RunningPlugin, ShortTempDir, error_lines, plugin_client, run_to_exit,
-    spawn_plugin, terminate,
+    COOKIE, MonitorClient, RunningMonitor, ShortTempDir, error_lines, monitor_client, run_to_exit,
+    spawn_monitor, terminate,
 };
 use support::schema::goose_era_database;
 use support::{Database, SIGNAL_WAIT, database, database_url_as, login_role, migrated_database};
@@ -38,7 +38,7 @@ const PREPARATION_RETRY_LIMIT: Duration = Duration::from_secs(45);
 const REJECTED: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
 const GO_PAUSE: &str = "monitoring is paused because SEI rejected the login; restart sei-monitor after fixing the configuration";
 const HELD: &str = "nothing is logging in: request a check once the configuration is fixed";
-const PAUSED_HERE: &str = "restart the plugin with the configuration fixed, then request a check";
+const PAUSED_HERE: &str = "restart the monitor with the configuration fixed, then request a check";
 const DB_ROLE: &str = "sei_entrypoint_secrets";
 const DB_PASSWORD: &str = "db-secret-7f3a";
 const PGPASS_MARKER: &str = "pgpass-line-3c9d";
@@ -75,12 +75,12 @@ fn borrowed<'a>(env: &'a [(&'static str, String)]) -> Vec<(&'static str, &'a str
         .collect()
 }
 
-fn start_plugin(env: &[(&'static str, String)]) -> RunningPlugin {
-    spawn_plugin(&borrowed(env))
+fn start_monitor(env: &[(&'static str, String)]) -> RunningMonitor {
+    spawn_monitor(&borrowed(env))
 }
 
 async fn until<T, F: Future<Output = Option<T>>>(
-    plugin: &mut RunningPlugin,
+    spawned: &mut RunningMonitor,
     what: &str,
     mut check: impl FnMut() -> F,
 ) -> T {
@@ -90,15 +90,15 @@ async fn until<T, F: Future<Output = Option<T>>>(
             return found;
         }
         if Instant::now() >= deadline {
-            plugin.fail(&format!("timed out waiting until {what}"));
+            spawned.fail(&format!("timed out waiting until {what}"));
         }
         tokio::time::sleep(POLL).await;
     }
 }
 
 async fn status_where(
-    plugin: &mut RunningPlugin,
-    client: &mut PluginClient,
+    spawned: &mut RunningMonitor,
+    client: &mut MonitorClient,
     what: &str,
     accept: impl Fn(&StatusResponse) -> bool,
 ) -> StatusResponse {
@@ -109,7 +109,7 @@ async fn status_where(
             return status;
         }
         if Instant::now() >= deadline {
-            plugin.fail(&format!("timed out waiting until {what}; last {status:?}"));
+            spawned.fail(&format!("timed out waiting until {what}; last {status:?}"));
         }
         tokio::time::sleep(POLL).await;
     }
@@ -123,10 +123,10 @@ fn single_error(stderr: &str) -> Value {
     error.clone()
 }
 
-async fn stop_cleanly(plugin: &mut RunningPlugin) {
-    terminate(&mut plugin.child);
-    let status = plugin.exit_within(STOP_LIMIT);
-    assert_eq!(status.code(), Some(0), "{}", plugin.stderr_text());
+async fn stop_cleanly(spawned: &mut RunningMonitor) {
+    terminate(&mut spawned.child);
+    let status = spawned.exit_within(STOP_LIMIT);
+    assert_eq!(status.code(), Some(0), "{}", spawned.stderr_text());
 }
 
 async fn record_rejection(database: &Database, fake: &FakeSei) {
@@ -153,22 +153,22 @@ async fn count(client: &Client, query: &str) -> i64 {
 }
 
 async fn open_watch(
-    plugin: &mut RunningPlugin,
-    client: &mut PluginClient,
+    spawned: &mut RunningMonitor,
+    client: &mut MonitorClient,
 ) -> Streaming<WatchResponse> {
     match client.watch().await {
         Ok(watch) => watch,
-        Err(status) => plugin.fail(&format!("Watch failed: {status:?}")),
+        Err(status) => spawned.fail(&format!("Watch failed: {status:?}")),
     }
 }
 
 async fn next_watch_signal(
-    plugin: &mut RunningPlugin,
+    spawned: &mut RunningMonitor,
     watch: &mut Streaming<WatchResponse>,
 ) -> i64 {
     match tokio::time::timeout(SIGNAL_WAIT, watch.message()).await {
         Ok(Ok(Some(signal))) => signal.latest_seq,
-        other => plugin.fail(&format!(
+        other => spawned.fail(&format!(
             "no Watch signal within {SIGNAL_WAIT:?}: {other:?}"
         )),
     }
@@ -315,11 +315,11 @@ async fn rejected_password_pauses_and_stays_up() {
     };
     let fake = FakeSei::start();
     populate(&fake);
-    let mut plugin = start_plugin(&sei_env(&fake, &database.url, "errada"));
+    let mut spawned = start_monitor(&sei_env(&fake, &database.url, "errada"));
     let started = Instant::now();
-    let mut client = plugin_client(&plugin.socket).await;
+    let mut client = monitor_client(&spawned.socket).await;
 
-    let paused = status_where(&mut plugin, &mut client, "the plugin pauses", |status| {
+    let paused = status_where(&mut spawned, &mut client, "the monitor pauses", |status| {
         status.state == i32::from(State::Paused)
     })
     .await;
@@ -335,7 +335,7 @@ async fn rejected_password_pauses_and_stays_up() {
             break events;
         }
         if Instant::now() >= deadline {
-            plugin.fail("the login failure event was never served");
+            spawned.fail("the login failure event was never served");
         }
         tokio::time::sleep(POLL).await;
     };
@@ -343,10 +343,10 @@ async fn rejected_password_pauses_and_stays_up() {
     assert_eq!(kinds, ["account_login_failed"]);
 
     tokio::time::sleep(STAY_UP.saturating_sub(started.elapsed())).await;
-    assert!(plugin.still_running(), "{}", plugin.stderr_text());
+    assert!(spawned.still_running(), "{}", spawned.stderr_text());
     assert_eq!(fake.failed_logins(), 1);
     drop(client);
-    stop_cleanly(&mut plugin).await;
+    stop_cleanly(&mut spawned).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -361,31 +361,31 @@ async fn a_recorded_rejection_holds_across_restarts_until_a_check() {
     let env = sei_env(&fake, &database.url, PASSWORD);
 
     for life in 0..3 {
-        let mut plugin = start_plugin(&env);
+        let mut spawned = start_monitor(&env);
         let started = Instant::now();
-        let mut client = plugin_client(&plugin.socket).await;
-        let held = status_where(&mut plugin, &mut client, "the plugin holds", |status| {
+        let mut client = monitor_client(&spawned.socket).await;
+        let held = status_where(&mut spawned, &mut client, "the monitor holds", |status| {
             status.state == i32::from(State::Paused)
         })
         .await;
         tokio::time::sleep(STAY_UP.saturating_sub(started.elapsed())).await;
-        assert!(plugin.still_running(), "{}", plugin.stderr_text());
+        assert!(spawned.still_running(), "{}", spawned.stderr_text());
         drop(client);
-        stop_cleanly(&mut plugin).await;
+        stop_cleanly(&mut spawned).await;
         assert_eq!((fake.logins(), fake.failed_logins()), (0, 0), "life {life}");
         assert_eq!(held.message, format!("{REJECTED}; {HELD}"), "life {life}");
     }
 
-    let mut plugin = start_plugin(&env);
-    let mut client = plugin_client(&plugin.socket).await;
-    status_where(&mut plugin, &mut client, "the plugin holds", |status| {
+    let mut spawned = start_monitor(&env);
+    let mut client = monitor_client(&spawned.socket).await;
+    status_where(&mut spawned, &mut client, "the monitor holds", |status| {
         status.message.ends_with(HELD)
     })
     .await;
     let accepted = client.check().await.expect("check");
     assert!(accepted.accepted, "{accepted:?}");
     let paused = status_where(
-        &mut plugin,
+        &mut spawned,
         &mut client,
         "the check is rejected",
         |status| status.message.ends_with(PAUSED_HERE),
@@ -396,7 +396,7 @@ async fn a_recorded_rejection_holds_across_restarts_until_a_check() {
     let client_db = admin(&database.url).await;
     assert_eq!(count(&client_db, "SELECT count(*) FROM accounts").await, 1);
     drop(client);
-    stop_cleanly(&mut plugin).await;
+    stop_cleanly(&mut spawned).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -410,27 +410,27 @@ async fn a_rejection_recorded_before_the_switch_holds_the_first_start() {
     populate(&fake);
     fake.set_password("changed-by-the-user");
     record_rejection(&database, &fake).await;
-    let mut plugin = start_plugin(&sei_env(&fake, &database.url, PASSWORD));
+    let mut spawned = start_monitor(&sei_env(&fake, &database.url, PASSWORD));
     let started = Instant::now();
-    let mut plugin_client = plugin_client(&plugin.socket).await;
+    let mut monitor_client = monitor_client(&spawned.socket).await;
 
     let held = status_where(
-        &mut plugin,
-        &mut plugin_client,
-        "the plugin holds",
+        &mut spawned,
+        &mut monitor_client,
+        "the monitor holds",
         |status| status.state == i32::from(State::Paused),
     )
     .await;
     let client = &client;
-    until(&mut plugin, "the hold's event is stored", || async move {
+    until(&mut spawned, "the hold's event is stored", || async move {
         (count(client, HELD_EVENTS).await == 1).then_some(())
     })
     .await;
     tokio::time::sleep(STAY_UP.saturating_sub(started.elapsed())).await;
-    assert!(plugin.still_running(), "{}", plugin.stderr_text());
+    assert!(spawned.still_running(), "{}", spawned.stderr_text());
     assert_eq!((fake.logins(), fake.failed_logins()), (0, 0));
-    drop(plugin_client);
-    stop_cleanly(&mut plugin).await;
+    drop(monitor_client);
+    stop_cleanly(&mut spawned).await;
 
     assert_eq!(held.message, format!("{REJECTED}; {HELD}"));
     let reason: String = client
@@ -468,19 +468,19 @@ async fn a_rejection_recorded_before_the_switch_holds_the_first_start() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_fatal_configuration_keeps_the_plugin_up() {
+async fn a_fatal_configuration_keeps_the_monitor_up() {
     let Some(database) = migrated_database().await else {
         return;
     };
     let fake = FakeSei::start();
     let mut env = sei_env(&fake, &database.url, PASSWORD);
     with(&mut env, "SEI_ORG", "NOPE");
-    let mut plugin = start_plugin(&env);
+    let mut spawned = start_monitor(&env);
     let started = Instant::now();
-    let mut client = plugin_client(&plugin.socket).await;
+    let mut client = monitor_client(&spawned.socket).await;
 
     let failing = status_where(
-        &mut plugin,
+        &mut spawned,
         &mut client,
         "the preparation fails",
         |status| status.message.starts_with("agency not found"),
@@ -490,13 +490,13 @@ async fn a_fatal_configuration_keeps_the_plugin_up() {
     let deadline = started + PREPARATION_RETRY_LIMIT;
     while fake.calls(ROUTE_LOGIN_PAGE) < 2 {
         if Instant::now() >= deadline {
-            plugin.fail("the preparation was never tried again");
+            spawned.fail("the preparation was never tried again");
         }
         tokio::time::sleep(POLL).await;
     }
     let retried = client.status().await.expect("status");
 
-    assert!(plugin.still_running(), "{}", plugin.stderr_text());
+    assert!(spawned.still_running(), "{}", spawned.stderr_text());
     assert!(started.elapsed() >= FIRST_RETRY, "{:?}", started.elapsed());
     assert_eq!(retried.state, i32::from(State::Failing));
     assert!(
@@ -505,7 +505,7 @@ async fn a_fatal_configuration_keeps_the_plugin_up() {
     );
     assert_eq!((fake.logins(), fake.failed_logins()), (0, 0));
     drop(client);
-    stop_cleanly(&mut plugin).await;
+    stop_cleanly(&mut spawned).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -516,10 +516,10 @@ async fn a_failing_cycle_shows_in_status_until_one_succeeds() {
     let fake = FakeSei::start();
     populate(&fake);
     fake.fail_next(ROUTE_PROCESSES, 500, 1);
-    let mut plugin = start_plugin(&sei_env(&fake, &database.url, PASSWORD));
-    let mut client = plugin_client(&plugin.socket).await;
+    let mut spawned = start_monitor(&sei_env(&fake, &database.url, PASSWORD));
+    let mut client = monitor_client(&spawned.socket).await;
 
-    let failing = status_where(&mut plugin, &mut client, "the cycle fails", |status| {
+    let failing = status_where(&mut spawned, &mut client, "the cycle fails", |status| {
         status.state == i32::from(State::Failing) && status.message.starts_with("sei: ")
     })
     .await;
@@ -530,7 +530,7 @@ async fn a_failing_cycle_shows_in_status_until_one_succeeds() {
             break status;
         }
         if Instant::now() >= deadline {
-            plugin.fail(&format!("the retry never succeeded; last {status:?}"));
+            spawned.fail(&format!("the retry never succeeded; last {status:?}"));
         }
         tokio::time::sleep(POLL).await;
     };
@@ -543,7 +543,7 @@ async fn a_failing_cycle_shows_in_status_until_one_succeeds() {
     assert_eq!(recovered.state, i32::from(State::Idle), "{recovered:?}");
     assert_eq!(recovered.message, "");
     drop(client);
-    stop_cleanly(&mut plugin).await;
+    stop_cleanly(&mut spawned).await;
 }
 
 async fn last_run(client: &Client) -> Option<(bool, String)> {
@@ -565,8 +565,8 @@ async fn sigterm_closes_the_cycle_while_a_call_is_still_held() {
     let fake = FakeSei::start();
     populate(&fake);
     fake.stall(ROUTE_PROCESSES);
-    let mut plugin = start_plugin(&sei_env(&fake, &database.url, PASSWORD));
-    until(&mut plugin, "the cycle asks for the processes", || async {
+    let mut spawned = start_monitor(&sei_env(&fake, &database.url, PASSWORD));
+    until(&mut spawned, "the cycle asks for the processes", || async {
         (fake.calls(ROUTE_PROCESSES) > 0).then_some(())
     })
     .await;
@@ -576,13 +576,13 @@ async fn sigterm_closes_the_cycle_while_a_call_is_still_held() {
         .await
         .expect("hold the events table");
     let observer = admin(&database.url).await;
-    let socket = plugin.socket.clone();
+    let socket = spawned.socket.clone();
     let held_call = tokio::spawn(async move {
-        let mut client = plugin_client(&socket).await;
+        let mut client = monitor_client(&socket).await;
         client.events(0, 0).await
     });
     until(
-        &mut plugin,
+        &mut spawned,
         "the Events call waits on the events table",
         || async {
             let waiting: i64 = observer
@@ -600,7 +600,7 @@ async fn sigterm_closes_the_cycle_while_a_call_is_still_held() {
     .await;
 
     let signalled = Instant::now();
-    terminate(&mut plugin.child);
+    terminate(&mut spawned.child);
     let closed = loop {
         let run = last_run(&observer).await;
         if run.as_ref().is_some_and(|(finished, _)| *finished) {
@@ -613,8 +613,8 @@ async fn sigterm_closes_the_cycle_while_a_call_is_still_held() {
     };
     let closed_after = signalled.elapsed();
     let call_still_held = !held_call.is_finished();
-    let running_while_closed = plugin.still_running();
-    let status = plugin.exit_within(STOP_LIMIT);
+    let running_while_closed = spawned.still_running();
+    let status = spawned.exit_within(STOP_LIMIT);
     let exited_after = signalled.elapsed();
     holder
         .batch_execute("ROLLBACK")
@@ -629,7 +629,7 @@ async fn sigterm_closes_the_cycle_while_a_call_is_still_held() {
         closed,
         Some((true, "context canceled".to_owned())),
         "after {closed_after:?}\n{}",
-        plugin.stderr_text()
+        spawned.stderr_text()
     );
     assert!(
         call_still_held,
@@ -640,7 +640,7 @@ async fn sigterm_closes_the_cycle_while_a_call_is_still_held() {
         "the process ended before the cycle was closed"
     );
     assert!(exited_after < STOP_LIMIT, "{exited_after:?}");
-    assert_eq!(status.code(), Some(0), "{}", plugin.stderr_text());
+    assert_eq!(status.code(), Some(0), "{}", spawned.stderr_text());
     assert!(answered.is_err(), "{answered:?}");
 }
 
@@ -652,24 +652,24 @@ async fn sigterm_during_a_cycle_exits_within_two_seconds() {
     let fake = FakeSei::start();
     populate(&fake);
     fake.stall(ROUTE_PROCESSES);
-    let mut plugin = start_plugin(&sei_env(&fake, &database.url, PASSWORD));
-    assert!(plugin.socket.exists(), "{}", plugin.socket.display());
-    until(&mut plugin, "the cycle asks for the processes", || async {
+    let mut spawned = start_monitor(&sei_env(&fake, &database.url, PASSWORD));
+    assert!(spawned.socket.exists(), "{}", spawned.socket.display());
+    until(&mut spawned, "the cycle asks for the processes", || async {
         (fake.calls(ROUTE_PROCESSES) > 0).then_some(())
     })
     .await;
 
     let signalled = Instant::now();
-    terminate(&mut plugin.child);
-    let status = plugin.exit_within(STOP_LIMIT);
+    terminate(&mut spawned.child);
+    let status = spawned.exit_within(STOP_LIMIT);
 
     assert!(
         signalled.elapsed() < STOP_LIMIT,
         "{:?}",
         signalled.elapsed()
     );
-    assert_eq!(status.code(), Some(0), "{}", plugin.stderr_text());
-    assert!(!plugin.socket.exists(), "{}", plugin.socket.display());
+    assert_eq!(status.code(), Some(0), "{}", spawned.stderr_text());
+    assert!(!spawned.socket.exists(), "{}", spawned.socket.display());
     let run = admin(&database.url)
         .await
         .query_one(
@@ -679,7 +679,7 @@ async fn sigterm_during_a_cycle_exits_within_two_seconds() {
         .await
         .expect("the last cycle run");
     let (finished, error): (bool, String) = (run.get(0), run.get(1));
-    assert!(finished, "{}", plugin.stderr_text());
+    assert!(finished, "{}", spawned.stderr_text());
     assert_eq!(error, "context canceled");
 }
 
@@ -690,7 +690,7 @@ async fn losing_the_database_lock_exits_1() {
     };
     let fake = FakeSei::start();
     populate(&fake);
-    let mut plugin = start_plugin(&sei_env(&fake, &database.url, PASSWORD));
+    let mut spawned = start_monitor(&sei_env(&fake, &database.url, PASSWORD));
     let client = admin(&database.url).await;
 
     let terminated: Vec<bool> = client
@@ -708,11 +708,11 @@ async fn losing_the_database_lock_exits_1() {
         .map(|row| row.get(0))
         .collect();
     assert_eq!(terminated, [true]);
-    let status = plugin.exit_within(Duration::from_secs(5));
+    let status = spawned.exit_within(Duration::from_secs(5));
 
-    assert_eq!(status.code(), Some(1), "{}", plugin.stderr_text());
+    assert_eq!(status.code(), Some(1), "{}", spawned.stderr_text());
     tokio::time::sleep(Duration::from_millis(100)).await;
-    let stderr = plugin.stderr_text();
+    let stderr = spawned.stderr_text();
     let fatal: Vec<Value> = error_lines(&stderr)
         .into_iter()
         .filter(|line| line["@message"] == "fatal")
@@ -725,7 +725,7 @@ async fn losing_the_database_lock_exits_1() {
         text.starts_with("the database lock was lost: the lock's connection"),
         "{stderr}"
     );
-    assert!(!plugin.socket.exists(), "{}", plugin.socket.display());
+    assert!(!spawned.socket.exists(), "{}", spawned.socket.display());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -735,8 +735,8 @@ async fn hardened_process_has_no_core_dumps_no_inspection_and_private_files() {
     };
     let fake = FakeSei::start();
     populate(&fake);
-    let mut plugin = start_plugin(&sei_env(&fake, &database.url, PASSWORD));
-    let proc_dir = format!("/proc/{}", plugin.child.id());
+    let mut spawned = start_monitor(&sei_env(&fake, &database.url, PASSWORD));
+    let proc_dir = format!("/proc/{}", spawned.child.id());
 
     let limits = std::fs::read_to_string(format!("{proc_dir}/limits")).expect("limits");
     let core: Vec<&str> = limits
@@ -751,7 +751,7 @@ async fn hardened_process_has_no_core_dumps_no_inspection_and_private_files() {
         status.lines().any(|line| line == "Umask:\t0077"),
         "{status}"
     );
-    let mode = std::fs::metadata(&plugin.socket)
+    let mode = std::fs::metadata(&spawned.socket)
         .expect("socket metadata")
         .permissions()
         .mode();
@@ -761,7 +761,7 @@ async fn hardened_process_has_no_core_dumps_no_inspection_and_private_files() {
             .expect_err("the environment of a process that cannot be inspected");
         assert_eq!(environ.kind(), std::io::ErrorKind::PermissionDenied);
     }
-    stop_cleanly(&mut plugin).await;
+    stop_cleanly(&mut spawned).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -786,21 +786,18 @@ async fn secrets_never_reach_logs_or_answers() {
     let mut env = sei_env(&fake, &url, PASSWORD);
     with(&mut env, "LOG_LEVEL", "debug");
     with(&mut env, "POLL_INTERVAL", "5m");
-    let mut plugin = start_plugin(&env);
-    let mut plugin_calls = plugin_client(&plugin.socket).await;
+    let mut spawned = start_monitor(&env);
+    let mut calls = monitor_client(&spawned.socket).await;
 
-    let done = status_where(
-        &mut plugin,
-        &mut plugin_calls,
-        "a cycle succeeds",
-        |status| status.last_success_at.is_some(),
-    )
+    let done = status_where(&mut spawned, &mut calls, "a cycle succeeds", |status| {
+        status.last_success_at.is_some()
+    })
     .await;
-    let check = plugin_calls.check().await.expect("check");
-    let first = plugin_calls.events(0, 0).await.expect("events");
-    let second = plugin_calls.events(0, 0).await.expect("events");
-    drop(plugin_calls);
-    stop_cleanly(&mut plugin).await;
+    let check = calls.check().await.expect("check");
+    let first = calls.events(0, 0).await.expect("events");
+    let second = calls.events(0, 0).await.expect("events");
+    drop(calls);
+    stop_cleanly(&mut spawned).await;
     let payloads: Vec<String> = client
         .query("SELECT payload FROM events", &[])
         .await
@@ -813,7 +810,7 @@ async fn secrets_never_reach_logs_or_answers() {
     assert!(tokens.len() >= 2, "{tokens:?}");
     assert!(!check.accepted);
     let shown = [
-        plugin.stderr_text(),
+        spawned.stderr_text(),
         format!("{done:?}"),
         format!("{check:?}"),
         format!("{first:?}"),
@@ -851,9 +848,9 @@ async fn the_hubs_first_read_leaves_the_first_cycle_for_the_next_one() {
     assert!(!history.is_empty());
     h.fake.add_process(UNIT_NUPROC, process(9004, 4, "Ofício"));
     let client = admin(&database.url).await;
-    let mut plugin = start_plugin(&sei_env(&h.fake, &database.url, PASSWORD));
+    let mut spawned = start_monitor(&sei_env(&h.fake, &database.url, PASSWORD));
     until(
-        &mut plugin,
+        &mut spawned,
         "the first cycle records the new process",
         || async {
             let recorded = count(
@@ -865,7 +862,7 @@ async fn the_hubs_first_read_leaves_the_first_cycle_for_the_next_one() {
         },
     )
     .await;
-    let mut calls = plugin_client(&plugin.socket).await;
+    let mut calls = monitor_client(&spawned.socket).await;
 
     let first = calls.events(0, 500).await.expect("first read");
     let last = first.last().expect("the history").seq;
@@ -884,7 +881,7 @@ async fn the_hubs_first_read_leaves_the_first_cycle_for_the_next_one() {
         "{second:?}"
     );
     drop(calls);
-    stop_cleanly(&mut plugin).await;
+    stop_cleanly(&mut spawned).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -920,17 +917,17 @@ async fn watch_signals_at_once_with_the_newest_event_stored_before_the_start() {
     h.fake.stall(ROUTE_VERSION);
     h.fake.stall(ROUTE_LOGIN_PAGE);
     let logins_before = h.fake.calls(ROUTE_LOGIN);
-    let mut plugin = start_plugin(&sei_env(&h.fake, &database.url, PASSWORD));
-    let mut client = plugin_client(&plugin.socket).await;
+    let mut spawned = start_monitor(&sei_env(&h.fake, &database.url, PASSWORD));
+    let mut client = monitor_client(&spawned.socket).await;
 
-    let mut watch = open_watch(&mut plugin, &mut client).await;
-    let first = next_watch_signal(&mut plugin, &mut watch).await;
+    let mut watch = open_watch(&mut spawned, &mut client).await;
+    let first = next_watch_signal(&mut spawned, &mut watch).await;
 
     assert_eq!(first, stored);
     assert_eq!(h.fake.calls(ROUTE_LOGIN), logins_before);
     drop(watch);
     drop(client);
-    stop_cleanly(&mut plugin).await;
+    stop_cleanly(&mut spawned).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -942,18 +939,18 @@ async fn a_rejected_login_reaches_the_hub_as_a_signal() {
     populate(&fake);
     let db = admin(&database.url).await;
     let issued_before = count(&db, "SELECT COALESCE(max(id), 0) FROM events").await;
-    let mut plugin = start_plugin(&sei_env(&fake, &database.url, "errada"));
-    let mut client = plugin_client(&plugin.socket).await;
+    let mut spawned = start_monitor(&sei_env(&fake, &database.url, "errada"));
+    let mut client = monitor_client(&spawned.socket).await;
 
-    let mut watch = open_watch(&mut plugin, &mut client).await;
+    let mut watch = open_watch(&mut spawned, &mut client).await;
     let deadline = Instant::now() + PATIENCE;
     let announced = loop {
-        let seq = next_watch_signal(&mut plugin, &mut watch).await;
+        let seq = next_watch_signal(&mut spawned, &mut watch).await;
         if seq > issued_before {
             break seq;
         }
         if Instant::now() >= deadline {
-            plugin.fail("no Watch signal announced the login failure");
+            spawned.fail("no Watch signal announced the login failure");
         }
     };
     let recorded = count(
@@ -969,5 +966,5 @@ async fn a_rejected_login_reaches_the_hub_as_a_signal() {
     assert_eq!(fake.calls(ROUTE_LOGIN), 1);
     drop(watch);
     drop(client);
-    stop_cleanly(&mut plugin).await;
+    stop_cleanly(&mut spawned).await;
 }

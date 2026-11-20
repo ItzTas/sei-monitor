@@ -57,7 +57,7 @@ impl Drop for ShortTempDir {
     }
 }
 
-pub struct RunningPlugin {
+pub struct RunningMonitor {
     pub child: Child,
     pub socket: PathBuf,
     pub stderr: Arc<Mutex<String>>,
@@ -70,11 +70,11 @@ pub struct Exited {
     pub stderr: String,
 }
 
-pub fn spawn_plugin(env: &[(&str, &str)]) -> RunningPlugin {
+pub fn spawn_monitor(env: &[(&str, &str)]) -> RunningMonitor {
     let temp = ShortTempDir::new();
     let mut child = command(&["monitor"], &[COOKIE, ("TMPDIR", temp.text())], env)
         .spawn()
-        .expect("start the plugin");
+        .expect("start the monitor");
     let stdout = child.stdout.take().expect("piped stdout");
     let stderr = Arc::new(Mutex::new(String::new()));
     collect_lines(
@@ -82,22 +82,22 @@ pub fn spawn_plugin(env: &[(&str, &str)]) -> RunningPlugin {
         Arc::clone(&stderr),
     );
     let first_line = first_line(stdout);
-    let mut plugin = RunningPlugin {
+    let mut spawned = RunningMonitor {
         child,
         socket: PathBuf::new(),
         stderr,
         _temp: temp,
     };
     let Ok(line) = first_line.recv_timeout(HANDSHAKE_LIMIT) else {
-        plugin.fail("the plugin printed no handshake line within 30 seconds");
+        spawned.fail("the monitor printed no handshake line within 30 seconds");
     };
     let Some(socket) = handshake_socket(&line) else {
-        plugin.fail(&format!(
+        spawned.fail(&format!(
             "the first stdout line is not a handshake: {line:?}"
         ));
     };
-    plugin.socket = socket;
-    plugin
+    spawned.socket = socket;
+    spawned
 }
 
 pub fn run_to_exit(args: &[&str], env: &[(&str, &str)], within: Duration) -> Exited {
@@ -202,7 +202,7 @@ pub fn error_lines(stderr: &str) -> Vec<Value> {
         .collect()
 }
 
-impl RunningPlugin {
+impl RunningMonitor {
     pub fn stderr_text(&self) -> String {
         self.stderr
             .lock()
@@ -216,7 +216,7 @@ impl RunningPlugin {
 
     pub fn exit_within(&mut self, within: Duration) -> ExitStatus {
         let Some(status) = wait_exit(&mut self.child, within) else {
-            self.fail(&format!("the plugin did not exit within {within:?}"));
+            self.fail(&format!("the monitor did not exit within {within:?}"));
         };
         status
     }
@@ -225,36 +225,36 @@ impl RunningPlugin {
         let _ = self.child.kill();
         let _ = self.child.wait();
         thread::sleep(Duration::from_millis(50));
-        panic!("{problem}\nplugin stderr:\n{}", self.stderr_text());
+        panic!("{problem}\nmonitor stderr:\n{}", self.stderr_text());
     }
 }
 
-impl Drop for RunningPlugin {
+impl Drop for RunningMonitor {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
 }
 
-pub struct PluginClient {
+pub struct MonitorClient {
     grpc: Grpc<Channel>,
 }
 
-pub async fn plugin_client(socket: &Path) -> PluginClient {
+pub async fn monitor_client(socket: &Path) -> MonitorClient {
     let endpoint = Endpoint::from_shared(format!("unix:{}", socket.display()))
         .expect("a socket endpoint")
         .connect_timeout(CONNECT_LIMIT)
         .timeout(CALL_LIMIT);
     let channel = tokio::time::timeout(CONNECT_LIMIT, endpoint.connect())
         .await
-        .expect("the plugin socket answered in time")
-        .expect("connect to the plugin");
-    PluginClient {
+        .expect("the monitor socket answered in time")
+        .expect("connect to the monitor");
+    MonitorClient {
         grpc: Grpc::new(channel),
     }
 }
 
-impl PluginClient {
+impl MonitorClient {
     pub async fn describe(&mut self) -> Result<DescribeResponse, Status> {
         self.call("Describe", DescribeRequest {}).await
     }

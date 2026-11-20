@@ -56,7 +56,7 @@ async fn seed_one_event(database_url: &str, sei_url: &str) {
     assert_eq!(stored.len(), 1, "{stored:?}");
 }
 
-fn plugin_conformance(sei_url: &str, database_url: &str, sockets: &ShortTempDir) -> Conformance {
+fn monitor_conformance(sei_url: &str, database_url: &str, sockets: &ShortTempDir) -> Conformance {
     let mut conformance = Conformance::new(env!("CARGO_BIN_EXE_sei-monitor"));
     conformance.command.push("monitor".to_owned());
     conformance.env = [
@@ -78,7 +78,7 @@ fn plugin_conformance(sei_url: &str, database_url: &str, sockets: &ShortTempDir)
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn plugin_passes_the_hub_conformance_suite() {
+async fn the_monitor_passes_the_hub_conformance_suite() {
     let Some(database) = migrated_database().await else {
         return;
     };
@@ -86,7 +86,7 @@ async fn plugin_passes_the_hub_conformance_suite() {
     let sei_url = format!("{}/sei/", fake.url());
     seed_one_event(&database.url, &sei_url).await;
     let sockets = ShortTempDir::new();
-    let conformance = plugin_conformance(&sei_url, &database.url, &sockets);
+    let conformance = monitor_conformance(&sei_url, &database.url, &sockets);
 
     let outcome = tokio::task::spawn_blocking(move || run(&conformance))
         .await

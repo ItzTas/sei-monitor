@@ -97,7 +97,7 @@ impl SeiConfig {
     }
 }
 
-pub struct PluginConfig {
+pub struct Config {
     pub sei: SeiConfig,
     pub database_url: Secret,
     pub poll_interval: Duration,
@@ -107,8 +107,8 @@ pub struct PluginConfig {
     pub log_level: i64,
 }
 
-impl PluginConfig {
-    pub fn load(source: &Source) -> Result<PluginConfig, ConfigError> {
+impl Config {
+    pub fn load(source: &Source) -> Result<Config, ConfigError> {
         let mut reader = Reader::new(source);
         let full_detail = detail_level(&mut reader, "NOTIFICATION_DETAIL", false);
         let return_warning_days = reader.integer("RETURN_WARNING_DAYS", 2, 0, 60);
@@ -117,7 +117,7 @@ impl PluginConfig {
         let poll_interval = poll_interval(&mut reader);
         let retention_days = retention_days(&mut reader, return_warning_days);
         let log_level = log_level(&mut reader);
-        reader.finish(PluginConfig {
+        reader.finish(Config {
             sei,
             database_url,
             poll_interval,

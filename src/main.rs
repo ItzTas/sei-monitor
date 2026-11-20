@@ -7,9 +7,9 @@ use std::time::Duration;
 
 use clap::Parser;
 use monitor_hub_sdk::{NOT_LAUNCHED_BY_HUB, launched_by_hub, logging};
-use sei_monitor::app::run_plugin;
+use sei_monitor::app::run_monitor;
 use sei_monitor::cli::{Cli, Command, command_exit, diagnose, orgs, test_login, usage_exit};
-use sei_monitor::config::{ConfigError, PluginConfig, Source};
+use sei_monitor::config::{Config, ConfigError, Source};
 use sei_monitor::harden::harden;
 use tokio::runtime::{Builder, Runtime};
 use tokio::signal::unix::{SignalKind, signal};
@@ -81,7 +81,7 @@ fn monitor(hardening: Option<io::Error>) -> ExitCode {
     if !launched_by_hub() {
         return not_launched_by_hub();
     }
-    let config = match PluginConfig::load(&Source::environment()) {
+    let config = match Config::load(&Source::environment()) {
         Ok(config) => config,
         Err(problems) => return refuse(&problems),
     };
@@ -105,7 +105,7 @@ fn monitor(hardening: Option<io::Error>) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let result = runtime.block_on(run_plugin(config));
+    let result = runtime.block_on(run_monitor(config));
     runtime.shutdown_timeout(RUNTIME_SHUTDOWN_LIMIT);
     let Err(failure) = result else {
         return ExitCode::SUCCESS;
@@ -180,7 +180,7 @@ mod tests {
         if !sleep_installed() {
             return;
         }
-        let runtime = runtime().expect("the plugin runtime");
+        let runtime = runtime().expect("the monitor runtime");
         let command = PasswordCommand::new("sleep 30")
             .expect("a command line")
             .with_timeout(Duration::from_millis(200));

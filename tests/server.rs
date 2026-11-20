@@ -20,7 +20,7 @@ use tonic::{Code, Request};
 use sei_monitor::event::Kind;
 use sei_monitor::monitor::{Clock, Monitor};
 use sei_monitor::secret::Secret;
-use sei_monitor::server::SeiPlugin;
+use sei_monitor::server::SeiMonitor;
 use sei_monitor::store::{AccountKey, Store, Trigger};
 
 use support::fake_sei::{
@@ -37,11 +37,11 @@ const EVENTUALLY: Duration = Duration::from_secs(10);
 const REJECTED: &str = "SEI rejected the login (Usuário ou Senha Inválida.)";
 const GO_PAUSE: &str = "monitoring is paused because SEI rejected the login; restart sei-monitor after fixing the configuration";
 const HELD: &str = "nothing is logging in: request a check once the configuration is fixed";
-const PAUSED_HERE: &str = "restart the plugin with the configuration fixed, then request a check";
+const PAUSED_HERE: &str = "restart the monitor with the configuration fixed, then request a check";
 const NOT_REACHED: &str = "sei-monitor has not reached SEI yet";
 const UNAVAILABLE: &str = "the database is unavailable";
 const HUB_AHEAD: &str =
-    "the hub is ahead of this database: reset the hub's position for the sei plugin";
+    "the hub is ahead of this database: reset the hub's position for the sei monitor";
 const DB_ROLE: &str = "sei_server_locked_out";
 const DB_PASSWORD: &str = "db-secret-7f3a";
 const FLAPPING_ROLE: &str = "sei_events_flapping";
@@ -69,35 +69,35 @@ async fn eventually<F: Future<Output = bool>>(what: &str, mut check: impl FnMut(
         .unwrap_or_else(|_| panic!("timed out waiting until {what}"));
 }
 
-fn plugin(h: &Harness) -> SeiPlugin {
-    SeiPlugin::new(Arc::clone(&h.monitor), false)
+fn served(h: &Harness) -> SeiMonitor {
+    SeiMonitor::new(Arc::clone(&h.monitor), false)
 }
 
 fn timestamp(at: DateTime<Utc>) -> Timestamp {
     Timestamp::from(SystemTime::from(at))
 }
 
-async fn events(plugin: &SeiPlugin, after: i64, limit: i32) -> Result<Vec<Event>, tonic::Status> {
-    plugin
+async fn events(served: &SeiMonitor, after: i64, limit: i32) -> Result<Vec<Event>, tonic::Status> {
+    served
         .events(Request::new(EventsRequest { after, limit }))
         .await
         .map(|response| response.into_inner().events)
 }
 
-async fn page(plugin: &SeiPlugin, after: i64, limit: i32) -> Vec<Event> {
-    events(plugin, after, limit).await.expect("events")
+async fn page(served: &SeiMonitor, after: i64, limit: i32) -> Vec<Event> {
+    events(served, after, limit).await.expect("events")
 }
 
-async fn status(plugin: &SeiPlugin) -> StatusResponse {
-    plugin
+async fn status(served: &SeiMonitor) -> StatusResponse {
+    served
         .status(Request::new(StatusRequest {}))
         .await
         .expect("status")
         .into_inner()
 }
 
-async fn check(plugin: &SeiPlugin) -> CheckResponse {
-    plugin
+async fn check(served: &SeiMonitor) -> CheckResponse {
+    served
         .check(Request::new(CheckRequest {}))
         .await
         .expect("check")
@@ -235,14 +235,14 @@ fn ids(h_events: &[sei_monitor::event::Event]) -> Vec<i64> {
 }
 
 #[tokio::test]
-async fn describe_names_the_plugin_and_its_kinds() {
+async fn describe_names_the_monitor_and_its_kinds() {
     let store = Store::new(&Secret::new(
         "postgres://sei:unused@127.0.0.1:1/sei".to_owned(),
     ))
     .expect("a store that never connects");
     let h = Harness::new(&store, |_| {});
 
-    let described = plugin(&h)
+    let described = served(&h)
         .describe(Request::new(DescribeRequest {}))
         .await
         .expect("describe")
@@ -270,9 +270,9 @@ async fn events_are_unavailable_until_the_account_is_known() {
     let history = with_history(&store).await;
     let confirmed = history.events().await[1].id;
     let h = Harness::new(&store, |_| {});
-    let plugin = plugin(&h);
+    let served = served(&h);
 
-    let failure = events(&plugin, confirmed, 0)
+    let failure = events(&served, confirmed, 0)
         .await
         .expect_err("events before the account is known");
 
@@ -287,9 +287,9 @@ async fn events_map_the_stored_events() {
         return;
     };
     let h = with_history(&store).await;
-    let plugin = plugin(&h);
+    let served = served(&h);
 
-    let all = page(&plugin, 0, 0).await;
+    let all = page(&served, 0, 0).await;
 
     assert_eq!(
         kinds(&all),
@@ -342,12 +342,12 @@ async fn events_follow_after_and_limit() {
         return;
     };
     let h = with_history(&store).await;
-    let plugin = plugin(&h);
-    let all = seqs(&page(&plugin, 0, 0).await);
+    let served = served(&h);
+    let all = seqs(&page(&served, 0, 0).await);
 
-    assert_eq!(seqs(&page(&plugin, all[1], 0).await), all[2..]);
+    assert_eq!(seqs(&page(&served, all[1], 0).await), all[2..]);
     assert_eq!(h.monitor.acked_seq(), all[1]);
-    assert_eq!(seqs(&page(&plugin, 0, 2).await), all[..2]);
+    assert_eq!(seqs(&page(&served, 0, 2).await), all[..2]);
     assert_eq!(h.monitor.acked_seq(), all[1]);
 }
 
@@ -369,16 +369,16 @@ async fn events_clamp_the_limit() {
         )
         .await
         .expect("insert events");
-    let plugin = plugin(&h);
+    let served = served(&h);
 
-    let default = page(&plugin, 0, 0).await;
+    let default = page(&served, 0, 0).await;
     assert_eq!(default.len(), 100);
-    assert_eq!(page(&plugin, 0, -3).await, default);
-    assert_eq!(seqs(&page(&plugin, 0, 7).await), seqs(&default)[..7]);
-    let full = page(&plugin, 0, i32::MAX).await;
+    assert_eq!(page(&served, 0, -3).await, default);
+    assert_eq!(seqs(&page(&served, 0, 7).await), seqs(&default)[..7]);
+    let full = page(&served, 0, i32::MAX).await;
     assert_eq!(full.len(), 500);
     assert_eq!(seqs(&full)[..100], seqs(&default));
-    assert_eq!(page(&plugin, full[499].seq, 500).await.len(), 100);
+    assert_eq!(page(&served, full[499].seq, 500).await.len(), 100);
 }
 
 #[tokio::test]
@@ -387,9 +387,9 @@ async fn full_detail_puts_the_details_in_the_body() {
         return;
     };
     let h = with_history(&store).await;
-    let plugin = SeiPlugin::new(Arc::clone(&h.monitor), true);
+    let served = SeiMonitor::new(Arc::clone(&h.monitor), true);
 
-    let all = page(&plugin, 0, 0).await;
+    let all = page(&served, 0, 0).await;
 
     let added = all
         .iter()
@@ -404,14 +404,14 @@ async fn login_failure_is_urgent_and_explains_itself() {
         return;
     };
     let h = rejected_harness(&store);
-    let plugin = plugin(&h);
+    let served = served(&h);
     let _run = spawn_run(&h.monitor);
     eventually("the login failure is recorded", || async {
         h.monitor.state().paused && !h.events().await.is_empty()
     })
     .await;
 
-    let all = page(&plugin, 0, 0).await;
+    let all = page(&served, 0, 0).await;
 
     let [failed] = &all[..] else {
         panic!("expected one event: {all:?}");
@@ -459,7 +459,7 @@ async fn events_of_another_account_are_left_out() {
     add_one_event(&h).await;
     let ours = ids(&h.events().await);
 
-    assert_eq!(seqs(&page(&plugin(&h), 0, 0).await), ours);
+    assert_eq!(seqs(&page(&served(&h), 0, 0).await), ours);
 }
 
 #[tokio::test]
@@ -469,9 +469,9 @@ async fn status_follows_the_monitor() {
     };
     let h = Harness::new(&store, |_| {});
     populate(&h.fake);
-    let plugin = plugin(&h);
+    let served = served(&h);
 
-    let before = status(&plugin).await;
+    let before = status(&served).await;
     assert_eq!(before.state, i32::from(State::Failing));
     assert!(before.message.starts_with(NOT_REACHED), "{before:?}");
     assert_eq!(
@@ -494,7 +494,7 @@ async fn status_follows_the_monitor() {
         .finished_at
         .expect("finished");
     assert_eq!(
-        status(&plugin).await,
+        status(&served).await,
         StatusResponse {
             state: State::Idle.into(),
             message: String::new(),
@@ -508,7 +508,7 @@ async fn status_follows_the_monitor() {
     h.clock.advance(scheduled.duration);
     scheduled.fire.send(()).expect("the monitor is waiting");
     eventually("the monitor pauses", || async { h.monitor.state().paused }).await;
-    let paused = status(&plugin).await;
+    let paused = status(&served).await;
     assert_eq!(paused.state, i32::from(State::Paused));
     assert_eq!(paused.message, format!("{REJECTED}; {PAUSED_HERE}"));
     assert_eq!(paused.next_check_at, None);
@@ -523,15 +523,15 @@ async fn status_shows_a_failing_cycle_until_one_succeeds() {
     let h = Harness::new(&store, |_| {});
     populate(&h.fake);
     h.fake.fail_next(ROUTE_PROCESSES, 500, 1);
-    let plugin = plugin(&h);
+    let served = served(&h);
     let _run = spawn_run(&h.monitor);
 
     let retry = h.clock.next_sleep().await;
-    let failing = status(&plugin).await;
+    let failing = status(&served).await;
     h.clock.advance(retry.duration);
     retry.fire.send(()).expect("the monitor is waiting");
     h.clock.next_sleep().await;
-    let recovered = status(&plugin).await;
+    let recovered = status(&served).await;
 
     assert_eq!(failing.state, i32::from(State::Failing));
     assert_eq!(
@@ -562,13 +562,13 @@ async fn status_shows_events_that_cannot_be_read() {
         no_jitter(),
     );
     bounded(monitor.prepare()).await.expect("prepare");
-    let plugin = SeiPlugin::new(Arc::clone(&monitor), false);
-    let readable = status(&plugin).await;
+    let served = SeiMonitor::new(Arc::clone(&monitor), false);
+    let readable = status(&served).await;
 
-    let failure = events(&plugin, 0, 0)
+    let failure = events(&served, 0, 0)
         .await
         .expect_err("events the role cannot read");
-    let failing = status(&plugin).await;
+    let failing = status(&served).await;
 
     assert_eq!(readable.state, i32::from(State::Idle), "{readable:?}");
     assert_eq!(failure.code(), Code::Unavailable);
@@ -585,14 +585,14 @@ async fn status_shows_a_cycle_in_progress() {
     let h = Harness::new(&store, |_| {});
     populate(&h.fake);
     h.fake.stall(ROUTE_PROCESSES);
-    let plugin = plugin(&h);
+    let served = served(&h);
     let _run = spawn_run(&h.monitor);
     eventually("the cycle asks for the processes", || async {
         h.fake.calls(ROUTE_PROCESSES) > 0
     })
     .await;
 
-    let checking = status(&plugin).await;
+    let checking = status(&served).await;
 
     assert_eq!(
         checking,
@@ -621,8 +621,8 @@ async fn status_explains_why_sei_is_not_reached() {
     })
     .await;
 
-    let retrying = status(&plugin(&waiting)).await;
-    let stopped = status(&plugin(&unknown)).await;
+    let retrying = status(&served(&waiting)).await;
+    let stopped = status(&served(&unknown)).await;
 
     assert_eq!(retrying.state, i32::from(State::Failing));
     assert_eq!(
@@ -645,10 +645,10 @@ async fn check_maps_the_trigger_errors() {
     };
     let h = Harness::new(&store, |_| {});
     populate(&h.fake);
-    let plugin = plugin(&h);
+    let served = served(&h);
 
     assert_eq!(
-        check(&plugin).await,
+        check(&served).await,
         CheckResponse {
             accepted: false,
             message: NOT_REACHED.to_owned(),
@@ -658,7 +658,7 @@ async fn check_maps_the_trigger_errors() {
     h.run_once().await;
     h.clock.advance(Duration::from_secs(60));
     assert_eq!(
-        check(&plugin).await,
+        check(&served).await,
         CheckResponse {
             accepted: false,
             message: "the last cycle started less than 5m0s ago; try again in 4m0s".to_owned(),
@@ -666,7 +666,7 @@ async fn check_maps_the_trigger_errors() {
     );
     h.clock.advance(Duration::from_secs(4 * 60));
     assert_eq!(
-        check(&plugin).await,
+        check(&served).await,
         CheckResponse {
             accepted: true,
             message: String::new(),
@@ -680,7 +680,7 @@ async fn check_maps_the_trigger_errors() {
     })
     .await;
     assert_eq!(
-        check(&SeiPlugin::new(Arc::clone(&rejected.monitor), false)).await,
+        check(&SeiMonitor::new(Arc::clone(&rejected.monitor), false)).await,
         CheckResponse {
             accepted: false,
             message: format!("{GO_PAUSE}, then request a check"),
@@ -709,18 +709,18 @@ async fn a_held_monitor_says_how_to_resume_and_accepts_one_check() {
         .set_paused_reason(account.id, REJECTED)
         .await
         .expect("record the rejection");
-    let plugin = plugin(&h);
+    let served = served(&h);
     let _run = spawn_run(&h.monitor);
     eventually("the monitor holds", || async { h.monitor.state().held }).await;
 
-    let held = status(&plugin).await;
+    let held = status(&served).await;
     assert_eq!(held.state, i32::from(State::Paused));
     assert_eq!(held.message, format!("{REJECTED}; {HELD}"));
     assert_eq!(held.next_check_at, None);
     assert_eq!(h.fake.failed_logins(), 0);
 
     assert_eq!(
-        check(&plugin).await,
+        check(&served).await,
         CheckResponse {
             accepted: true,
             message: String::new(),
@@ -732,7 +732,7 @@ async fn a_held_monitor_says_how_to_resume_and_accepts_one_check() {
     })
     .await;
     assert_eq!(h.fake.failed_logins(), 1);
-    let paused = status(&plugin).await;
+    let paused = status(&served).await;
     assert_eq!(paused.state, i32::from(State::Paused));
     assert_eq!(paused.message, format!("{REJECTED}; {PAUSED_HERE}"));
 }
@@ -758,8 +758,8 @@ async fn database_failures_never_show_the_password() {
     populate(&h.fake);
     h.prepare().await;
     h.run_once().await;
-    let plugin = plugin(&h);
-    assert_eq!(status(&plugin).await.state, i32::from(State::Idle));
+    let served = served(&h);
+    assert_eq!(status(&served).await.state, i32::from(State::Idle));
 
     client
         .batch_execute(&format!(
@@ -769,12 +769,12 @@ async fn database_failures_never_show_the_password() {
         .await
         .expect("lock the role out");
 
-    let failure = events(&plugin, 0, 0)
+    let failure = events(&served, 0, 0)
         .await
         .expect_err("events from a database that refuses the role");
     assert_eq!(failure.code(), Code::Unavailable);
     assert_eq!(failure.message(), UNAVAILABLE);
-    let failing = status(&plugin).await;
+    let failing = status(&served).await;
     assert_eq!(failing.state, i32::from(State::Failing));
     assert_eq!(failing.message, UNAVAILABLE);
     for shown in [format!("{failure:?}"), format!("{failing:?}")] {
@@ -789,14 +789,14 @@ async fn the_first_read_holds_only_the_events_from_before_the_start() {
     };
     let h = with_history(&store).await;
     let history = ids(&h.events().await);
-    let plugin = plugin(&h).with_first_read_boundary(last_issued(&h).await);
+    let served = served(&h).with_first_read_boundary(last_issued(&h).await);
     add_one_event(&h).await;
-    let all = seqs(&page(&SeiPlugin::new(Arc::clone(&h.monitor), false), 0, 500).await);
+    let all = seqs(&page(&SeiMonitor::new(Arc::clone(&h.monitor), false), 0, 500).await);
     assert_eq!(all.len(), history.len() + 1);
 
-    assert_eq!(seqs(&page(&plugin, 0, 500).await), history);
+    assert_eq!(seqs(&page(&served, 0, 500).await), history);
     assert_eq!(
-        seqs(&page(&plugin, *history.last().expect("history"), 500).await),
+        seqs(&page(&served, *history.last().expect("history"), 500).await),
         all[history.len()..]
     );
 }
@@ -807,16 +807,16 @@ async fn the_first_read_ends_with_its_first_short_page() {
         return;
     };
     let h = with_history(&store).await;
-    let plugin = plugin(&h).with_first_read_boundary(last_issued(&h).await);
+    let served = served(&h).with_first_read_boundary(last_issued(&h).await);
     add_one_event(&h).await;
-    let all = seqs(&page(&SeiPlugin::new(Arc::clone(&h.monitor), false), 0, 500).await);
+    let all = seqs(&page(&SeiMonitor::new(Arc::clone(&h.monitor), false), 0, 500).await);
     assert_eq!(all.len(), 7);
 
-    assert_eq!(seqs(&page(&plugin, 0, 2).await), all[..2]);
-    assert_eq!(seqs(&page(&plugin, all[1], 2).await), all[2..4]);
-    assert_eq!(seqs(&page(&plugin, all[3], 2).await), all[4..6]);
-    assert_eq!(seqs(&page(&plugin, all[5], 2).await), Vec::<i64>::new());
-    assert_eq!(seqs(&page(&plugin, all[5], 2).await), all[6..]);
+    assert_eq!(seqs(&page(&served, 0, 2).await), all[..2]);
+    assert_eq!(seqs(&page(&served, all[1], 2).await), all[2..4]);
+    assert_eq!(seqs(&page(&served, all[3], 2).await), all[4..6]);
+    assert_eq!(seqs(&page(&served, all[5], 2).await), Vec::<i64>::new());
+    assert_eq!(seqs(&page(&served, all[5], 2).await), all[6..]);
 }
 
 #[tokio::test]
@@ -826,7 +826,7 @@ async fn on_a_new_database_the_first_read_is_empty() {
     };
     let h = Harness::new(&store, |_| {});
     populate(&h.fake);
-    let plugin = plugin(&h).with_first_read_boundary(0);
+    let served = served(&h).with_first_read_boundary(0);
     h.prepare().await;
     h.run_once().await;
     add_one_event(&h).await;
@@ -834,8 +834,8 @@ async fn on_a_new_database_the_first_read_is_empty() {
     let stored = ids(&h.events().await);
     assert!(!stored.is_empty());
 
-    assert_eq!(page(&plugin, 0, 0).await, []);
-    assert_eq!(seqs(&page(&plugin, 0, 0).await), stored);
+    assert_eq!(page(&served, 0, 0).await, []);
+    assert_eq!(seqs(&page(&served, 0, 0).await), stored);
 }
 
 #[tokio::test]
@@ -845,18 +845,18 @@ async fn a_hub_ahead_of_the_database_gets_nothing_and_confirms_nothing() {
     };
     let h = with_history(&store).await;
     let newest = last_issued(&h).await;
-    let plugin = plugin(&h);
-    assert_eq!(status(&plugin).await.state, i32::from(State::Idle));
+    let served = served(&h);
+    assert_eq!(status(&served).await.state, i32::from(State::Idle));
 
-    assert_eq!(page(&plugin, newest + 50, 0).await, []);
+    assert_eq!(page(&served, newest + 50, 0).await, []);
     assert_eq!(h.monitor.acked_seq(), 0);
-    let ahead = status(&plugin).await;
+    let ahead = status(&served).await;
     assert_eq!(ahead.state, i32::from(State::Failing));
     assert_eq!(ahead.message, HUB_AHEAD);
 
-    assert_eq!(page(&plugin, newest, 0).await, []);
+    assert_eq!(page(&served, newest, 0).await, []);
     assert_eq!(h.monitor.acked_seq(), newest);
-    let in_line = status(&plugin).await;
+    let in_line = status(&served).await;
     assert_eq!(in_line.state, i32::from(State::Idle));
     assert_eq!(in_line.message, "");
 }
@@ -889,7 +889,7 @@ async fn an_activity_time_outside_the_years_1_to_9999_is_announced_at_detection(
         .await
         .expect("insert an event stored with a time past year 9999");
 
-    let all = page(&plugin(&h), 0, 0).await;
+    let all = page(&served(&h), 0, 0).await;
 
     let stored: Vec<_> = h
         .events()
@@ -965,12 +965,12 @@ async fn a_long_rejection_from_sei_is_cut_in_the_pause_and_in_status() {
         &[("Content-Type", "application/json")],
         body.into_bytes(),
     );
-    let plugin = plugin(&h);
+    let served = served(&h);
     let _run = spawn_run(&h.monitor);
     eventually("the monitor pauses", || async { h.monitor.state().paused }).await;
 
     let reason = h.monitor.state().paused_reason;
-    let shown = status(&plugin).await.message;
+    let shown = status(&served).await.message;
 
     let cut: String = message.chars().take(500).collect();
     assert_eq!(reason, format!("SEI rejected the login ({cut})"));
@@ -985,9 +985,9 @@ async fn the_end_of_the_first_read_signals_the_events_it_held() {
     };
     let h = with_history(&store).await;
     let boundary = last_issued(&h).await;
-    let plugin = plugin(&h).with_first_read_boundary(boundary);
+    let served = served(&h).with_first_read_boundary(boundary);
     add_one_event_through_another_monitor(&h).await;
-    let all = seqs(&page(&SeiPlugin::new(Arc::clone(&h.monitor), false), 0, 500).await);
+    let all = seqs(&page(&SeiMonitor::new(Arc::clone(&h.monitor), false), 0, 500).await);
     assert_eq!(all.len(), 7);
     let newest = all[6];
     insert_again(&database.url, newest).await;
@@ -996,11 +996,11 @@ async fn the_end_of_the_first_read_signals_the_events_it_held() {
     let mut signals = h.monitor.notifier().subscribe();
     let known = signals.latest_seq();
 
-    let full = page(&plugin, 0, 2).await;
+    let full = page(&served, 0, 2).await;
     let after_a_full_page = pending_signal(&mut signals).await;
-    let short = page(&plugin, all[1], 500).await;
+    let short = page(&served, all[1], 500).await;
     let after_the_short_page = pending_signal(&mut signals).await;
-    let later = page(&plugin, all[5], 500).await;
+    let later = page(&served, all[5], 500).await;
     let after_a_later_read = pending_signal(&mut signals).await;
 
     assert_eq!(seqs(&full), all[..2]);
@@ -1021,20 +1021,20 @@ async fn the_hub_falling_ahead_and_back_in_line_signals_the_status() {
     };
     let h = with_history(&store).await;
     let newest = last_issued(&h).await;
-    let plugin = plugin(&h);
+    let served = served(&h);
     h.clock.advance(FIFTEEN_MINUTES);
     let logins = h.fake.calls(ROUTE_LOGIN);
     let mut signals = h.monitor.notifier().subscribe();
     signals.latest_seq();
 
-    assert_eq!(page(&plugin, newest + 50, 0).await, []);
+    assert_eq!(page(&served, newest + 50, 0).await, []);
     let fell_ahead = pending_signal(&mut signals).await;
-    let ahead = status(&plugin).await;
-    assert_eq!(page(&plugin, newest + 50, 0).await, []);
+    let ahead = status(&served).await;
+    assert_eq!(page(&served, newest + 50, 0).await, []);
     let still_ahead = pending_signal(&mut signals).await;
-    assert_eq!(page(&plugin, newest, 0).await, []);
+    assert_eq!(page(&served, newest, 0).await, []);
     let back_in_line = pending_signal(&mut signals).await;
-    let in_line = status(&plugin).await;
+    let in_line = status(&served).await;
 
     assert!(fell_ahead.is_some());
     assert_eq!(ahead.state, i32::from(State::Failing));
@@ -1066,17 +1066,17 @@ async fn a_failing_read_of_the_events_and_its_recovery_signal_the_status() {
         no_jitter(),
     );
     bounded(monitor.prepare()).await.expect("prepare");
-    let plugin = SeiPlugin::new(Arc::clone(&monitor), false);
+    let served = SeiMonitor::new(Arc::clone(&monitor), false);
     let logins = h.fake.calls(ROUTE_LOGIN);
     let mut signals = monitor.notifier().subscribe();
     signals.latest_seq();
 
-    let failure = events(&plugin, 0, 0)
+    let failure = events(&served, 0, 0)
         .await
         .expect_err("events the role cannot read");
     let failed = pending_signal(&mut signals).await;
-    let failing = status(&plugin).await;
-    events(&plugin, 0, 0)
+    let failing = status(&served).await;
+    events(&served, 0, 0)
         .await
         .expect_err("events the role still cannot read");
     let failed_again = pending_signal(&mut signals).await;
@@ -1084,9 +1084,9 @@ async fn a_failing_read_of_the_events_and_its_recovery_signal_the_status() {
         .batch_execute(&format!("GRANT SELECT ON events TO {FLAPPING_ROLE}"))
         .await
         .expect("give the role the events back");
-    let recovered_page = page(&plugin, 0, 0).await;
+    let recovered_page = page(&served, 0, 0).await;
     let recovered = pending_signal(&mut signals).await;
-    let readable = status(&plugin).await;
+    let readable = status(&served).await;
 
     assert_eq!(failure.code(), Code::Unavailable);
     assert_eq!(failure.message(), UNAVAILABLE);
@@ -1107,11 +1107,11 @@ async fn the_end_of_the_first_read_starts_no_cycle() {
         return;
     };
     let h = with_history(&store).await;
-    let plugin = plugin(&h).with_first_read_boundary(last_issued(&h).await);
+    let served = served(&h).with_first_read_boundary(last_issued(&h).await);
     h.clock.advance(FIFTEEN_MINUTES);
     let logins = h.fake.calls(ROUTE_LOGIN);
 
-    let short = page(&plugin, 0, 500).await;
+    let short = page(&served, 0, 500).await;
 
     assert!(!short.is_empty());
     assert_eq!(h.monitor.trigger_cycle(), Ok(()));

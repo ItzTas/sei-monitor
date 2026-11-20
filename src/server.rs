@@ -20,23 +20,23 @@ use crate::monitor::{Monitor, MonitorError, State as MonitorState, TriggerError}
 use crate::store::StoreError;
 use crate::version::VERSION;
 
-const PLUGIN_NAME: &str = "sei";
+const MONITOR_NAME: &str = "sei";
 const DISPLAY_NAME: &str = "SEI";
 const DEFAULT_LIMIT: i64 = 100;
 const MAX_LIMIT: i64 = 500;
 const STATUS_QUERY_LIMIT: Duration = Duration::from_secs(10);
 const DATABASE_UNAVAILABLE: &str = "the database is unavailable";
 const HUB_AHEAD: &str =
-    "the hub is ahead of this database: reset the hub's position for the sei plugin";
+    "the hub is ahead of this database: reset the hub's position for the sei monitor";
 const HELD_INSTRUCTION: &str =
     "nothing is logging in: request a check once the configuration is fixed";
 const PAUSED_INSTRUCTION: &str =
-    "restart the plugin with the configuration fixed, then request a check";
+    "restart the monitor with the configuration fixed, then request a check";
 const CHECK_AFTER_RESTART: &str = ", then request a check";
 const FIRST_YEAR: i32 = 1;
 const LAST_YEAR: i32 = 9999;
 
-pub struct SeiPlugin {
+pub struct SeiMonitor {
     monitor: Arc<Monitor>,
     full_detail: bool,
     first_read_boundary: Option<i64>,
@@ -45,9 +45,9 @@ pub struct SeiPlugin {
     events_failing: AtomicBool,
 }
 
-impl SeiPlugin {
-    pub fn new(monitor: Arc<Monitor>, full_detail: bool) -> SeiPlugin {
-        SeiPlugin {
+impl SeiMonitor {
+    pub fn new(monitor: Arc<Monitor>, full_detail: bool) -> SeiMonitor {
+        SeiMonitor {
             monitor,
             full_detail,
             first_read_boundary: None,
@@ -57,7 +57,7 @@ impl SeiPlugin {
         }
     }
 
-    pub fn with_first_read_boundary(mut self, boundary: i64) -> SeiPlugin {
+    pub fn with_first_read_boundary(mut self, boundary: i64) -> SeiMonitor {
         self.first_read_boundary = Some(boundary);
         self
     }
@@ -188,13 +188,13 @@ impl SeiPlugin {
 }
 
 #[tonic::async_trait]
-impl monitor_hub_sdk::Monitor for SeiPlugin {
+impl monitor_hub_sdk::Monitor for SeiMonitor {
     async fn describe(
         &self,
         _: Request<DescribeRequest>,
     ) -> Result<Response<DescribeResponse>, Status> {
         Ok(Response::new(DescribeResponse {
-            name: PLUGIN_NAME.to_owned(),
+            name: MONITOR_NAME.to_owned(),
             display_name: DISPLAY_NAME.to_owned(),
             version: VERSION.to_owned(),
             kinds: Kind::ALL

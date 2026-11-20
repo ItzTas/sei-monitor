@@ -9,18 +9,18 @@ use tokio::task::JoinHandle;
 use tokio::time::{Instant, timeout, timeout_at};
 use tracing::info;
 
-use crate::config::PluginConfig;
+use crate::config::Config;
 use crate::monitor::{Monitor, MonitorConfig, SystemClock, random_jitter};
 use crate::secret::Secret;
 use crate::sei::{Options, REQUEST_TIMEOUT, Target};
-use crate::server::SeiPlugin;
+use crate::server::SeiMonitor;
 use crate::store::{LOCK_LOST, Store, WriterLock, acquire_writer_lock};
 use crate::version::user_agent;
 
 const START_UP_LIMIT: Duration = Duration::from_secs(45);
 const CYCLE_CLOSE_LIMIT: Duration = Duration::from_millis(500);
 const LISTENING: &str = "listening for SIGTERM and SIGINT";
-const SCHEDULER_STOPPED: &str = "the monitor stopped after an internal error; see the plugin log";
+const SCHEDULER_STOPPED: &str = "the monitor stopped after an internal error; see the monitor log";
 
 struct Started {
     lock: WriterLock,
@@ -29,7 +29,7 @@ struct Started {
     newest_event: i64,
 }
 
-pub async fn run_plugin(config: PluginConfig) -> anyhow::Result<()> {
+pub async fn run_monitor(config: Config) -> anyhow::Result<()> {
     let started = start_up(&config.database_url, START_UP_LIMIT).await?;
     let monitor = Monitor::new(
         monitor_config(&config),
@@ -38,9 +38,9 @@ pub async fn run_plugin(config: PluginConfig) -> anyhow::Result<()> {
         random_jitter(),
     );
     monitor.notifier().events_recorded(started.newest_event);
-    let plugin = SeiPlugin::new(Arc::clone(&monitor), config.full_detail)
+    let served = SeiMonitor::new(Arc::clone(&monitor), config.full_detail)
         .with_first_read_boundary(started.first_read_boundary);
-    serve_until_stopped(started.lock, monitor, plugin).await
+    serve_until_stopped(started.lock, monitor, served).await
 }
 
 async fn start_up(database_url: &Secret, limit: Duration) -> anyhow::Result<Started> {
@@ -98,7 +98,7 @@ where
     finished.context(step)
 }
 
-fn monitor_config(config: &PluginConfig) -> MonitorConfig {
+fn monitor_config(config: &Config) -> MonitorConfig {
     let sei = &config.sei;
     MonitorConfig {
         target: Target {
@@ -126,7 +126,7 @@ fn monitor_config(config: &PluginConfig) -> MonitorConfig {
 async fn serve_until_stopped(
     mut lock: WriterLock,
     monitor: Arc<Monitor>,
-    plugin: SeiPlugin,
+    served: SeiMonitor,
 ) -> anyhow::Result<()> {
     let terminate = signal(SignalKind::terminate()).context(LISTENING)?;
     let interrupt = signal(SignalKind::interrupt()).context(LISTENING)?;
@@ -139,7 +139,7 @@ async fn serve_until_stopped(
     let scheduler = run.abort_handle();
     let supervisor = tokio::spawn(supervise(Arc::clone(&monitor), run));
     let ended = tokio::select! {
-        served = serve(plugin, monitor.notifier().clone()) => served.context("serving the plugin"),
+        outcome = serve(served, monitor.notifier().clone()) => outcome.context("serving the monitor"),
         () = lock.closed() => Err(lock_lost(&lock)),
     };
     monitor.shut_down();

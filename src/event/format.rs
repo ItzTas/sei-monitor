@@ -10,7 +10,7 @@ use crate::timezone::{days_until, format_local};
 const LABEL_LIMIT: usize = 40;
 const SUMMARY_LIMIT: usize = 80;
 const PAYLOAD_KEYS: [&str; 4] = ["procedure_id", "process_number", "unit", "detail"];
-const RESUME_STEPS: &str = "Fix the configuration, restart the hub if you changed its settings, then request a check for the sei plugin.";
+const RESUME_STEPS: &str = "Fix the configuration, restart the hub if you changed its settings, then request a check for the sei monitor.";
 
 #[derive(Clone)]
 pub struct Formatter {
@@ -649,7 +649,7 @@ mod tests {
             utc(false, "").details(&failure),
             [
                 "Reason: SEI rejected the login (Usuário ou Senha Inválida.)",
-                "Fix the configuration, restart the hub if you changed its settings, then request a check for the sei plugin.",
+                "Fix the configuration, restart the hub if you changed its settings, then request a check for the sei monitor.",
             ]
         );
     }
@@ -679,7 +679,7 @@ mod tests {
         assert!(utc(true, "").body(&document).starts_with("When: "));
         assert_eq!(
             utc(false, "").body(&failure),
-            "Reason: SEI rejected the login (Usuário ou Senha Inválida.)\nFix the configuration, restart the hub if you changed its settings, then request a check for the sei plugin."
+            "Reason: SEI rejected the login (Usuário ou Senha Inválida.)\nFix the configuration, restart the hub if you changed its settings, then request a check for the sei monitor."
         );
     }
 
@@ -862,7 +862,7 @@ mod tests {
     const GO_RESUME_LINE: &str =
         "Monitoring is paused until sei-monitor restarts with the configuration fixed.";
 
-    fn plugin_details(case: &EventTextCase) -> Vec<String> {
+    fn monitor_details(case: &EventTextCase) -> Vec<String> {
         let mut details = case.details.clone();
         if case.event.kind != Kind::AccountLoginFailed.as_str() {
             return details;
@@ -891,7 +891,7 @@ mod tests {
             let details = formatter.details(&event);
 
             assert_eq!(formatter.title(&event), case.title, "{} title", case.name);
-            assert_eq!(details, plugin_details(&case), "{} details", case.name);
+            assert_eq!(details, monitor_details(&case), "{} details", case.name);
             assert_eq!(view_json, case.view, "{} view", case.name);
             assert_eq!(payload, restricted(&case.view), "{} payload", case.name);
 

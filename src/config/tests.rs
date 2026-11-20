@@ -67,8 +67,8 @@ fn problems<T>(result: Result<T, ConfigError>) -> Vec<String> {
     }
 }
 
-fn loaded(env: &[(&str, &str)]) -> PluginConfig {
-    match PluginConfig::load(&source(env)) {
+fn loaded(env: &[(&str, &str)]) -> Config {
+    match Config::load(&source(env)) {
         Ok(config) => config,
         Err(err) => panic!("{err}"),
     }
@@ -107,7 +107,7 @@ async fn password_setting_gives_its_secret() {
 fn retention_outlasts_the_return_warning() {
     let too_short = with(&[("RETURN_WARNING_DAYS", "30"), ("RETENTION_DAYS", "31")]);
     assert_eq!(
-        problems(PluginConfig::load(&source(&too_short))),
+        problems(Config::load(&source(&too_short))),
         [
             "RETENTION_DAYS: keep events for at least 32 days, RETURN_WARNING_DAYS plus 2, or use 0 to keep them forever (got 31)"
         ]
@@ -131,13 +131,13 @@ fn load_requires_a_postgres_database() {
     let mut missing = defaults_env();
     missing.retain(|(name, _)| *name != "DATABASE_URL");
     assert_eq!(
-        problems(PluginConfig::load(&source(&missing))),
+        problems(Config::load(&source(&missing))),
         ["DATABASE_URL: set the Postgres address, postgres://user:password@host/database"]
     );
 
     let mysql = with(&[("DATABASE_URL", "mysql://x")]);
     assert_eq!(
-        problems(PluginConfig::load(&source(&mysql))),
+        problems(Config::load(&source(&mysql))),
         ["DATABASE_URL: use postgres://user:password@host/database"]
     );
 }
@@ -150,7 +150,7 @@ fn problems_never_show_secret_values() {
         ("DATABASE_URL", "mysql://u:hunter3@h/db"),
     ]);
 
-    let Err(err) = PluginConfig::load(&source(&env)) else {
+    let Err(err) = Config::load(&source(&env)) else {
         panic!("the configuration loaded without problems");
     };
 
@@ -170,7 +170,7 @@ fn problems_never_show_secret_values() {
 
 #[test]
 fn every_problem_is_listed_at_once() {
-    let Err(err) = PluginConfig::load(&source(&[("POLL_INTERVAL", "1m")])) else {
+    let Err(err) = Config::load(&source(&[("POLL_INTERVAL", "1m")])) else {
         panic!("the configuration loaded without problems");
     };
 
@@ -281,7 +281,7 @@ fn secrets_that_are_not_valid_utf8_are_refused() {
         ),
     ];
     for (source, want) in cases {
-        assert_eq!(problems(PluginConfig::load(&source)), want);
+        assert_eq!(problems(Config::load(&source)), want);
     }
 }
 
@@ -289,7 +289,7 @@ fn secrets_that_are_not_valid_utf8_are_refused() {
 fn settings_that_are_not_secrets_keep_the_lossy_value() {
     let source = not_utf8_source(&[("SEI_ORG", "SED\u{fffd}MO")], &["SEI_ORG"], &[]);
 
-    let config = match PluginConfig::load(&source) {
+    let config = match Config::load(&source) {
         Ok(config) => config,
         Err(err) => panic!("{err}"),
     };
@@ -409,7 +409,7 @@ fn sei_record(sei: &SeiConfig) -> Value {
     })
 }
 
-fn plugin_record(config: &PluginConfig) -> Value {
+fn config_record(config: &Config) -> Value {
     json!({
         "sei": sei_record(&config.sei),
         "database_url": config.database_url.reveal(),
@@ -436,10 +436,11 @@ fn config_matches_go() {
     let Some(program_dir) = FakeProgramDir::create("config-test") else {
         return;
     };
+    // The frozen golden file names this group "plugin".
     for case in golden::cases::<ConfigCase>("config", "/plugin") {
         let got = outcome(
-            PluginConfig::load(&case_source(&case, &program_dir)),
-            plugin_record,
+            Config::load(&case_source(&case, &program_dir)),
+            config_record,
         );
         assert_eq!(got, (case.result, case.problems), "plugin: {}", case.name);
     }

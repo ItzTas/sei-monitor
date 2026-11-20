@@ -250,7 +250,7 @@ async fn describe_names_the_plugin_and_its_kinds() {
 
     assert_eq!(described.name, "sei");
     assert_eq!(described.display_name, "SEI");
-    assert_eq!(described.version, "2.1.0");
+    assert_eq!(described.version, "2.2.0");
     let expected: Vec<EventKind> = Kind::ALL
         .iter()
         .map(|kind| EventKind {

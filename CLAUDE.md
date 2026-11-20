@@ -66,11 +66,18 @@ skipping.
 - Postgres: `tests/support/postgres.rs`'s `database()` gives each test its own database. It uses
   `TEST_DATABASE_URL` when set (the compose Postgres works, see `.env.example`), and otherwise
   starts a throwaway cluster with `initdb` and `postgres` from `PATH`, listening on a local TCP
-  port.
-  `tests/support::migrated_database` adds the migrations. With `TEST_DATABASE_URL` every test binary
-  shares one server with password authentication, as in CI. So a test that needs a role of its own
-  creates it with `support::login_role` (create or alter, with a password) under a name no other
-  test uses, and connects with that password.
+  port. `TEST_DATABASE_URL` must carry a password, like `DATABASE_URL`. The throwaway cluster
+  trusts every login, so its URL carries one that Postgres ignores. Unit tests reach the same file
+  as `crate::postgres`, through a `#[path]` in `src/lib.rs`.
+- `tests/support::migrated_database` takes the writer lock and runs the migrations, as start-up
+  does. With `TEST_DATABASE_URL` every test binary shares one server with password authentication,
+  as in CI. So a test that needs a role of its own creates it with `support::login_role` (create
+  or alter, with a password) under a name no other test uses, and connects with that password.
+- `tests/migration.rs` runs the migrations on goose-era databases that `tests/support/schema.rs`
+  builds (goose versions 1 and 2, a gap, an empty version table, the seventeen `whatsmeow_*`
+  tables) and compares the catalog and the rows before and after.
+- `tests/support/proxy.rs` is a TCP proxy that stops forwarding when told to. Two lock tests in
+  `tests/store.rs` use it and wait out the whole 30 s loss limit, so that binary takes about 33 s.
 - The conformance command for `tests/conformance.rs`: the binary named by `PLUGIN_CONFORMANCE`, or
   else `go install` of `plugin-conformance` at the SDK's Go tag `sdk-go/v0.4.0`, which also checks
   `Watch` on the real binary.
@@ -92,7 +99,7 @@ CI: `.github/workflows/ci.yml` runs fmt and clippy in one job and `cargo test --
 with a `postgres:18-alpine` service, Go 1.27.2 (`.prototools` pins the same version) and the
 conformance command installed. `.github/workflows/docker.yml` builds the image for amd64 and arm64
 and publishes it to `ghcr.io/itztas/sei-monitor` on every run that is not a pull request. A `v*`
-tag publishes the version tags (`2.1.0` and `2.1`), only the default branch moves `latest`
+tag publishes the version tags (`2.2.0` and `2.2`), only the default branch moves `latest`
 (`flavor: latest=false` keeps the semver rules from moving it too), and every image gets a `sha-`
 tag.
 
@@ -120,8 +127,40 @@ removes the prefix before it starts the plugin. The plugin reads only its enviro
 `.env`. `config::PluginConfig::load` collects every problem and reports them together, with Go's
 texts, and never shows a secret value.
 
-- `DATABASE_URL` (required, secret, or `DATABASE_URL_FILE`): `postgres://` or `postgresql://`. The
-  plugin connects without TLS.
+- `DATABASE_URL` (required, secret, or `DATABASE_URL_FILE`): the Postgres address, as
+  `postgres://user:password@host:port/database?sslmode=disable` (`postgresql://` works too). Put
+  the host, port, user, password and database in the URL. The configuration refuses any other
+  scheme, the key=value form included, with Go's text `DATABASE_URL: use
+  postgres://user:password@host/database`. Start-up checks the rest when it takes the writer lock.
+  - The password goes in the address or in a `password` query key. A URL without one, or with an
+    empty one, is refused with `DATABASE_URL has no password: add the role's password to the URL`.
+    Without a password in the URL, sqlx would read `PGPASSWORD`, `PGPASSFILE` or `~/.pgpass`, and
+    it logs a malformed `.pgpass` line whole at `warn`. A line missing a field, such as
+    `*:*:*:secret`, puts the password where sqlx expects the user name, so the log would show it.
+    With the refusal in place, the plugin never uses `PGPASSWORD` and never reads a `.pgpass` file.
+    A database that trusts the role still needs a password in the URL, and Postgres ignores it.
+  - Whatever else the URL leaves out, sqlx takes from the `PG*` variables (`PGPORT`, `PGUSER`,
+    `PGDATABASE`, `PGOPTIONS`, `PGSSLMODE` and the rest), then the user from the system account.
+    Under the hub the `PG*` variables only arrive when set as `SEI__PG*`.
+  - The plugin connects without TLS. `sslmode=disable`, `allow` and `prefer` connect in plain
+    text; `require`, `verify-ca` and `verify-full` fail at once.
+  - These are refused with `DATABASE_URL is not a valid Postgres address`, which never repeats the
+    address: several hosts (`h1,h2`), a URL with no host (unless a non-empty `host` or `hostaddr`
+    query key names one), and any query key the plugin does not know. sqlx would log an unknown
+    key together with its value, and that value can be a secret (`sslpassword`, a misspelled
+    `Password`). When a URL has neither a host nor a password, the host is the one reported.
+  - The plugin passes on the query keys sqlx reads: `sslmode`, `options` and `options[<setting>]`,
+    `application_name`, `host`, `hostaddr`, `port`, `dbname`, `user`, `password`, the certificate
+    keys (`sslrootcert`, `sslcert`, `sslkey`, their dashed forms and `ssl-ca`) and
+    `statement-cache-capacity`. Key names are case sensitive.
+  - It accepts and ignores the libpq keys that 2.1 took and sqlx has no equivalent for:
+    `connect_timeout`, `tcp_user_timeout`, `keepalives`, `keepalives_idle`, `keepalives_interval`,
+    `keepalives_retries` and `load_balance_hosts`, plus `channel_binding=disable` or `prefer`,
+    `sslnegotiation=postgres` and `target_session_attrs=any`. Any other value of those last three
+    stops the start with a message that names the key and never its value: `channel_binding` and
+    `sslnegotiation` need TLS, and `target_session_attrs` needs a session check the plugin does not
+    run.
+  - An IPv6 host goes in brackets: `postgres://user:password@[::1]:5432/database`.
 - `SEI_URL` (required): the SEI address without `/sei`. https, or http for localhost only.
 - `SEI_API_URL`: the `mod-wssei` address, when discovery fails.
 - `SEI_USERNAME` and `SEI_ORG` (required). `SEI_ORG` is the agency acronym or numeric id.
@@ -167,14 +206,22 @@ src/
 │                           login page and its agencies (orgs.rs, orgs/), connection (connect.rs),
 │                           the JSON envelope and wire types (wire.rs, wire/, json.rs, types.rs),
 │                           errors and their classification (errors.rs), HTML entities (html.rs)
-├── store/                  Postgres: MIGRATIONS, the writer lock, the pool (mod.rs); accounts,
-│                           cycle runs, processes and the cycle transaction, events and pruning
+├── store/                  Postgres: Store, StoreError and ServerError (mod.rs); DATABASE_URL
+│                           checks, connection options and the pool (connection.rs); the writer
+│                           lock, its 0.5 s check and migrate (lock.rs); the SeaORM entities
+│                           (entity/); accounts (accounts.rs), cycle runs (runs.rs), processes and
+│                           the cycle transaction (cycle.rs), events and pruning (events.rs), the
+│                           records the store returns (records.rs)
+├── migration/              Migrator, the migrations in order (mod.rs); catch_up, the goose files
+│                           a database has not recorded (goose.rs); the two migrations
+│                           (m20261118_000001_goose_schema.rs, m20261118_000002_drop_go_tables.rs)
 └── monitor/                Monitor and its state (mod.rs), the diff (diff.rs), activities and
                             documents (details.rs), pruning (prune.rs), the scheduler, pause and
                             back-off (scheduler.rs)
-sql/schema/                 the goose migrations, embedded by store/mod.rs
+sql/schema/                 the goose files, read by the first migration; never edited
 tests/                      one file per area; tests/support/ holds the fake SEI, the fake clock,
-                            the process helpers
+                            the process helpers, the throwaway Postgres, goose-era databases and a
+                            TCP proxy
 ```
 
 ## Process contract
@@ -182,11 +229,14 @@ tests/                      one file per area; tests/support/ holds the fake SEI
 - The hub starts `sei-monitor plugin` with its cookie variable. Started any other way, or with no
   command, the binary prints the SDK's `NOT_LAUNCHED_BY_HUB` text on stderr and exits 1.
 - Stdout carries only the handshake line. Logs go to stderr as JSON lines.
-- Start-up reads the configuration, takes the database writer lock (a Postgres advisory lock on its
-  own connection), applies the migrations on that connection, opens the pool and reads the highest
-  event position ever issued and the id of the newest stored event, all before the handshake. Each
-  connection attempt has 10 s and the whole sequence has 45 s, because the hub kills a plugin that
-  has not answered in 60 s. The plugin does not call SEI before the handshake.
+- Start-up reads the configuration, takes the database writer lock (a Postgres advisory lock on a
+  connection of its own), applies the migrations with `sea-orm-migration` on that connection, opens
+  the pool and reads the highest event position ever issued and the id of the newest stored event,
+  all before the handshake. Taking the lock has 10 s, and sqlx retries a refused connection within
+  them, so a database that refuses connections stops the start after 10 s with `taking the
+  database writer lock: the database did not answer in time: taking the writer lock`. The whole
+  sequence has 45 s, because the hub kills a plugin that has not answered in 60 s. The plugin does
+  not call SEI before the handshake.
 - Exit code 0 is a clean stop (SIGTERM or SIGINT). When the plugin exits 1 because of a
   configuration error, a failed start-up step or a lost writer lock, it writes exactly one JSON
   `fatal` line at `error` level, whose `error` field holds the configuration problems, names the
@@ -197,6 +247,11 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   SDK's `serve` (a `fatal` line and exit 1). An unknown agency or module, a failing cycle, a
   rejected login and a panic in the scheduler leave it running, with the reason in `Status`,
   because an exit would make the hub restart it in a loop.
+- A query on the lock's connection every 0.5 s, with 30 s to answer, notices a lost lock (see
+  Persistence). The reason after `the database lock was lost: ` is `the lock's connection failed:
+  ...`, `the lock's connection did not answer within 30s` or `the lock's connection was replaced`,
+  and it never carries the address. A lock lost before the migrations stops the start the same
+  way, under the step `applying the database migrations`, and nothing is migrated.
 - A second process on the same database fails at start-up with `another sei-monitor process holds
   the database lock`, migrates nothing and does not call SEI.
 - On SIGTERM the running cycle is cancelled at once and recorded as `context canceled`. The SDK
@@ -217,6 +272,13 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   less means 100, and the maximum is 500. `seq` and `id` are `events.id`. Each call acknowledges
   `after` in memory (it never moves back and is not stored). Before the account is known `Events`
   answers `UNAVAILABLE`, and so does a database error (`the database is unavailable`).
+- Against a database that refuses new connections while the lock's connection still answers,
+  sqlx keeps retrying for the 10 s allowed to get a connection. `Status` and `Events` then take up
+  to 10 s to answer, under the hub's 30 s limit per call. A cycle takes about 20 s and shows
+  `CHECKING` until it ends, because starting its cycle run waits those 10 s and recording its
+  failure waits 10 s more. `Status` then shows `the database did not answer in time: getting a
+  connection`. A server that stops ends the lock's connection too, and the plugin exits 1 within
+  about a second.
 - The first read stops at the highest position issued before start-up. Until one `Events` call
   returns a page shorter than its limit, newer events are left out. The hub stores its first read
   of a plugin as a baseline and announces none of it, so this keeps the first cycle's events out of
@@ -228,21 +290,22 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   reset and the hub's position was not. `Events` then returns nothing and acknowledges nothing,
   logs `the hub is ahead of this database: reset the hub's position for the sei plugin` once, and
   `Status` shows that text until the two agree.
-- The plugin serves `Watch` with the SDK's `serve_with_notifier`. `Monitor` owns the `Notifier`, and
-  start-up sets it to the id of the newest stored event. After each committed write that inserted
-  events (a cycle, the `login:` and `login-held:` events) the monitor calls `notify` with the
-  highest inserted id; a write that inserted nothing signals nothing. It calls `status_changed`
-  when what `Status` answers changes: a cycle starts or ends (a cancelled one too), the next check
-  time is set, a preparation fails (an unknown agency or module only when its text changes) or
-  works, the monitor pauses, holds or leaves the hold, the scheduler panics, the hub falls ahead of
-  the database or back in line, and the last `Events` read fails or recovers. The end of the first
-  read calls `notify` with the id of the newest stored event. Signals carry the id of a stored
-  event, never the sequence's own value: an insert that meets the `(account, kind, ref)` conflict
-  still uses up a sequence value, and a signal above every stored event would make the hub read
-  `Events` on every signal until the next event. The first-read boundary and the hub-ahead check
-  keep using the highest position issued. A signal is a value in a channel inside the process: the
-  hub answers it with `Describe`, `Status` and maybe `Events`, never `Check`, so no signal calls SEI
-  or logs in.
+- The plugin serves `Watch` with the SDK's `serve_with_notifier`. `Monitor` owns the `Notifier` and
+  hands a clone to its `Store`, and start-up sets it to the id of the newest stored event.
+  `Store::apply_cycle` writes every event (a cycle's, and the `login:` and `login-held:` ones), and
+  right after a commit that inserted events it calls `notify` with the highest inserted id. A
+  failed commit, or a write that inserted nothing, signals nothing. The monitor calls
+  `status_changed` when what `Status` answers changes: a cycle starts or ends (a cancelled one
+  too), the next check time is set, a preparation fails (an unknown agency or module only when its
+  text changes) or works, the monitor pauses, holds or leaves the hold, the scheduler panics, the
+  hub falls ahead of the database or back in line, and the last `Events` read fails or recovers.
+  The end of the first read calls `notify` with the id of the newest stored event. Signals carry
+  the id of a stored event, never the sequence's own value: an insert that meets the `(account,
+  kind, ref)` conflict still uses up a sequence value, and a signal above every stored event would
+  make the hub read `Events` on every signal until the next event. The first-read boundary and the
+  hub-ahead check keep using the highest position issued. A signal is a value in a channel inside
+  the process: the hub answers it with `Describe`, `Status` and maybe `Events`, never `Check`, so
+  no signal calls SEI or logs in.
 - A stored event that cannot be read (unknown kind or a payload that does not decode) is skipped
   and logged once at `error` as `skipping a stored event that cannot be read`, with its id and no
   stored value. After 1,024 such ids one summary line replaces the rest. One call walks at most
@@ -303,25 +366,108 @@ Two locks guard the events:
 2. An acknowledged event stays until the cutoff, so a `return_due_soon` is not deleted early and
    created again with a new id.
 
-Deleting an event also deletes the Go release's `deliveries` rows for it (`ON DELETE CASCADE`).
-
 ## Persistence
 
-- The schema is the Go release's, unchanged: `sql/schema/00001_initial.sql` and
-  `00002_cycle_runs.sql`, applied by the SDK's `migrate::up` with goose's version table, so the Go
-  release reads the same database.
-- A schema change is a new file `sql/schema/0000N_name.sql` in goose format (`-- +goose Up` and
-  `-- +goose Down`) and a new entry in `MIGRATIONS` in `src/store/mod.rs`. **Never edit a migration
-  that already exists.** The Go release starts on a database that holds a migration it has no file
-  for, so a new migration keeps the way back to Go open only while it leaves alone everything Go
-  reads and writes: tables, columns, constraints and the event `ref` formats. A migration that
-  changes one of those breaks the rollback, and nothing stops Go from starting on that database:
-  the damage shows as wrong or failing queries. The same holds for a `ref` format changed in code:
-  Go would announce the event again after a rollback.
-- All SQL lives in `src/store/`. Never insert explicit ids: the columns are
+- The plugin reaches Postgres through SeaORM on sqlx. The tables are hand-written entities in
+  `src/store/entity/`. The migrations are `sea-orm-migration` modules in `src/migration/`, run in
+  the order of `Migrator::migrations`, and `seaql_migrations` records the ones applied.
+- The first migration, `m20261118_000001_goose_schema`, adopts the schema that goose built for 2.1
+  and the Go release. It reads `goose_db_version` in the current schema and runs the Up section of
+  each `sql/schema/` file that table has not recorded. A database without the table is new and
+  gets every file. It refuses a gap (`migration version 1 is not applied but the database is
+  already at version 2`) and a table with no rows, accepts versions above 2, and never writes a
+  goose row.
+- The second, `m20261118_000002_drop_go_tables`, drops what the Go release left in that same
+  schema: `deliveries`, `goose_db_version` and every table whose name starts with `whatsmeow_` (the
+  Go release's WhatsApp session, keys included). It never uses `CASCADE`. The first two get a
+  statement each, and the `whatsmeow_*` tables share one because their foreign keys point at each
+  other. If another object depends on one of them, the drop fails, nothing is dropped, and
+  start-up stops with Postgres's error and its detail, which names the object.
+- 2.1 and the Go release no longer run on a database that went through it. Starting 2.1 on such a
+  database fails with `relation "accounts" already exists` and changes no data. It does leave a
+  new `goose_db_version` table with one version-0 row, which 2.2 ignores and never drops, because
+  the drop migration is already recorded. Drop it by hand.
+- **Upgrading from 2.1.** The first 2.2 start creates `seaql_migrations` and drops the Go tables.
+  The plugin's role therefore needs `CREATE` on the current schema and must own those tables,
+  which 2.1 never needed after its own first start. Without `CREATE` the start fails with
+  `applying the database migrations: db error: ERROR: permission denied for schema public`, and
+  without ownership with `... must be owner of table deliveries`. Either way it changes nothing,
+  but under the hub it becomes a restart loop. No try gets as far as calling SEI. Before the first
+  2.2 start, run these as the plugin's role:
+
+  ```sql
+  SELECT has_schema_privilege(current_user, current_schema(), 'CREATE');
+  SELECT tablename, tableowner FROM pg_tables
+  WHERE schemaname = current_schema()
+    AND (tablename IN ('deliveries', 'goose_db_version') OR starts_with(tablename, 'whatsmeow_'));
+  ```
+
+  The first must return `t`, and every row of the second must show the plugin's role as
+  `tableowner`. Later starts need only the rights on the tables and on `events_id_seq` that 2.1
+  needed. Take a `pg_dump` of the database before that start, because once 2.2 has run, 2.1 cannot
+  use the database again. A login rejection that 2.1 recorded still holds the first 2.2 start,
+  which makes no login.
+- A schema change is a new module in `src/migration/` and a new entry at the end of
+  `Migrator::migrations`. **Never edit a migration that already exists, nor the files in
+  `sql/schema/`**: they are the first migration's input.
+- Start-up runs the migrations on the writer lock's connection, in one transaction that first
+  checks that the connection still holds the lock. Each migration's own transaction becomes a
+  savepoint inside it, and a run that fails records nothing. No migration can leave that
+  transaction: `use_transaction(Some(false))` does not take it out, and a statement Postgres
+  refuses inside a transaction block, such as `CREATE INDEX CONCURRENTLY`, makes start-up fail.
+- When nothing is pending, start-up reads `seaql_migrations` without creating it and sends no
+  DDL, so a role with rights on the tables alone starts on a migrated database.
+- The SQL lives in the store (`src/store/`) and in the migrations (`src/migration/`, which reads
+  `sql/schema/`). Nothing inserts an event outside `Store::apply_cycle`, which locks the account
+  row first (`FOR NO KEY UPDATE`), so the order of ids is the order of the commits. Events are
+  stored once per `(account, kind, ref)`, so a changed `ref` format lets an event the plugin
+  detects again be stored and announced a second time. Never insert explicit ids: the columns are
   `GENERATED ALWAYS AS IDENTITY`.
-- Pool connections run with a 20 s `statement_timeout`, a 5 s `lock_timeout`, TCP keepalives and a
-  60 s `tcp_user_timeout`. The writer lock's connection has the same keepalives but no statement
-  timeout, because it runs the migrations.
-- The `deliveries` and `whatsmeow_*` tables belong to the Go release. The plugin never reads or
-  writes them.
+- Most queries go through SeaORM's query builder. These keep 2.1's SQL text and run as raw
+  statements:
+  - `ENSURE_ACCOUNT`, whose `ON CONFLICT ... DO UPDATE ... RETURNING *` also gives back an account
+    that already exists;
+  - `SET_PAUSED_REASON`, `LIST_ACCOUNT_PROCESSES` and `START_CYCLE_RUN`, which the scheduler tests
+    find in `pg_stat_activity` by their text;
+  - `LOCK_ACCOUNT`, the `FOR NO KEY UPDATE` above;
+  - `UPSERT_PROCESS`, whose `DO UPDATE` list leaves `first_seen_at` alone and clears `left_at`;
+  - `LAST_ISSUED_SEQ` and `NEWEST_EVENT_ID`, which read the `events_id_seq` sequence and the
+    highest id;
+  - `PRUNE_CYCLE_RUNS`, a subquery with `OFFSET`.
+- A server error prints the way tokio-postgres printed it in 2.1, `db error: ERROR: <message>`
+  with `DETAIL` and `HINT` lines when the server sends them, so `Status` and `cycle_runs.error`
+  read the same. The severity word is the English one (`ERROR`, `FATAL`) whatever the server's
+  `lc_messages`, where 2.1 showed the server's own word. The message follows `lc_messages`.
+- The pool has 10 connections. Each one runs with a 20 s `statement_timeout` and a 5 s
+  `lock_timeout`, asks the server for TCP keepalives (`tcp_keepalives_idle=30`,
+  `tcp_keepalives_interval=10`, `tcp_keepalives_count=3`, `tcp_user_timeout=60000`, in ms), and
+  is tested before each use. Getting a connection has 10 s. The pool keeps no minimum, idle limit
+  or lifetime, so sqlx runs no maintenance task, `Store::new` works outside a runtime, and an open
+  connection stays open.
+- The writer lock (`pg_try_advisory_lock`) has a connection of its own, in a one-connection pool
+  apart from the store's, with the same keepalives, no statement or lock timeout because the
+  migrations run there, and `client_min_messages=warning`. It is never tested before use: a
+  failed test would quietly open a new connection without the lock. Every 0.5 s, a query with
+  30 s to answer checks in `pg_locks` that this connection still holds the lock. sqlx pings the
+  connection each time it goes back to that pool, with no limit of its own, so the wait for the
+  connection gets the same 30 s. The limit is that long because a false loss stops the process,
+  and the restart logs in to SEI unless a recorded rejection holds it. The plugin gives up on a
+  silent connection after about 30.5 s, and the server frees a vanished plugin's lock only after
+  about 60 s, so the lock cannot pass to a second copy while the first could still write.
+
+The database layer adds these lines to the log. None carries the address or a password.
+
+- At start-up, when a migration is pending, sea-orm-migration logs `Applying all pending
+  migrations`, then `Applying migration '<name>'` and `Migration '<name>' has been applied` for
+  each one it runs. Those lines show even when a later migration fails and the run records
+  nothing. The plugin then logs `database migrations applied` with the names it applied. On a
+  restart that line comes alone, with `[]`. Postgres's notices, such as the migration table's
+  `already exists, skipping`, stay out because of `client_min_messages=warning`; warnings and
+  errors still show.
+- `there is no transaction in progress` (`warn`, `sqlx::postgres::notice`) follows a commit that
+  Postgres refused, because SeaORM sends a `ROLLBACK` after it.
+- `error occurred while testing the connection on-release` (`warn`) appears when a call is
+  dropped in the middle of a statement (the 10 s limit of `Status`, a cancelled clear of the pause
+  reason, a stop) or a connection is cut. sqlx then closes that connection.
+- `acquired connection, but time to acquire exceeded slow threshold` (`warn`) appears when getting
+  a connection took more than 2 s.

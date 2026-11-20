@@ -82,7 +82,7 @@ hub without `Watch` never opens the call and reads the plugin every 15 seconds.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `DATABASE_URL` | | Required, secret. `postgres://user:password@host/database`. The plugin connects without TLS. `DATABASE_URL_FILE` reads it from a file. |
+| `DATABASE_URL` | | Required, secret. `postgres://user:password@host:port/database?sslmode=disable`, or the same with `postgresql://`. The password is required, a URL with several hosts is refused, and the plugin connects without TLS. `DATABASE_URL_FILE` reads it from a file. |
 | `SEI_URL` | | Required. SEI address, without `/sei` at the end. Must be https; plain http works only for localhost. |
 | `SEI_API_URL` | discovered | Address of the `mod-wssei` API, only if the discovery fails. |
 | `SEI_USERNAME` | | Required. Your SEI login. |
@@ -101,11 +101,24 @@ A bad value stops the plugin at start-up with one `fatal` line in the hub's log 
 problem at once. The hub then restarts it with a back-off until the configuration is fixed.
 
 The plugin is stricter about its database than the Go release was. Point `DATABASE_URL` straight
-at Postgres, not at a transaction pooler. Use `sslmode=disable` or `prefer` and no parameter that
-only pgx understands. Don't set `idle_session_timeout` on its role: when the connection that holds
-the plugin's lock closes, the plugin exits, the hub starts it again, and each new start logs in to
-SEI once, up to 12 times an hour. The role must own the tables and be able to read the
-`events_id_seq` sequence.
+at Postgres, not at a transaction pooler, and put the host, port, user, password and database in
+it. The plugin checks the address when it takes its database lock, and a bad one stops the start
+with a message that never shows the address:
+
+- With no password, or an empty one: `DATABASE_URL has no password: add the role's password to
+  the URL`. If the database trusts the role without a password, put any password there; Postgres
+  ignores it.
+- With several hosts, no host, or a query parameter the plugin does not know: `DATABASE_URL is not
+  a valid Postgres address`. The libpq parameters that 2.1 accepted, such as `connect_timeout` and
+  `keepalives`, are accepted and ignored.
+
+Use `sslmode=disable` or `prefer`. The plugin has no TLS, so `require` fails.
+
+When the connection that holds the plugin's lock closes, or gives no answer for 30 seconds, the
+plugin exits, the hub starts it again, and each new start logs in to SEI once, up to 12 times an
+hour. So keep anything outside the plugin from ending its database connections, such as a firewall
+that cuts long-lived connections or a script that runs `pg_terminate_backend`. The role must own
+the tables and be able to read the `events_id_seq` sequence.
 
 Keep `SEI_URL`, `SEI_USERNAME` and `SEI_ORG` stable. Together they identify the account in the
 database. A change starts a new account, and its first check is a silent baseline.
@@ -165,6 +178,10 @@ also reads it every 5 minutes. A hub without `Watch` reads it every 15 seconds i
 
 The plugin does not exit on these errors. An exit would make the hub restart it in a loop, and with
 a wrong password every restart would cost a rejected login.
+
+When the database refuses connections, the plugin waits 10 seconds for it before it answers a read
+from the hub, and a check takes about 20 seconds to fail. A plugin that starts while the database
+refuses connections gives up after 10 seconds, and the hub tries again later.
 
 Nobody is told when the plugin is `failing`, or stays `paused` without a new event: the hub sends no
 notification about a plugin's state. Look at `GET /api/plugins` after every hub restart and every
@@ -304,10 +321,11 @@ Ctrl+C stops a command with exit code 130.
 
 ## Switching from the Go release to the plugin
 
-Both programs use the same database and schema, and the plugin needs no SQL step to take over from
-the Go release. The Go release holds no lock while it runs, and the plugin's lock only keeps a
-second plugin out. Running both at once makes two monitors fight over the same account, so stop
-the Go release completely before starting the plugin.
+The plugin takes over the Go release's database and keeps its accounts, processes and events. It
+needs no SQL step when its role can create tables and owns the Go release's tables (step 3 below).
+The Go release holds no lock while it runs, and the plugin's lock only keeps a second plugin out.
+Running both at once makes two monitors fight over the same account, so stop the Go release
+completely before starting the plugin.
 
 ### Releases and `latest`
 
@@ -318,7 +336,7 @@ directly, and the plugin image exits at once when run alone, which `restart: unl
 into a restart loop with SEI unwatched. So pin the old stack to `ghcr.io/itztas/sei-monitor:1.0.0`
 before the merge.
 
-### From the Go release to the plugin
+### Steps
 
 1. Pin the old stack to `:1.0.0` (above).
 2. Let the Go release send everything it has. It sends pending notifications every 30 seconds and
@@ -329,9 +347,9 @@ before the merge.
    SELECT count(*) FROM deliveries WHERE status = 'pending';
    ```
 
-   A notification still pending at the switch is never sent while the plugin runs: the hub's first
-   read takes that event as history. If a channel never delivers (an unpaired WhatsApp number, for
-   example), its rows stay pending: pair it first.
+   A notification still pending at the switch is never sent: the plugin's first start deletes it
+   with the `deliveries` table, and the hub's first read takes its event as history. If a channel
+   never delivers (an unpaired WhatsApp number, for example), its rows stay pending: pair it first.
 
    In the same database this must return an empty reason:
 
@@ -341,20 +359,53 @@ before the merge.
 
    With a reason there, the plugin starts held and watches nothing until you request a check. It
    says so once, in an event the hub announces on its second read.
-3. Give the hub the same `SEI_URL`, `SEI_USERNAME` and `SEI_ORG` as the old `.env`, with the
+3. Check the role and back the database up. The plugin's first start drops `deliveries`,
+   `goose_db_version` and every `whatsmeow_*` table, the Go release's WhatsApp session with it, so
+   the Go release can no longer run on this database. The plugin's role needs `CREATE` on the
+   schema and must own those tables: run the checks in [Upgrading from 2.1](#upgrading-from-21) as
+   that role, then take a `pg_dump` of the database.
+4. Give the hub the same `SEI_URL`, `SEI_USERNAME` and `SEI_ORG` as the old `.env`, with the
    `SEI__` prefix, and point `SEI__DATABASE_URL` at the old database.
-4. Stop the Go release, then start the hub. Go keeps checking SEI until it stops, and events it
+5. Stop the Go release, then start the hub. Go keeps checking SEI until it stops, and events it
    detects between step 2 and the stop are never announced, so do both close together.
-5. The plugin reads the database as Go left it: no new account, no new baseline, no repeated
+6. The plugin reads the database as Go left it: no new account, no new baseline, no repeated
    events. The hub's first read takes the Go-era events as history (see [The hub's first
    read](#the-hubs-first-read)).
-6. If the Go release was paused by a rejected login, the plugin starts held. Fix the password and
+7. If the Go release was paused by a rejected login, the plugin starts held. Fix the password and
    request a check (see [When SEI refuses the login](#when-sei-refuses-the-login)).
-7. After the first start, `GET /api/plugins` shows `sei` as `idle` with a fresh
+8. After the first start, `GET /api/plugins` shows `sei` as `idle` with a fresh
    `last_success_at`, `SELECT count(*) FROM accounts` still returns 1, and the hub logs
    `baseline complete` for `sei`. The baseline comes on the hub's first poll after the plugin has
    reached SEI. Don't restart the hub before that line (see [The hub's first
    read](#the-hubs-first-read)).
+
+## Upgrading from 2.1
+
+The first start of 2.2 on a 2.1 database keeps every account, process, document, event and cycle
+run, with the same ids. It drops the tables the Go release left behind: `deliveries`,
+`goose_db_version` and every `whatsmeow_*` table. A login rejection that 2.1 recorded still holds
+the plugin, and nothing logs in. The hub's log shows `database migrations applied` with the two
+migration names on that start, and with `[]` on every later one.
+
+To create its `seaql_migrations` table and drop those tables, the plugin's role needs `CREATE` on
+its schema and must own the tables it drops. 2.1 never needed either after its own first start.
+Without them the start stops with `permission denied for schema public` or `must be owner of table
+deliveries` and changes nothing, and the hub restarts the plugin in a loop until you fix the role.
+Those tries never reach SEI. Run these as the plugin's role first:
+
+```sql
+SELECT has_schema_privilege(current_user, current_schema(), 'CREATE');
+SELECT tablename, tableowner FROM pg_tables
+WHERE schemaname = current_schema()
+  AND (tablename IN ('deliveries', 'goose_db_version') OR starts_with(tablename, 'whatsmeow_'));
+```
+
+The first must return `t`, and every row of the second must show the plugin's role as
+`tableowner`. Later starts need only the rights 2.1 needed.
+
+Take a `pg_dump` of the database before that first start. Once 2.2 has run on it, neither 2.1 nor
+the Go release can use it again. 2.1 stops with `relation "accounts" already exists` and changes no
+data, but it leaves a new `goose_db_version` table behind; drop it by hand.
 
 ## Security
 
@@ -369,9 +420,10 @@ before the merge.
   refuse redirects.
 - The image has no shell and no other program, and runs as user 65532. Inside the hub the plugin
   runs as the hub's user, in the hub's hardened container.
-- Database connections have a 10-second connect limit, a 20-second statement limit and TCP
-  keepalives. The connection to Postgres is not encrypted, so keep the database on the same
-  machine or Docker network.
+- Getting a database connection has a 10-second limit, and each query of the store 20 seconds. The
+  plugin asks Postgres to send TCP keepalives on its connections, and it checks the connection that
+  holds its lock every half second. The connection to Postgres is not encrypted, so keep the
+  database on the same machine or Docker network.
 - Everything the plugin keeps lives in Postgres. Treat the database and its backups as secrets: they
   hold your processes and, with `full`, their contents.
 - To keep the load on SEI low, checks run at least 5 minutes apart, with a cap on simultaneous
@@ -430,9 +482,10 @@ The plugin was checked against the Go release's own output. These differences ar
   Postgres on `127.0.0.1:5432` from `compose.yaml`; copy `.env.example` to `.env` first and set
   `POSTGRES_PASSWORD`.
 - The database tests use `TEST_DATABASE_URL` when it is set, and otherwise start a throwaway
-  Postgres from `initdb` and `postgres` on `PATH`, on a local TCP port. To use the compose Postgres, export
-  `TEST_DATABASE_URL` in your shell, with the same password as `POSTGRES_PASSWORD`. The
-  conformance test runs the program named by `PLUGIN_CONFORMANCE`, or else installs `plugin-conformance` with `go`.
+  Postgres from `initdb` and `postgres` on `PATH`, on a local TCP port. To use the compose
+  Postgres, export `TEST_DATABASE_URL` in your shell, with the same password as
+  `POSTGRES_PASSWORD`; that URL needs a password, as `DATABASE_URL` does. The conformance test
+  runs the program named by `PLUGIN_CONFORMANCE`, or else installs `plugin-conformance` with `go`.
   With `CI` set, a missing tool fails the tests instead of skipping them.
 - `git config core.hooksPath .githooks` turns on the hooks: Conventional Commits messages, and
   `cargo fmt --check` plus the tests before each commit. The hook and `make` run cargo through

@@ -1,0 +1,391 @@
+[
+  {
+    "name": "login.html with an ISO-8859-1 header",
+    "content_type": "text/html; charset=iso-8859-1",
+    "body_base64": "PCFET0NUWVBFIGh0bWwgUFVCTElDICItLy9XM0MvL0RURCBIVE1MIDQuMDEvL0VOIj4KPGh0bWw+PGhlYWQ+PG1ldGEgaHR0cC1lcXVpdj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9aXNvLTg4NTktMSI+PHRpdGxlPlNJUCAtIEF1dGVudGljYefjbyBkZSBVc3XhcmlvPC90aXRsZT48L2hlYWQ+Cjxib2R5Pjxmb3JtIGlkPSJmcm1Mb2dpbiIgbWV0aG9kPSJwb3N0IiBhY3Rpb249ImxvZ2luLnBocCI+CjxsYWJlbCBmb3I9InR4dFVzdWFyaW8iPlVzdeFyaW86PC9sYWJlbD48aW5wdXQgdHlwZT0idGV4dCIgaWQ9InR4dFVzdWFyaW8iIG5hbWU9InR4dFVzdWFyaW8iPgo8c2VsZWN0IGlkPSJzZWxPcmdhbyIgbmFtZT0ic2VsT3JnYW8iIGNsYXNzPSJpbmZyYVNlbGVjdCI+CjxvcHRpb24gdmFsdWU9Im51bGwiPiZuYnNwOzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSIzNCI+QURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNDgiPkJERU1PPC9vcHRpb24+CjxvcHRpb24gdmFsdWU9IjEyIj5DREVNTzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSI2MyIgc2VsZWN0ZWQ9InNlbGVjdGVkIj5TRURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNzciPtNSR8NPREVNTzwvb3B0aW9uPgo8L3NlbGVjdD48L2Zvcm0+PC9ib2R5PjwvaHRtbD4K",
+    "orgs": [
+      {
+        "id": 34,
+        "acronym": "ADEMO"
+      },
+      {
+        "id": 48,
+        "acronym": "BDEMO"
+      },
+      {
+        "id": 12,
+        "acronym": "CDEMO"
+      },
+      {
+        "id": 63,
+        "acronym": "SEDEMO"
+      },
+      {
+        "id": 77,
+        "acronym": "ÓRGÃODEMO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "login.html with only the meta tag",
+    "content_type": "",
+    "body_base64": "PCFET0NUWVBFIGh0bWwgUFVCTElDICItLy9XM0MvL0RURCBIVE1MIDQuMDEvL0VOIj4KPGh0bWw+PGhlYWQ+PG1ldGEgaHR0cC1lcXVpdj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9aXNvLTg4NTktMSI+PHRpdGxlPlNJUCAtIEF1dGVudGljYefjbyBkZSBVc3XhcmlvPC90aXRsZT48L2hlYWQ+Cjxib2R5Pjxmb3JtIGlkPSJmcm1Mb2dpbiIgbWV0aG9kPSJwb3N0IiBhY3Rpb249ImxvZ2luLnBocCI+CjxsYWJlbCBmb3I9InR4dFVzdWFyaW8iPlVzdeFyaW86PC9sYWJlbD48aW5wdXQgdHlwZT0idGV4dCIgaWQ9InR4dFVzdWFyaW8iIG5hbWU9InR4dFVzdWFyaW8iPgo8c2VsZWN0IGlkPSJzZWxPcmdhbyIgbmFtZT0ic2VsT3JnYW8iIGNsYXNzPSJpbmZyYVNlbGVjdCI+CjxvcHRpb24gdmFsdWU9Im51bGwiPiZuYnNwOzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSIzNCI+QURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNDgiPkJERU1PPC9vcHRpb24+CjxvcHRpb24gdmFsdWU9IjEyIj5DREVNTzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSI2MyIgc2VsZWN0ZWQ9InNlbGVjdGVkIj5TRURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNzciPtNSR8NPREVNTzwvb3B0aW9uPgo8L3NlbGVjdD48L2Zvcm0+PC9ib2R5PjwvaHRtbD4K",
+    "orgs": [
+      {
+        "id": 34,
+        "acronym": "ADEMO"
+      },
+      {
+        "id": 48,
+        "acronym": "BDEMO"
+      },
+      {
+        "id": 12,
+        "acronym": "CDEMO"
+      },
+      {
+        "id": 63,
+        "acronym": "SEDEMO"
+      },
+      {
+        "id": 77,
+        "acronym": "ÓRGÃODEMO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "login.html with a text/html header and no charset",
+    "content_type": "text/html",
+    "body_base64": "PCFET0NUWVBFIGh0bWwgUFVCTElDICItLy9XM0MvL0RURCBIVE1MIDQuMDEvL0VOIj4KPGh0bWw+PGhlYWQ+PG1ldGEgaHR0cC1lcXVpdj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9aXNvLTg4NTktMSI+PHRpdGxlPlNJUCAtIEF1dGVudGljYefjbyBkZSBVc3XhcmlvPC90aXRsZT48L2hlYWQ+Cjxib2R5Pjxmb3JtIGlkPSJmcm1Mb2dpbiIgbWV0aG9kPSJwb3N0IiBhY3Rpb249ImxvZ2luLnBocCI+CjxsYWJlbCBmb3I9InR4dFVzdWFyaW8iPlVzdeFyaW86PC9sYWJlbD48aW5wdXQgdHlwZT0idGV4dCIgaWQ9InR4dFVzdWFyaW8iIG5hbWU9InR4dFVzdWFyaW8iPgo8c2VsZWN0IGlkPSJzZWxPcmdhbyIgbmFtZT0ic2VsT3JnYW8iIGNsYXNzPSJpbmZyYVNlbGVjdCI+CjxvcHRpb24gdmFsdWU9Im51bGwiPiZuYnNwOzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSIzNCI+QURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNDgiPkJERU1PPC9vcHRpb24+CjxvcHRpb24gdmFsdWU9IjEyIj5DREVNTzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSI2MyIgc2VsZWN0ZWQ9InNlbGVjdGVkIj5TRURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNzciPtNSR8NPREVNTzwvb3B0aW9uPgo8L3NlbGVjdD48L2Zvcm0+PC9ib2R5PjwvaHRtbD4K",
+    "orgs": [
+      {
+        "id": 34,
+        "acronym": "ADEMO"
+      },
+      {
+        "id": 48,
+        "acronym": "BDEMO"
+      },
+      {
+        "id": 12,
+        "acronym": "CDEMO"
+      },
+      {
+        "id": 63,
+        "acronym": "SEDEMO"
+      },
+      {
+        "id": 77,
+        "acronym": "ÓRGÃODEMO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "UTF-8 with charset=utf-8",
+    "content_type": "text/html; charset=utf-8",
+    "body_base64": "PGh0bWw+PGhlYWQ+PG1ldGEgY2hhcnNldD0idXRmLTgiPjwvaGVhZD48Ym9keT48c2VsZWN0IGlkPSJzZWxPcmdhbyI+PG9wdGlvbiB2YWx1ZT0iNzciPsOTUkfDg088L29wdGlvbj48b3B0aW9uIHZhbHVlPSI3OCI+Q09OQ0VJw4fDg088L29wdGlvbj48L3NlbGVjdD48L2JvZHk+PC9odG1sPg==",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO"
+      },
+      {
+        "id": 78,
+        "acronym": "CONCEIÇÃO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "UTF-8 with a quoted upper-case charset",
+    "content_type": "text/html; charset=\"UTF-8\"",
+    "body_base64": "PGh0bWw+PGhlYWQ+PG1ldGEgY2hhcnNldD0idXRmLTgiPjwvaGVhZD48Ym9keT48c2VsZWN0IGlkPSJzZWxPcmdhbyI+PG9wdGlvbiB2YWx1ZT0iNzciPsOTUkfDg088L29wdGlvbj48b3B0aW9uIHZhbHVlPSI3OCI+Q09OQ0VJw4fDg088L29wdGlvbj48L3NlbGVjdD48L2JvZHk+PC9odG1sPg==",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO"
+      },
+      {
+        "id": 78,
+        "acronym": "CONCEIÇÃO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "UTF-8 without any indication",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9Ijc3Ij7Dk1JHw4NPPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "UTF-8 without any indication, a rune split at byte 1024",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGhlYWQ+PHRpdGxlPng8L3RpdGxlPjwvaGVhZD48Ym9keT48cD5hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhw5M8L3A+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9Ijc3Ij7Dk1JHw4NPPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "Ã“RGÃƒO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "UTF-8 without any indication, a rune split at byte 1024 after another one",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGhlYWQ+PHRpdGxlPng8L3RpdGxlPjwvaGVhZD48Ym9keT48cD7Dp2FhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhw5M8L3A+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9Ijc3Ij7Dk1JHw4NPPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "meta tag after the first 1024 bytes over UTF-8",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGhlYWQ+PCEtLWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhLS0+PG1ldGEgY2hhcnNldD0iaXNvLTg4NTktMSI+PC9oZWFkPjxib2R5PjxzZWxlY3QgaWQ9InNlbE9yZ2FvIj48b3B0aW9uIHZhbHVlPSI3NyI+w5NSR8ODTzwvb3B0aW9uPjwvc2VsZWN0PjwvYm9keT48L2h0bWw+",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "Ã“RGÃƒO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "meta tag after the first 1024 bytes over Latin-1",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGhlYWQ+PCEtLWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhLS0+PG1ldGEgY2hhcnNldD0idXRmLTgiPjwvaGVhZD48Ym9keT48c2VsZWN0IGlkPSJzZWxPcmdhbyI+PG9wdGlvbiB2YWx1ZT0iNzciPtNSR8NPPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "Latin-1 without any indication, with byte 0x80",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9Ijc3Ij7TUkfDTyCAPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO €"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "ISO-8859-1 header over byte 0x80",
+    "content_type": "text/html; charset=iso-8859-1",
+    "body_base64": "PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9Ijc3Ij7TUkfDTyCAPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO €"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "UTF-8 BOM against an ISO-8859-1 header",
+    "content_type": "text/html; charset=iso-8859-1",
+    "body_base64": "77u/PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9Ijc3Ij7Dk1JHw4NPPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "unknown charset in the header, meta tag decides",
+    "content_type": "text/html; charset=x-unknown-sei",
+    "body_base64": "PCFET0NUWVBFIGh0bWwgUFVCTElDICItLy9XM0MvL0RURCBIVE1MIDQuMDEvL0VOIj4KPGh0bWw+PGhlYWQ+PG1ldGEgaHR0cC1lcXVpdj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9aXNvLTg4NTktMSI+PHRpdGxlPlNJUCAtIEF1dGVudGljYefjbyBkZSBVc3XhcmlvPC90aXRsZT48L2hlYWQ+Cjxib2R5Pjxmb3JtIGlkPSJmcm1Mb2dpbiIgbWV0aG9kPSJwb3N0IiBhY3Rpb249ImxvZ2luLnBocCI+CjxsYWJlbCBmb3I9InR4dFVzdWFyaW8iPlVzdeFyaW86PC9sYWJlbD48aW5wdXQgdHlwZT0idGV4dCIgaWQ9InR4dFVzdWFyaW8iIG5hbWU9InR4dFVzdWFyaW8iPgo8c2VsZWN0IGlkPSJzZWxPcmdhbyIgbmFtZT0ic2VsT3JnYW8iIGNsYXNzPSJpbmZyYVNlbGVjdCI+CjxvcHRpb24gdmFsdWU9Im51bGwiPiZuYnNwOzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSIzNCI+QURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNDgiPkJERU1PPC9vcHRpb24+CjxvcHRpb24gdmFsdWU9IjEyIj5DREVNTzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSI2MyIgc2VsZWN0ZWQ9InNlbGVjdGVkIj5TRURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNzciPtNSR8NPREVNTzwvb3B0aW9uPgo8L3NlbGVjdD48L2Zvcm0+PC9ib2R5PjwvaHRtbD4K",
+    "orgs": [
+      {
+        "id": 34,
+        "acronym": "ADEMO"
+      },
+      {
+        "id": 48,
+        "acronym": "BDEMO"
+      },
+      {
+        "id": 12,
+        "acronym": "CDEMO"
+      },
+      {
+        "id": 63,
+        "acronym": "SEDEMO"
+      },
+      {
+        "id": 77,
+        "acronym": "ÓRGÃODEMO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "unknown charset in the header over UTF-8",
+    "content_type": "text/html; charset=x-unknown-sei",
+    "body_base64": "PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9Ijc3Ij7Dk1JHw4NPPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "meta charset windows-1252",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGhlYWQ+PG1ldGEgY2hhcnNldD0id2luZG93cy0xMjUyIj48L2hlYWQ+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9Ijc3Ij7TUkfDTyCAPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 77,
+        "acronym": "ÓRGÃO €"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "select by name without id",
+    "content_type": "",
+    "body_base64": "PHNlbGVjdCBuYW1lPSJzZWxPcmdhbyI+PG9wdGlvbiB2YWx1ZT0iMSI+QURFTU88L29wdGlvbj48L3NlbGVjdD4=",
+    "orgs": [
+      {
+        "id": 1,
+        "acronym": "ADEMO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "two selects, the first wins",
+    "content_type": "",
+    "body_base64": "PHNlbGVjdCBpZD0ib3RoZXIiPjxvcHRpb24gdmFsdWU9IjkiPk9VVFJPPC9vcHRpb24+PC9zZWxlY3Q+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9IjEiPkFERU1PPC9vcHRpb24+PC9zZWxlY3Q+PHNlbGVjdCBuYW1lPSJzZWxPcmdhbyI+PG9wdGlvbiB2YWx1ZT0iMiI+QkRFTU88L29wdGlvbj48L3NlbGVjdD4=",
+    "orgs": [
+      {
+        "id": 1,
+        "acronym": "ADEMO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "id in another case does not match",
+    "content_type": "",
+    "body_base64": "PFNFTEVDVCBJRD0iU0VMT1JHQU8iPjxvcHRpb24gdmFsdWU9IjEiPkFERU1PPC9vcHRpb24+PC9TRUxFQ1Q+PHNlbGVjdCBJRD0ic2VsT3JnYW8iPjxPUFRJT04gVkFMVUU9IjIiPkJERU1PPC9PUFRJT04+PC9zZWxlY3Q+",
+    "orgs": [
+      {
+        "id": 2,
+        "acronym": "BDEMO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "option values",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9IiA2MyAiPkE8L29wdGlvbj48b3B0aW9uIHZhbHVlPSJudWxsIj5CPC9vcHRpb24+PG9wdGlvbiB2YWx1ZT0iMCI+Qzwvb3B0aW9uPjxvcHRpb24gdmFsdWU9Ii01Ij5EPC9vcHRpb24+PG9wdGlvbiB2YWx1ZT0iKzciPkU8L29wdGlvbj48b3B0aW9uIHZhbHVlPSI3eCI+Rjwvb3B0aW9uPjxvcHRpb24+Rzwvb3B0aW9uPjxvcHRpb24gdmFsdWU9IiI+SDwvb3B0aW9uPjxvcHRpb24gdmFsdWU9IjkyMjMzNzIwMzY4NTQ3NzU4MDgiPkk8L29wdGlvbj48b3B0aW9uIHZhbHVlPSIwMDYzIj5KPC9vcHRpb24+PG9wdGlvbiB2YWx1ZT0iMWUzIj5LPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 63,
+        "acronym": "A"
+      },
+      {
+        "id": 7,
+        "acronym": "E"
+      },
+      {
+        "id": 63,
+        "acronym": "J"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "option text with nested tags and spaces",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9IjUiPiAgQSA8Yj5CPC9iPgoJIEMgIDxpPkQgPHU+RTwvdT48L2k+IDwvb3B0aW9uPjxvcHRpb24gdmFsdWU9IjYiPjwvb3B0aW9uPjxvcHRpb24gdmFsdWU9IjciPiZuYnNwOzwvb3B0aW9uPjwvc2VsZWN0PjwvYm9keT48L2h0bWw+",
+    "orgs": [
+      {
+        "id": 5,
+        "acronym": "A B C D E"
+      },
+      {
+        "id": 6,
+        "acronym": ""
+      },
+      {
+        "id": 7,
+        "acronym": ""
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "option text with entities",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9IjUiPiZPYWN1dGU7UkcmQXRpbGRlO08gJmFtcDsgQ0lBJm5ic3A7WDwvb3B0aW9uPjwvc2VsZWN0PjwvYm9keT48L2h0bWw+",
+    "orgs": [
+      {
+        "id": 5,
+        "acronym": "ÓRGÃO & CIA X"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "options inside optgroup",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRncm91cCBsYWJlbD0iZyI+PG9wdGlvbiB2YWx1ZT0iMSI+QURFTU88L29wdGlvbj48L29wdGdyb3VwPjxvcHRpb24gdmFsdWU9IjIiPkJERU1PPC9vcHRpb24+PC9zZWxlY3Q+PC9ib2R5PjwvaHRtbD4=",
+    "orgs": [
+      {
+        "id": 1,
+        "acronym": "ADEMO"
+      },
+      {
+        "id": 2,
+        "acronym": "BDEMO"
+      }
+    ],
+    "error": null
+  },
+  {
+    "name": "no select",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGJvZHk+PGZvcm0+PGlucHV0IG5hbWU9InNlbE9yZ2FvIiB2YWx1ZT0iMSI+PC9mb3JtPjwvYm9keT48L2h0bWw+",
+    "orgs": null,
+    "error": "sei: the login page has no agency list (selOrgao field)"
+  },
+  {
+    "name": "select without valid options",
+    "content_type": "",
+    "body_base64": "PGh0bWw+PGJvZHk+PHNlbGVjdCBpZD0ic2VsT3JnYW8iPjxvcHRpb24gdmFsdWU9Im51bGwiPiZuYnNwOzwvb3B0aW9uPjwvc2VsZWN0PjwvYm9keT48L2h0bWw+",
+    "orgs": null,
+    "error": "sei: the login page has no agency list (selOrgao field)"
+  },
+  {
+    "name": "empty body",
+    "content_type": "",
+    "body_base64": "",
+    "orgs": null,
+    "error": "sei: decode the login page: EOF"
+  }
+]

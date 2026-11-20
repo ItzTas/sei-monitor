@@ -1,10 +1,11 @@
 *
 
-!go.mod
-!go.sum
-!*.go
-!internal
-!sql
+!Cargo.toml
+!Cargo.lock
+!rust-toolchain.toml
+!monitor.json
+!src
+!sql/schema/*.sql
+!testdata/golden/html_entities.json
 
-**/*_test.go
-**/testdata
+src/**/testdata

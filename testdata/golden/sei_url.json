@@ -1,0 +1,503 @@
+[
+  {
+    "input": "https://sei.rr.gov.br",
+    "normalized": "https://sei.rr.gov.br",
+    "problems": null
+  },
+  {
+    "input": "https://sei.rr.gov.br/",
+    "normalized": "https://sei.rr.gov.br",
+    "problems": null
+  },
+  {
+    "input": "https://sei.rr.gov.br/sei",
+    "normalized": "https://sei.rr.gov.br",
+    "problems": null
+  },
+  {
+    "input": "https://sei.rr.gov.br/sei/",
+    "normalized": "https://sei.rr.gov.br",
+    "problems": null
+  },
+  {
+    "input": "https://sei.rr.gov.br/SEI",
+    "normalized": "https://sei.rr.gov.br/SEI",
+    "problems": null
+  },
+  {
+    "input": "https://sei.rr.gov.br/sei/sei/",
+    "normalized": "https://sei.rr.gov.br/sei",
+    "problems": null
+  },
+  {
+    "input": "https://sei.rr.gov.br/x/sei//",
+    "normalized": "https://sei.rr.gov.br/x",
+    "problems": null
+  },
+  {
+    "input": "HTTPS://SEI.RR.GOV.BR/Sei",
+    "normalized": "https://SEI.RR.GOV.BR/Sei",
+    "problems": null
+  },
+  {
+    "input": "https://h/%73ei",
+    "normalized": "https://h",
+    "problems": null
+  },
+  {
+    "input": "https://h/a b",
+    "normalized": "https://h/a%20b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a%20b",
+    "normalized": "https://h/a%20b",
+    "problems": null
+  },
+  {
+    "input": "https://h/ção",
+    "normalized": "https://h/%C3%A7%C3%A3o",
+    "problems": null
+  },
+  {
+    "input": "https://h/ção/sei",
+    "normalized": "https://h/%C3%A7%C3%A3o",
+    "problems": null
+  },
+  {
+    "input": "https://sêi.br",
+    "normalized": "https://s%C3%AAi.br",
+    "problems": null
+  },
+  {
+    "input": "https://h:443",
+    "normalized": "https://h:443",
+    "problems": null
+  },
+  {
+    "input": "https://h?",
+    "normalized": "https://h?",
+    "problems": null
+  },
+  {
+    "input": "https://h#",
+    "normalized": "https://h",
+    "problems": null
+  },
+  {
+    "input": "https://h?x=1",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: remove everything after ? or #"
+    ]
+  },
+  {
+    "input": "https://h#f",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: remove everything after ? or #"
+    ]
+  },
+  {
+    "input": "https://u:p@h",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: remove the username and password from the address"
+    ]
+  },
+  {
+    "input": "https://u@h",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: remove the username and password from the address"
+    ]
+  },
+  {
+    "input": "http://localhost:8080/sei/",
+    "normalized": "http://localhost:8080",
+    "problems": null
+  },
+  {
+    "input": "http://LOCALHOST",
+    "normalized": "http://LOCALHOST",
+    "problems": null
+  },
+  {
+    "input": "http://127.0.0.2",
+    "normalized": "http://127.0.0.2",
+    "problems": null
+  },
+  {
+    "input": "http://[::1]:8080",
+    "normalized": "http://[::1]:8080",
+    "problems": null
+  },
+  {
+    "input": "http://example.com",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use https (plain http is only accepted for localhost)"
+    ]
+  },
+  {
+    "input": "ftp://h",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https:h",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https:///p",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https://h/%zz",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https://h{}",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "  https://h/  ",
+    "normalized": "https://h",
+    "problems": null
+  },
+  {
+    "input": "",
+    "normalized": null,
+    "problems": [
+      "SEI_URL is required (the SEI address, e.g. https://sei.rr.gov.br)"
+    ]
+  },
+  {
+    "input": "   ",
+    "normalized": null,
+    "problems": [
+      "SEI_URL is required (the SEI address, e.g. https://sei.rr.gov.br)"
+    ]
+  },
+  {
+    "input": "sei.rr.gov.br",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https://h/%2Fsei",
+    "normalized": "https://h",
+    "problems": null
+  },
+  {
+    "input": "https://h/a%2fb/",
+    "normalized": "https://h/a/b",
+    "problems": null
+  },
+  {
+    "input": "https://h/sei%2F",
+    "normalized": "https://h",
+    "problems": null
+  },
+  {
+    "input": "https://h/a%41",
+    "normalized": "https://h/aA",
+    "problems": null
+  },
+  {
+    "input": "https://h/a%7e",
+    "normalized": "https://h/a~",
+    "problems": null
+  },
+  {
+    "input": "https://h/a%7E",
+    "normalized": "https://h/a~",
+    "problems": null
+  },
+  {
+    "input": "https://h/a%c3%a7",
+    "normalized": "https://h/a%C3%A7",
+    "problems": null
+  },
+  {
+    "input": "https://h/a%2a",
+    "normalized": "https://h/a%2A",
+    "problems": null
+  },
+  {
+    "input": "https://h/a%21",
+    "normalized": "https://h/a%21",
+    "problems": null
+  },
+  {
+    "input": "https://h:",
+    "normalized": "https://h:",
+    "problems": null
+  },
+  {
+    "input": "https://h:99999",
+    "normalized": "https://h:99999",
+    "problems": null
+  },
+  {
+    "input": "https://h:65536",
+    "normalized": "https://h:65536",
+    "problems": null
+  },
+  {
+    "input": "https://h:0",
+    "normalized": "https://h:0",
+    "problems": null
+  },
+  {
+    "input": "https://h:abc",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https://h:-1",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https://h/a\tb",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https://h/ab",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https://h/a\u0001b",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https://%68",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "https://h%2Eexample.org",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use a full address starting with https://"
+    ]
+  },
+  {
+    "input": "http://[::ffff:127.0.0.1]",
+    "normalized": "http://[::ffff:127.0.0.1]",
+    "problems": null
+  },
+  {
+    "input": "http://[::ffff:127.0.0.1]:8080/sei",
+    "normalized": "http://[::ffff:127.0.0.1]:8080",
+    "problems": null
+  },
+  {
+    "input": "http://[::ffff:10.0.0.1]",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use https (plain http is only accepted for localhost)"
+    ]
+  },
+  {
+    "input": "https://[fe80::1%25eth0]",
+    "normalized": "https://[fe80::1%25eth0]",
+    "problems": null
+  },
+  {
+    "input": "http://[fe80::1%25eth0]",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use https (plain http is only accepted for localhost)"
+    ]
+  },
+  {
+    "input": "http://[::1%25lo]",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use https (plain http is only accepted for localhost)"
+    ]
+  },
+  {
+    "input": "http://127.1",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use https (plain http is only accepted for localhost)"
+    ]
+  },
+  {
+    "input": "https://h/a'b(c)*",
+    "normalized": "https://h/a%27b%28c%29%2A",
+    "problems": null
+  },
+  {
+    "input": "https://h/a!b",
+    "normalized": "https://h/a%21b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a'b",
+    "normalized": "https://h/a%27b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a(b",
+    "normalized": "https://h/a%28b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a)b",
+    "normalized": "https://h/a%29b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a*b",
+    "normalized": "https://h/a%2Ab",
+    "problems": null
+  },
+  {
+    "input": "https://h/a;b",
+    "normalized": "https://h/a;b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a=b",
+    "normalized": "https://h/a=b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a,b",
+    "normalized": "https://h/a,b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a$b",
+    "normalized": "https://h/a$b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a&b",
+    "normalized": "https://h/a&b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a+b",
+    "normalized": "https://h/a+b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a@b",
+    "normalized": "https://h/a@b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a:b",
+    "normalized": "https://h/a:b",
+    "problems": null
+  },
+  {
+    "input": "https://h/a~b",
+    "normalized": "https://h/a~b",
+    "problems": null
+  },
+  {
+    "input": "https://:443",
+    "normalized": "https://:443",
+    "problems": null
+  },
+  {
+    "input": "https://:",
+    "normalized": "https://:",
+    "problems": null
+  },
+  {
+    "input": "http://:8080",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use https (plain http is only accepted for localhost)"
+    ]
+  },
+  {
+    "input": "https://@h",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: remove the username and password from the address"
+    ]
+  },
+  {
+    "input": "https://:@h",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: remove the username and password from the address"
+    ]
+  },
+  {
+    "input": "https://h/a/../sei",
+    "normalized": "https://h/a/..",
+    "problems": null
+  },
+  {
+    "input": "https://h/sei/./",
+    "normalized": "https://h/sei/.",
+    "problems": null
+  },
+  {
+    "input": "https://h/xsei",
+    "normalized": "https://h/xsei",
+    "problems": null
+  },
+  {
+    "input": "https://h/sei?",
+    "normalized": "https://h?",
+    "problems": null
+  },
+  {
+    "input": "https://h/?",
+    "normalized": "https://h?",
+    "problems": null
+  },
+  {
+    "input": "http://localhost.",
+    "normalized": null,
+    "problems": [
+      "SEI_URL: use https (plain http is only accepted for localhost)"
+    ]
+  },
+  {
+    "input": "https://h.",
+    "normalized": "https://h.",
+    "problems": null
+  }
+]

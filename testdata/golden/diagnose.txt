@@ -1,0 +1,31 @@
+sei-monitor diagnose
+SEI 5.0.5, mod-wssei 3.0.4; units: 2 available, 1 watched (checks use the first one)
+
+[1] Pagination with limit=2
+    /processo/listar: page 0 has 2 ids, page 1 has 1, 0 in common -> start is a page number
+    /atividade/listar: page 0 has 2 ids, page 1 has 1, 0 in common -> start is a page number
+    /documento/listar: page 0 has 2 ids, page 1 has 1, 0 in common -> start is a page number
+
+[2] Coverage of /processo/listar by processoGeradoRecebido
+    default call: total 3; G=1 R=2 other=0
+    tipo=R:       total 2; G=0 R=2 other=0
+    tipo=G:       total 1; G=1 R=0 other=0
+
+[3] Scheduled returns (first 100 processes)
+    retornoProgramado=S: 1; retornoData: object{dataProgramada,unidade} x1
+    dataProgramada: 99/99/9999 x1
+    retornoProgramado=N with retornoData filled: 2 (sei-monitor ignores those)
+
+[4] Fields that may hold a link
+    none in the process items
+    a stable link to a process still needs a manual check in the browser
+
+[5] Field types
+    process: id string x3; idProcedimento string x3; usuarioAtribuido null x2, object x1; total string
+    activity: id string x3; data string x3; hora string x3; usuario string x3
+    document: id string x3; nomeComposto string x3; protocoloFormatado string x3
+    empty page: data key absent, total string
+
+[6] Order
+    activities: newest first (ids going down)
+    documents: oldest first (ids going up)

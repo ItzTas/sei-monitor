@@ -1,12 +1,16 @@
 # sei-monitor
 
-sei-monitor watches your processes on SEI and tells you when something changes. It logs in with
-your own SEI account through SEI's REST module (`mod-wssei`), checks the processes of your units
-every few minutes and turns what changed into events. You can read them in an RSS feed or a JSON
-API, or get them by email, Telegram, ntfy, webhook, AMQP (RabbitMQ) or WhatsApp.
+sei-monitor watches your processes on SEI. It logs in with your own SEI account through SEI's REST
+module (`mod-wssei`), checks the processes of your units every few minutes and records what
+changed as events.
 
-It is self-hosted. It runs on your own machine or server, keeps its data in Postgres, and
-talks only to your SEI and to the channels you turn on. The name is provisional.
+It is a monitor for monitor-hub and does not run on its own. The hub starts it, reads its events
+and sends the notifications through the hub's channels (email, Telegram, ntfy, webhook, AMQP,
+WhatsApp, the feed). The monitor keeps its data in its own Postgres database and talks only to your
+SEI and to that database.
+
+Release `1.0.0` was a standalone service with its own notifications, feed, API and web page. That
+code is gone (see [Switching from the Go release to the monitor](#switching-from-the-go-release-to-the-monitor)).
 
 ## What it reports
 
@@ -21,393 +25,477 @@ talks only to your SEI and to the channels you turn on. The name is provisional.
 | `return_overdue` | A scheduled return is overdue. |
 | `account_login_failed` | SEI refused the login, so monitoring paused (see [When SEI refuses the login](#when-sei-refuses-the-login)). |
 
-The very first check only takes note of what is already there. You won't get a message for every
-process you had before you installed sei-monitor; reports start with the second check.
+`account_login_failed` and `return_overdue` reach the hub as urgent, the rest as info.
 
-## Before you start
+The first check of a new account only takes note of what is already there. You don't get a
+message for every process you had before; reports start with the second check.
 
-- Your SEI needs the `mod-wssei` module turned on. The `orgs` and `test-login` commands tell you
-  whether it answers.
-- Docker with Compose, or Go 1.27 to build from source.
+## How monitor-hub runs it
 
-## Quick start with Docker
+The image `ghcr.io/itztas/sei-monitor` holds two files: `/monitor/monitor.json` and the static binary
+`/monitor/sei-monitor`, built for amd64 and arm64. The hub's `monitors.json` names the image, and the
+hub's image build copies `/monitor/` to `/opt/monitor-hub/monitors/sei/`. The manifest tells the hub
+to run `sei-monitor monitor`:
 
-1. Copy the example configuration, `cp .env.example .env`, and set `POSTGRES_PASSWORD` in it.
-2. Set `SEI_URL` and list the agencies to find yours:
-   `docker compose run --rm sei-monitor orgs`.
-3. Fill in `SEI_USERNAME`, `SEI_ORG` and the password (see [Passwords](#passwords)).
-4. Check the login: `docker compose run --rm sei-monitor test-login`. It shows the SEI and module
-   versions and your units, and never the session token.
-5. Create the tokens for the feed and the API, running the command once for each:
-   `docker compose run --rm sei-monitor generate-token`.
-6. Turn on the channels you want in `.env` and try them:
-   `docker compose run --rm sei-monitor send-test`.
-7. Start it: `docker compose up -d`, and follow the logs with `docker compose logs -f sei-monitor`.
-
-Compose pulls the published image, `ghcr.io/itztas/sei-monitor`, and starts a Postgres next to it.
-The data stays in the `postgres` volume. sei-monitor waits for the database to accept connections
-and creates its tables on the first start. `docker compose up -d --build` builds the image from
-your checkout instead.
-
-### Coming from a SQLite install
-
-Installs that kept their data in SQLite have to start over on Postgres. The first check only takes
-note of what is already there, so you won't get a flood of old events. Pair the WhatsApp number
-again with `whatsapp-pair`.
-
-### Running on a server
-
-The server needs only `compose.yaml` and your `.env`. Every push to `main` publishes
-`ghcr.io/itztas/sei-monitor:latest` for amd64 and arm64, and a `v1.2.3` tag also publishes `1.2.3`
-and `1.2`. To update to the newest image:
-
-```sh
-docker compose pull
-docker compose up -d
+```json
+{"protocol_version":2,"name":"sei","command":["sei-monitor","monitor"],"apk":[]}
 ```
 
-To stay on a release rather than follow `main`, put its tag in the `image` line of `compose.yaml`,
-for example `ghcr.io/itztas/sei-monitor:1.2`.
+The monitor needs no Alpine package. It carries its own TLS roots and time zone table.
 
-## Running without Docker
+Set the monitor's variables in the hub's `.env` with the `SEI__` prefix: `SEI__SEI_URL`,
+`SEI__DATABASE_URL` and so on. The hub gives the monitor only the variables with that prefix, with
+the prefix removed, plus its own `PATH`, `TZ`, `TMPDIR` and `MONITOR_HUB_DATA_DIR`. A misspelled
+name is not an error: the monitor never sees it.
 
-With Go 1.27 installed, `make local` runs `serve` with the variables from `.env`, the same file
-Compose reads. Pass another command in `CMD`, as in `make local CMD=test-login` or
-`make local CMD=send-test`. A variable already set in your shell takes precedence over the file, so
-`LOG_LEVEL=debug make local` works. `make dev` runs it with hot reload and rebuilds on every change.
+Run the image by hand and it prints that the hub did not launch it, then exits with code 1.
 
-Outside Compose, point `DATABASE_URL` at a Postgres server you run yourself; the commented line in
-`.env.example` shows the shape. `HTTP_ADDRESS` is used as written, so `:8080` listens on every
-interface; use `127.0.0.1:8080` to keep it on your machine. `SEI_PASSWORD_CMD` fits best here,
-since tools such as `secret-tool` have the desktop session they need.
+The hub's API shows the monitor in `GET /api/monitors` (state and message) and starts a check with
+`POST /api/monitors/sei/check`. A check is refused while one is running and within 5 minutes of the
+last one. The hub's own deploy guide (`docs/deploy.md` in the monitor-hub repository) is the full
+runbook for moving the old service onto the hub.
 
-## Passwords
+## How the monitor tells the hub to read
 
-Set exactly one of these:
+The hub keeps a `Watch` call open to the monitor. The monitor sends a signal on that call when the hub
+should read it, and the hub then reads the monitor's state, and its events when there are new ones.
+The monitor signals when:
 
-- `SEI_PASSWORD`: the simplest, and the least safe. Anyone who can inspect the process or the
-  container can read environment variables.
-- `SEI_PASSWORD_FILE`: the path of a file that holds the password, such as a Docker secret.
-- `SEI_PASSWORD_CMD`: a command that prints the password, for example `pass show sei/monitor`.
-  sei-monitor runs it at every login, without a shell, with a 30-second limit, and without passing
-  on its own secret variables. Tools such as `secret-tool` need a D-Bus session, which a container
-  doesn't have, so this option fits best when sei-monitor runs outside Docker.
+- a check starts or ends, or the time of the next check changes;
+- SEI refuses the login, or the monitor starts held by a refusal from an earlier run;
+- a check you requested ends the hold, or SEI gave its login no answer and the monitor is held again;
+- the monitor cannot reach SEI, or does not find the agency or the module, and when it reaches SEI;
+- the hub is ahead of the monitor's database, and when the two agree again;
+- the hub cannot read the monitor's events, and when it can again;
+- the monitor's scheduler stops after an internal error;
+- the monitor records an event;
+- the hub's first read ends (see [The hub's first read](#the-hubs-first-read)).
 
-Every secret variable accepts the same `_FILE` form: `SEI_PASSWORD`, `DATABASE_URL`, `FEED_TOKEN`,
-`API_TOKEN`, `SMTP_PASSWORD`, `TELEGRAM_TOKEN`, `NTFY_TOKEN`, `WEBHOOK_SECRET` and `AMQP_URL`.
+A signal never contacts SEI and never logs in. The hub answers it by reading what the monitor holds
+in memory and in its database. It never starts a check because of a signal.
 
-A Docker secret for the password looks like this in `compose.yaml`:
-
-```yaml
-services:
-  sei-monitor:
-    environment:
-      SEI_PASSWORD_FILE: /run/secrets/sei_password
-    secrets:
-      - sei_password
-
-secrets:
-  sei_password:
-    file: ./sei_password.txt
-```
-
-The image runs as user 65532, so that user must be able to read the file.
-
-The session token SEI hands out after the login is a credential too. sei-monitor keeps it only in
-memory, never in the database, a file, a log or a message.
+When 30 seconds pass without a signal, the monitor sends one anyway, so the hub knows the call is
+alive. While the `Watch` call is down, the hub reads the monitor every 15 seconds until it opens
+the call again.
 
 ## Configuration
 
-`.env.example` documents every variable. In short:
-
 | Variable | Default | What it does |
 |---|---|---|
-| `SEI_URL` | | SEI address, without `/sei` at the end. |
+| `DATABASE_URL` | | Required, secret. `postgres://user:password@host:port/database?sslmode=disable`, or the same with `postgresql://`. The password is required, a URL with several hosts is refused, and the monitor connects without TLS. `DATABASE_URL_FILE` reads it from a file. |
+| `SEI_URL` | | Required. SEI address, without `/sei` at the end. Must be https; plain http works only for localhost. |
 | `SEI_API_URL` | discovered | Address of the `mod-wssei` API, only if the discovery fails. |
-| `SEI_USERNAME` | | Your SEI login. |
-| `SEI_PASSWORD`, `_FILE`, `_CMD` | | The password; set exactly one. |
-| `SEI_ORG` | | Agency acronym or id, as `orgs` lists them. |
+| `SEI_USERNAME` | | Required. Your SEI login. |
+| `SEI_PASSWORD`, `_FILE`, `_CMD` | | Required, secret. Set exactly one (see [Passwords](#passwords)). |
+| `SEI_ORG` | | Required. Agency acronym or id, as `orgs` lists them. |
 | `SEI_UNITS` | your current unit | Unit acronyms separated by commas, or `all`. |
-| `SEI_TIMEZONE` | `America/Sao_Paulo` | Time zone of the dates SEI shows. |
-| `POLL_INTERVAL` | `15m` | Time between checks, at least `5m`. |
+| `SEI_TIMEZONE` | `America/Sao_Paulo` | Time zone of the dates SEI shows. Roraima uses `America/Boa_Vista`. |
 | `SEI_CONCURRENCY` | `3` | Simultaneous calls to SEI, from 1 to 10. |
-| `DATABASE_URL` | | Required. `postgres://user:password@host/database`. Compose builds it from `POSTGRES_PASSWORD`. |
-| `POSTGRES_PASSWORD` | | Password of the Postgres that Compose starts. |
-| `HTTP_ADDRESS` | `:8080` | Address of the HTTP server; empty turns it off. |
-| `PUBLIC_URL` | | Public address behind nginx, used only for the feed's link to itself. |
-| `FEED_TOKEN` | | Turns on the RSS feed. At least 32 characters. |
-| `API_TOKEN` | | Turns on the JSON API and the web interface. At least 32 characters, different from `FEED_TOKEN`. |
-| `NOTIFICATION_DETAIL` | `minimal` | Detail of the feed and the messages: `minimal` or `full`. |
-| `API_DETAIL` | `NOTIFICATION_DETAIL` | Detail of the API: `minimal` or `full`. |
-| `RETURN_WARNING_DAYS` | `2` | How early to warn about a scheduled return. |
-| `RETENTION_DAYS` | `90` | How many days to keep events and the processes that left your units. Use at least `RETURN_WARNING_DAYS` + 2, or `0` to keep them forever. |
+| `POLL_INTERVAL` | `15m` | Time between checks, at least `5m`. |
+| `RETURN_WARNING_DAYS` | `2` | How many days before a scheduled return to warn, from 0 to 60. |
+| `RETENTION_DAYS` | `90` | How many days to keep events and the processes that left your units, up to 3650. Use at least `RETURN_WARNING_DAYS` + 2, or `0` to keep everything. |
+| `NOTIFICATION_DETAIL` | `minimal` | `minimal` or `full`, see [Detail level](#detail-level). |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
-| `SMTP_*`, `TELEGRAM_*`, `NTFY_*`, `WEBHOOK_*`, `AMQP_*`, `WHATSAPP_RECIPIENTS` | | The channels, below. |
 
-## Reading the events
+A bad value stops the monitor at start-up with one `fatal` line in the hub's log that lists every
+problem at once. The hub then restarts it with a back-off until the configuration is fixed.
 
-### RSS feed
+The monitor is stricter about its database than the Go release was. Point `DATABASE_URL` straight
+at Postgres, not at a transaction pooler, and put the host, port, user, password and database in
+it. The monitor checks the address when it takes its database lock, and a bad one stops the start
+with a message that never shows the address:
 
-With `FEED_TOKEN` set, the feed lives at `/feed/<FEED_TOKEN>.xml` and holds the latest 100 events.
-The token is the feed's only protection, so treat the address like a password. A wrong token gets
-the same 404 as any unknown page, and sei-monitor's own access log masks the token. If you set
-`PUBLIC_URL`, the feed links to itself, which puts its full address, token included, inside the
-feed.
+- With no password, or an empty one: `DATABASE_URL has no password: add the role's password to
+  the URL`. If the database trusts the role without a password, put any password there; Postgres
+  ignores it.
+- With several hosts, no host, or a query parameter the monitor does not know: `DATABASE_URL is not
+  a valid Postgres address`. The libpq parameters that 2.1 accepted, such as `connect_timeout` and
+  `keepalives`, are accepted and ignored.
 
-### JSON API
+Use `sslmode=disable` or `prefer`. The monitor has no TLS, so `require` fails.
 
-With `API_TOKEN` set, these routes answer to `Authorization: Bearer <API_TOKEN>`:
+When the connection that holds the monitor's lock closes, or gives no answer for 30 seconds, the
+monitor exits, the hub starts it again, and each new start logs in to SEI once, up to 12 times an
+hour. So keep anything outside the monitor from ending its database connections, such as a firewall
+that cuts long-lived connections or a script that runs `pg_terminate_backend`. The role must own
+the tables and be able to read the `events_id_seq` sequence.
 
-| Route | What it returns |
-|---|---|
-| `GET /status` | The agency, the watched units, the SEI versions, the latest check, the next one and the deliveries per channel. |
-| `GET /processes` | The processes in your units. Filters: `unit`, `assigned_to_me`, `return_scheduled`, `return_overdue`, `include_left`. |
-| `GET /processes/{procedure_id}` | One process, the documents sei-monitor has seen in it and its latest 50 events. |
-| `GET /events` | The events, newest first. Filters: `kind` (repeatable), `procedure_id`, `since`, `until`. |
-| `GET /deliveries` | The deliveries per channel. Filters: `status`, `channel`. |
-| `POST /cycle` | Starts a check now. |
-| `GET /openapi.json` | The OpenAPI document. It needs no token. |
+Keep `SEI_URL`, `SEI_USERNAME` and `SEI_ORG` stable. Together they identify the account in the
+database. A change starts a new account, and its first check is a silent baseline.
 
-```sh
-curl -H "Authorization: Bearer $API_TOKEN" https://example.org/api/v1/status
-curl -H "Authorization: Bearer $API_TOKEN" "https://example.org/api/v1/events?kind=document_added&limit=20"
-```
+### Passwords
 
-Lists come as `{"items": [...], "next_cursor": "..."}`. Pass `next_cursor` back as `cursor` to read
-the next page; it is `null` on the last one. `limit` goes from 1 to 200 and defaults to 50. Errors
-use the `application/problem+json` format. `POST /cycle` answers 202 when the check starts, 409
-while a check is running, while monitoring is paused or before sei-monitor first reaches SEI, and
-429 with `Retry-After` when the last check started less than 5 minutes ago.
+Set exactly one of these:
 
-[`docs/openapi.json`](docs/openapi.json) describes every route and field.
+- `SEI_PASSWORD`: the simplest, and the least safe. Anyone who can inspect the hub's container can
+  read its environment.
+- `SEI_PASSWORD_FILE`: the path of a file that holds the password, such as a Docker secret mounted
+  into the hub's container. The monitor reads it once, at start-up. The hub runs as user 65532, so
+  that user must be able to read the file.
+- `SEI_PASSWORD_CMD`: a command that prints the password. The monitor runs it at every login,
+  without a shell, with a 30-second limit. Its environment leaves out the secret variables: the
+  passwords, tokens and database addresses of the monitor and of the Go release, the same names
+  behind a prefix such as `SEI__` or `DIARIO__`, and `AMQP_URL`. Its program must exist inside the
+  hub's image, which has no password manager; start-up refuses a program it cannot find on `PATH`.
 
-### Web interface
+A password with `$` or quotes in the hub's `.env` can reach the monitor changed by the way that file
+is read. That costs one rejected login and a pause, so look at `GET /api/monitors` right after the
+first start.
 
-With `API_TOKEN` set, sei-monitor also serves a page at `/ui/` that lists the latest 50 events and
-refreshes the list every minute. Sign in with the `API_TOKEN`, and the browser keeps a session
-cookie for 7 days. The cookie carries a signature made with the token, so the browser never stores
-the token itself. Changing `API_TOKEN` signs every browser out; signing out on the page only clears
-the cookie in the browser you're using.
-
-The cookie is marked `Secure`, so open the page over HTTPS or on `localhost`. Browsers refuse it on
-plain HTTP to any other address, and signing in then sends you straight back to the form. With the
-nginx setup below, the page is at `https://example.org/api/v1/ui/`. It shows the events at the
-API's detail level (`API_DETAIL`).
+The session token SEI hands out after the login is a credential too. The monitor keeps it only in
+memory.
 
 ### Detail level
 
-At the `minimal` level, events carry the event type, the process number, the unit and the date.
+At the `minimal` level, events carry the event type, the process number, the unit, the date and
+the link to the process (see [Known limitations](#known-limitations)).
 `full` adds the process type and description, the activity text, the document name and who did
-what. Choose it only if you are fine with that content passing through the channels you use.
+what. Choose it only if you are fine with that content passing through the hub's channels.
 
-Your own SEI login, which is often your CPF, never shows up. Texts say "you", the API answers
-`assigned_to_me` and `activity_by_me`, and `/status` never returns the username.
+Your own SEI login, which is often your CPF, never shows up. Texts say "you", and the event data
+carries `assigned_to_me` and `activity_by_me` instead of your acronym.
 
-## Notifications
+## Status
 
-Every 30 seconds sei-monitor sends each channel one message with everything new for it. The
-message lists up to ten events and ends with "and N more" when there are others. When a channel
-fails, sei-monitor tries again after 1 minute, 5 minutes, 30 minutes, 2 hours and 6 hours, and
-then gives up on those events for that channel. `/status` counts the deliveries per channel, and
-`/deliveries` shows why the last attempt failed. Each event goes to the channels that were on when
-sei-monitor recorded it.
+The monitor tells the hub when its state changes or it records an event, and the hub reads it right
+away (see [How the monitor tells the hub to read](#how-the-monitor-tells-the-hub-to-read)). The hub
+also reads it every 5 minutes, and every 15 seconds while the `Watch` call is down.
+`GET /api/monitors` shows what the monitor answered:
 
-### Email
+| State | Message | Meaning |
+|---|---|---|
+| `checking` | | A check is running. |
+| `idle` | | The last check worked. `next_check_at` says when the next one starts. |
+| `paused` | the reason, then what to do | SEI refused the login. See below. |
+| `failing` | the error of the last check | The last check failed: SEI answered with an error or with a page that is not the API's, a unit in `SEI_UNITS` is no longer yours, the password command failed, or the database refused what the check found. Nothing is recorded while this lasts. The monitor tries again after 30 seconds, then a minute, doubling up to the check interval, and goes back to `idle` after the first check that works. |
+| `failing` | `sei-monitor has not reached SEI yet`, with the error when there is one | The monitor has not reached SEI since it started. It tries again with the same back-off. |
+| `failing` | an unknown agency or module | The login page does not list `SEI_ORG`, or neither module address answered like the module. A maintenance or error page in front of SEI looks the same, so the monitor keeps trying with the same back-off; these tries never log in. If the message stays, fix `SEI_ORG` or set `SEI_API_URL`, then restart the hub. |
+| `failing` | `the database is unavailable` | The monitor's database does not answer, or the last read of the events failed. Events wait in the database until it answers. |
+| `failing` | `the hub is ahead of this database: reset the hub's position for the sei monitor` | The monitor's database was reset and the hub's position for `sei` was not. Reset both together. |
+| `failing` | `the monitor stopped after an internal error; see the monitor log` | A bug stopped the monitor's scheduler. Restart the hub and send the monitor log. |
 
-Set `SMTP_HOST`, `SMTP_FROM` and `SMTP_TO`, plus `SMTP_USERNAME` and `SMTP_PASSWORD` if the server
-asks for a login. `SMTP_TLS` picks the encryption:
+`last_success_at` is the end of the last check that finished without an error.
 
-- `starttls`, the default, on port 587. The server must offer STARTTLS, or the email isn't sent.
-- `tls` on port 465.
-- `none` on port 25, which refuses a password.
+The monitor does not exit on these errors. An exit would make the hub restart it in a loop, and with
+a wrong password every restart would cost a rejected login.
 
-The subject reads like `[sei-monitor] 3 updates on your processes`, and the body is plain text.
+When the database refuses connections, the monitor waits 10 seconds for it before it answers a read
+from the hub, and a check takes about 20 seconds to fail. A monitor that starts while the database
+refuses connections gives up after 10 seconds, and the hub tries again later.
 
-### Telegram
-
-Create a bot with @BotFather and put its token in `TELEGRAM_TOKEN`. Send the bot any message, or add
-it to a group, then open `https://api.telegram.org/bot<TELEGRAM_TOKEN>/getUpdates` and copy the
-`chat.id` you find there into `TELEGRAM_CHAT_ID`. Group ids start with `-100`. A public channel
-also works as `@channel_name`.
-
-### ntfy
-
-Set `NTFY_URL` to the server and topic, such as `https://ntfy.sh/<topic>`. On the public ntfy.sh,
-anyone who knows a topic can read it, so pick a long random one (the output of `generate-token`
-works) or use a server with access control and `NTFY_TOKEN`. Login failures and overdue returns
-arrive with high priority.
-
-### Webhook
-
-sei-monitor posts the events as JSON to `WEBHOOK_URL`:
-
-```json
-{
-  "events": [
-    {
-      "id": 42,
-      "kind": "document_added",
-      "procedure_id": 9001,
-      "process_number": "00000.000001/2026-00",
-      "unit": "SEDEMO/NUPROC",
-      "title": "New document on process 00000.000001/2026-00",
-      "occurred_at": "2026-11-04T17:13:05Z",
-      "detected_at": "2026-11-04T17:15:00Z",
-      "detail": { "document_protocol": "0012345" }
-    }
-  ]
-}
-```
-
-Each event has the fields of the `Event` schema in `docs/openapi.json`, at the level set by
-`NOTIFICATION_DETAIL`. The message from `send-test` is `{"test": true, "events": []}`. Any 2xx
-answer counts as delivered, and sei-monitor doesn't follow redirects.
-
-The `X-Sei-Monitor-Signature` header carries `sha256=` followed by the hex HMAC-SHA256 of the raw
-body, keyed with `WEBHOOK_SECRET`. Check it before trusting a request. In Python:
-
-```python
-import hashlib
-import hmac
-
-def is_from_sei_monitor(secret: bytes, body: bytes, signature: str) -> bool:
-    expected = "sha256=" + hmac.new(secret, body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature)
-```
-
-### AMQP (RabbitMQ)
-
-Set `AMQP_URL` to the broker, as `amqp://user:password@host:5672/vhost` or `amqps://...` for TLS,
-with any special character in the password percent-encoded. Plain `amqp` sends the password and the
-events unencrypted. Keep it for a broker on the same machine or the same Docker network, and use
-`amqps` for anything else. The broker user needs the configure and write permissions on the
-exchange.
-
-sei-monitor declares a durable topic exchange named by `AMQP_EXCHANGE` (`sei-monitor` by default)
-and publishes one persistent message per event, with the event kind as the routing key. Bind a
-queue to `#` to get everything, or only to the kinds you care about, such as `return_overdue`. The
-body is a single event, the same object as one item of the webhook's `events` list. `message_id`
-holds the event id and `type` the kind. The message from `send-test` goes out under the routing key
-`test`, with the body `{"test": true}`.
-
-sei-monitor waits for the broker to confirm every message. If part of a batch fails, it sends the
-whole batch again, so a consumer can get the same event twice; drop duplicates by `message_id`.
-RabbitMQ confirms a message that no queue is bound to and then throws it away, so bind your queues
-before the events you want start arriving.
-
-### WhatsApp
-
-The WhatsApp channel uses an unofficial client library (whatsmeow), not an API offered by
-WhatsApp. WhatsApp may block a number it sees doing this, so pair a spare number, never your
-personal one.
-
-1. Set `WHATSAPP_RECIPIENTS` to the phone numbers that get the messages, with country and area
-   code (`5595991234567`), or to group ids, which end in `@g.us`.
-2. Pair the number that sends the messages:
-   `docker compose run --rm sei-monitor whatsapp-pair 5595991234567`. It prints a code. On the
-   phone with that number, open WhatsApp > Linked devices > Link a device, tap "Link with phone
-   number instead" and type the code.
-3. Restart sei-monitor.
-
-The WhatsApp session lives in sei-monitor's database, so protect the database like a password.
-Until the number is paired, the WhatsApp messages wait in the queue. To pair another number, unlink
-sei-monitor under Linked devices on the paired phone, start sei-monitor once so it drops the old
-session, and run `whatsapp-pair` again.
-
-## Behind nginx
-
-sei-monitor speaks plain HTTP and expects a reverse proxy in front of it for HTTPS. The compose file
-publishes it only on `127.0.0.1:8080`. Inside the `server` block of your site:
-
-```nginx
-location /api/v1/feed/ {
-    access_log off;
-    proxy_pass http://127.0.0.1:8080/feed/;
-}
-
-location /api/v1/ {
-    proxy_pass http://127.0.0.1:8080/;
-}
-```
-
-The first block keeps the feed token out of nginx's logs. sei-monitor doesn't need to know the
-prefix: it never builds absolute addresses and ignores the `X-Forwarded-*` headers. The one
-exception is the feed's link to itself, which comes from `PUBLIC_URL`.
-
-## Health check
-
-`GET /healthz` answers `{"ok": true}` with status 200 when the latest check finished without an
-error less than three intervals ago, and `{"ok": false}` with 503 otherwise. Right after the start,
-it answers 200 for one interval while the first check runs. The Docker image uses it for its
-`HEALTHCHECK`.
+Nobody is told when the monitor is `failing`, or stays `paused` without a new event: the hub sends no
+notification about a monitor's state. Look at `GET /api/monitors` after every hub restart and every
+configuration change.
 
 ## When SEI refuses the login
 
-sei-monitor doesn't try again, because repeated failures can lock the account. It pauses, records
-an `account_login_failed` event, delivers it through the channels and keeps serving the feed, the
-API and the web interface. Fix the configuration and restart it. Network errors and SEI outages are different: those
-are retried after 30 seconds, then a minute, doubling up to the check interval.
+The monitor tries the login once. When SEI rejects it, the monitor stops logging in, because repeated
+failures can lock the account. It stays up, keeps serving its events, and:
 
-## Commands
+- records one `account_login_failed` event (urgent) titled `sei-monitor could not log in to SEI`.
+  The body gives SEI's reason, for example `Reason: SEI rejected the login (Usuário ou Senha
+  Inválida.)`, and ends with `Fix the configuration, restart the hub if you changed its settings,
+  then request a check for the sei monitor.`;
+- logs `SEI rejected the login; monitoring is paused until sei-monitor restarts with the
+  configuration fixed` at `error`, with the reason. That line keeps the Go release's wording: a
+  restart alone is not enough, see the steps below;
+- answers `paused` with `<reason>; restart the monitor with the configuration fixed, then request a
+  check`, and refuses checks.
+
+It also stores the reason in its database. A monitor process that starts with a reason on record is
+held: it does not log in at all. It logs `SEI rejected the login in an earlier run; monitoring stays
+paused until a check is requested with the configuration fixed`, answers `paused` with `<reason>;
+nothing is logging in: request a check once the configuration is fixed`, and records one more
+`account_login_failed` event. Its reason ends with `still paused after a restart: request a check
+once the configuration is fixed`, followed by the same last sentence as the first event. That event
+is recorded at most once per UTC day, however often the monitor restarts.
+
+In both cases the monitor signals the hub, so the `account_login_failed` event and the `paused`
+state reach the hub right away.
+
+After a rejected login, a restart alone never logs in again, on purpose. The hub restarts the
+monitor by itself, for example after a lost database connection, and every attempt with a wrong
+password counts toward SEI locking the account. Only a check you request retries the login. With a
+correct password, each monitor restart costs one login.
+
+To resume:
+
+1. Fix the password: in SEI, or in the hub's `.env`, the secret file or the password command.
+2. Restart the hub so the monitor starts held with the new configuration. After editing `.env`, run
+   `docker compose up -d` in the hub's folder (a plain `restart` keeps the old environment);
+   otherwise `docker compose restart monitor-hub`. You can skip this step when the monitor already
+   shows the held message and its configuration did not change: you fixed the password in SEI, or
+   it comes from `SEI_PASSWORD_CMD`, which runs at every login.
+3. Request a check, with the hub's `API_TOKEN` in a shell variable (the hub's deploy guide shows
+   how to set it without writing it into the history) and the hub's port:
+
+   ```sh
+   curl -s -X POST -H "Authorization: Bearer $API_TOKEN" http://127.0.0.1:8090/api/monitors/sei/check
+   ```
+
+   Expect `{"accepted":true,...}`. `sei-monitor has not reached SEI yet` means the monitor is still
+   connecting after the restart: ask again in a minute.
+4. Read `GET /api/monitors` after half a minute. `sei` should be `idle` with a fresh
+   `last_success_at`. If SEI rejected the password again, it is `paused` with the first message,
+   and you start over from step 1.
+
+Once SEI accepts the login of a requested check, the monitor drops the recorded rejection and
+erases it from its database, even when something later in that check fails. The monitor then shows
+`failing` with the error and tries again on its own after 30 seconds, with the session it already
+has. If the database did not take the erase, the monitor writes it again after its next check that
+succeeds. A restart before that finds the rejection still recorded and holds the monitor again,
+without a login; request another check. Only a check whose login got no answer from SEI (an error
+page, a time-out) leaves the monitor held; request another one later. Network errors and SEI
+outages outside a pause are retried on their own: after 30 seconds, then a minute, doubling up to
+the check interval.
+
+## The hub's first read
+
+The first time the hub reads a monitor it does not know, it stores what the monitor already holds as
+a baseline and announces none of it. That read comes right after the monitor has reached SEI,
+because the monitor signals the hub then.
+
+The monitor's own first check may find changes before that read happens. So the monitor holds back
+everything newer than what it held at start-up until the hub's first read has ended. When that read
+ends, the monitor signals the hub again, and the events it held back reach the hub right away and are
+announced as usual.
+
+That hold belongs to one monitor process. If the monitor or the hub restarts after the first check
+recorded events and before the hub logged `baseline complete` for `sei`, the new process counts
+those events as history and the baseline takes them in. Nobody announces them. When that happens,
+check by hand:
+
+1. In the hub's log, look for the monitor's `cycle finished` lines from before the restart. An
+   `events` count above 0 means that check recorded events.
+2. List the events recorded since the hub started (use your role and database names, and the
+   start time in UTC):
+
+   ```sql
+   SELECT id, kind, payload::jsonb->>'process_number' AS process, detected_at
+   FROM events
+   WHERE detected_at >= '<when the hub started>'
+   ORDER BY id;
+   ```
+
+3. Look for each of them in your channels, and pass on the ones that never arrived.
+
+## Operator commands
+
+The binary has three commands for you, besides `monitor`:
 
 | Command | What it does |
 |---|---|
-| `serve` | Watches SEI, sends the notifications and serves the feed, the API and the web interface. It runs when you give no command. |
-| `test-login` | Logs in and shows the SEI and module versions and your units. |
-| `orgs` | Lists the acronym and id of every agency on the SEI login page. It needs only `SEI_URL`. |
+| `orgs` | Lists the acronym and id of every agency on the SEI login page. It needs only `SEI_URL` and never logs in. |
+| `test-login` | Logs in and shows the SEI and module versions and your units, never the session token. |
 | `diagnose` | Checks how the SEI API behaves and prints only counts and types, so its output is safe to share. |
-| `send-test` | Sends a test message through every channel that is on and says which one failed. |
-| `whatsapp-pair` | Pairs the WhatsApp number that sends the messages. |
-| `generate-token` | Prints a random token for `FEED_TOKEN` or `API_TOKEN`. |
 
-## Known limitations
+They run with your real account, also while the monitor is running. `test-login` and `diagnose`
+cost one login each run and don't look at a rejection the monitor recorded, so with a wrong password
+each run is one more rejected login. `diagnose` stops at the first rejected login instead of trying
+the remaining calls.
 
-- Agencies without `mod-wssei` aren't supported. sei-monitor doesn't read SEI's web pages, apart
-  from the login page that lists the agencies.
-- Special follow-ups (acompanhamentos especiais) aren't monitored, because the module's route for
-  them fails on at least one SEI instance.
-- Suspended processes (sobrestados) disappear from the module's process list, so sei-monitor
-  reports them as having left your units, and as new when they come back.
-- Accounts with two-factor authentication are untested.
-- One SEI account per sei-monitor instance.
-- Messages show the process number without a link, since SEI's internal links depend on the
-  session.
-- A captcha or Cloudflare challenge in front of SEI stops sei-monitor.
+Run them inside the hub's container, where the binary lives. They read the same variables as the
+monitor, without the `SEI__` prefix. This copies the hub's `SEI__` variables to the plain names
+inside the container and removes every other variable except `PATH`, so the command, and a
+password command it runs, never see the hub's other settings. No secret shows up on a command
+line:
+
+```sh
+cd /opt/stacks/monitor-hub
+docker compose exec monitor-hub sh -c '
+names="SEI_URL SEI_API_URL SEI_USERNAME SEI_PASSWORD SEI_PASSWORD_FILE SEI_PASSWORD_CMD SEI_ORG SEI_UNITS SEI_TIMEZONE SEI_CONCURRENCY"
+for name in $names; do
+  eval "value=\${SEI__$name-}"
+  [ -z "$value" ] || export "$name=$value"
+done
+for name in $(env | sed -n "s/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p"); do
+  case " PATH $names " in *" $name "*) ;; *) unset "$name" ;; esac
+done
+exec /opt/monitor-hub/monitors/sei/sei-monitor "$@"' sei test-login
+```
+
+Put `orgs` or `diagnose` in place of `test-login` at the end. When the hub reads the password from
+`SEI__SEI_PASSWORD_FILE` or `SEI__SEI_PASSWORD_CMD`, the command uses the same file or program.
+Ctrl+C stops a command with exit code 130.
+
+## Switching from the Go release to the monitor
+
+The monitor takes over the Go release's database and keeps its accounts, processes and events. It
+needs no SQL step when its role can create tables and owns the Go release's tables (step 3 below).
+The Go release holds no lock while it runs, and the monitor's lock only keeps a second monitor out.
+Running both at once makes two monitors fight over the same account, so stop the Go release
+completely before starting the monitor.
+
+### Releases and `latest`
+
+`v2.0.0` is tagged on the branch head before the merge into `main`, so the tag publishes
+`ghcr.io/itztas/sei-monitor:2.0.0` and `:2.0` and leaves `latest` alone. The merge into `main` moves
+`latest` to the monitor. The old production compose file names `ghcr.io/itztas/sei-monitor:latest`
+directly, and the monitor image exits at once when run alone, which `restart: unless-stopped` turns
+into a restart loop with SEI unwatched. So pin the old stack to `ghcr.io/itztas/sei-monitor:1.0.0`
+before the merge.
+
+### Steps
+
+1. Pin the old stack to `:1.0.0` (above).
+2. Let the Go release send everything it has. It sends pending notifications every 30 seconds and
+   retries a failed one after 1 minute, 5 minutes, 30 minutes, 2 hours and 6 hours. In its
+   database this must return 0:
+
+   ```sql
+   SELECT count(*) FROM deliveries WHERE status = 'pending';
+   ```
+
+   A notification still pending at the switch is never sent: the monitor's first start deletes it
+   with the `deliveries` table, and the hub's first read takes its event as history. If a channel
+   never delivers (an unpaired WhatsApp number, for example), its rows stay pending: pair it first.
+
+   In the same database this must return an empty reason:
+
+   ```sql
+   SELECT paused_reason FROM accounts;
+   ```
+
+   With a reason there, the monitor starts held and watches nothing until you request a check. It
+   says so once, in an event the hub announces on its second read.
+3. Check the role and back the database up. The monitor's first start drops `deliveries`,
+   `goose_db_version` and every `whatsmeow_*` table, the Go release's WhatsApp session with it, so
+   the Go release can no longer run on this database. The monitor's role needs `CREATE` on the
+   schema and must own those tables: run the checks in [Upgrading from 2.1](#upgrading-from-21) as
+   that role, then take a `pg_dump` of the database.
+4. Give the hub the same `SEI_URL`, `SEI_USERNAME` and `SEI_ORG` as the old `.env`, with the
+   `SEI__` prefix, and point `SEI__DATABASE_URL` at the old database.
+5. Stop the Go release, then start the hub. Go keeps checking SEI until it stops, and events it
+   detects between step 2 and the stop are never announced, so do both close together.
+6. The monitor reads the database as Go left it: no new account, no new baseline, no repeated
+   events. The hub's first read takes the Go-era events as history (see [The hub's first
+   read](#the-hubs-first-read)).
+7. If the Go release was paused by a rejected login, the monitor starts held. Fix the password and
+   request a check (see [When SEI refuses the login](#when-sei-refuses-the-login)).
+8. After the first start, `GET /api/monitors` shows `sei` as `idle` with a fresh
+   `last_success_at`, `SELECT count(*) FROM accounts` still returns 1, and the hub logs
+   `baseline complete` for `sei`. The baseline comes on the hub's first poll after the monitor has
+   reached SEI. Don't restart the hub before that line (see [The hub's first
+   read](#the-hubs-first-read)).
+
+## Upgrading from 2.1
+
+The first start of 2.2 on a 2.1 database keeps every account, process, document, event and cycle
+run, with the same ids. It drops the tables the Go release left behind: `deliveries`,
+`goose_db_version` and every `whatsmeow_*` table. A login rejection that 2.1 recorded still holds
+the monitor, and nothing logs in. The hub's log shows `database migrations applied` with the two
+migration names on that start, and with `[]` on every later one.
+
+To create its `seaql_migrations` table and drop those tables, the monitor's role needs `CREATE` on
+its schema and must own the tables it drops. 2.1 never needed either after its own first start.
+Without them the start stops with `permission denied for schema public` or `must be owner of table
+deliveries` and changes nothing, and the hub restarts the monitor in a loop until you fix the role.
+Those tries never reach SEI. Run these as the monitor's role first:
+
+```sql
+SELECT has_schema_privilege(current_user, current_schema(), 'CREATE');
+SELECT tablename, tableowner FROM pg_tables
+WHERE schemaname = current_schema()
+  AND (tablename IN ('deliveries', 'goose_db_version') OR starts_with(tablename, 'whatsmeow_'));
+```
+
+The first must return `t`, and every row of the second must show the monitor's role as
+`tableowner`. Later starts need the rights 2.1 needed and `SELECT` on `seaql_migrations`. Without
+that table's rights the start fails with the same `permission denied for schema public`, which
+points at the wrong right. That happens when another role ran the first 2.2 start: grant the
+monitor's role `SELECT` on it.
+
+Take a `pg_dump` of the database before that first start. Once 2.2 has run on it, neither 2.1 nor
+the Go release can use it again. 2.1 stops with `relation "accounts" already exists` and changes no
+data, but it leaves a new `goose_db_version` table behind; drop it by hand.
 
 ## Security
 
-- Secrets (the password, the tokens, the SMTP password, the webhook secret, the AMQP address) print
-  as `[redacted]` everywhere, and none of them goes into the database.
-- On Linux, sei-monitor turns off core dumps and blocks other processes from reading its memory
-  through debugging interfaces. It has no profiling endpoint.
-- Calls to SEI and to the email, Telegram, ntfy, webhook and AMQP channels verify TLS and time out
-  after 30 seconds. Logs never include request headers, and errors never include addresses that may
-  carry a token.
-- The feed and the API compare their tokens in constant time. The API sends `no-store`, has no
-  CORS and never returns the username.
-- Webhook bodies are signed with HMAC-SHA256.
-- The image runs as an unprivileged user. The compose file makes its filesystem read-only and drops
-  every Linux capability. Everything sei-monitor keeps, the WhatsApp session included, lives in
-  Postgres, so treat the database and its backups as secrets.
+- The SEI password, the session token and `DATABASE_URL` print as `[redacted]` everywhere. None of
+  them appears in a log, an error, an event, a gRPC answer or command output, and the password is
+  never stored.
+- On start, the binary turns off core dumps, blocks other processes from reading its memory
+  through debugging interfaces, and sets its file mode mask to 077.
+- Calls to SEI verify TLS against the root certificates built into the binary (the
+  `webpki-root-certs` crate), not the system's. Each request has a 30-second total limit, reads at
+  most 16 MiB of a body, and errors never include addresses that may carry a token. API calls
+  refuse redirects.
+- The image has no shell and no other program, and runs as user 65532. Inside the hub the monitor
+  runs as the hub's user, in the hub's hardened container.
+- Getting a database connection has a 10-second limit, and each query of the store 20 seconds. The
+  monitor asks Postgres to send TCP keepalives on its connections, and it checks the connection that
+  holds its lock every half second. The connection to Postgres is not encrypted, so keep the
+  database on the same machine or Docker network.
+- Everything the monitor keeps lives in Postgres. Treat the database and its backups as secrets: they
+  hold your processes and, with `full`, their contents.
 - To keep the load on SEI low, checks run at least 5 minutes apart, with a cap on simultaneous
   calls and some random spread between checks.
 
+## Known limitations
+
+- Agencies without `mod-wssei` aren't supported. The monitor doesn't read SEI's web pages, apart
+  from the login page that lists the agencies.
+- Special follow-ups (acompanhamentos especiais) aren't monitored, because the module's route for
+  them fails on at least one SEI instance.
+- Suspended processes (sobrestados) disappear from the module's process list, so the monitor
+  reports them as having left your units, and as new when they come back.
+- Accounts with two-factor authentication are untested.
+- One SEI account per monitor.
+- A captcha or Cloudflare challenge in front of SEI fails every check that meets it. The monitor
+  shows `failing` and keeps trying with the back-off. A challenge on the login route makes each
+  of those tries post the password again, so watch `GET /api/monitors` if SEI puts one up.
+- Each event carries a link to its process, built from `SEI_URL` and the process id:
+  `{SEI_URL}/sei/controlador.php?acao=procedimento_trabalhar&id_procedimento=<id>`. It is the Go
+  release's feed link and holds no session, so SEI may ask you to log in first or refuse it. It
+  was never opened against a real SEI. It is wrong when your SEI does not live under `/sei/`, as
+  can happen when you set `SEI_API_URL`. It goes out at the `minimal` level too and shows your SEI
+  address and SEI's internal process id.
+- A list of more than 400 pages for one unit fails the check instead of being cut short.
+
+### Where the monitor differs from the Go release
+
+The monitor was checked against the Go release's own output. These differences are deliberate:
+
+- A login rejected in an earlier run holds the monitor until you request a check. Go tried again at
+  every start.
+- `diagnose` stops at the first rejected login. Interrupted, it exits with 130 (Go went on and
+  exited 0). A user without units and `SEI_UNITS=all` is an error with exit 1.
+- `SEI_TIMEZONE=Local`, `Factory` and `posixrules` are refused. The time zone table is the 2025b
+  release built into the binary. It differs from Go's for a few zones outside Brazil, none of them
+  Brazilian.
+- A secret that is not valid UTF-8 (the password, `DATABASE_URL`, their files, the output of the
+  password command) is refused without showing it. Go used the raw bytes.
+- The pruning cutoff is computed in UTC, and never deletes an event the hub has not read.
+- The `account_login_failed` event ends with how to resume instead of Go's sentence that a
+  restart resumes monitoring.
+- A NUL character in text from SEI is dropped where the text enters. In Go it failed every check
+  and stored nothing.
+- SEI answers that the real server never sends (lone surrogate escapes, numbers too large for a
+  float, duplicate keys, nesting of 128 levels or more) are refused as `answer outside the API
+  format`.
+- A login page that is slow to parse fails at the request time limit, and pages in some East Asian
+  or UTF-16 encodings decode slightly differently. The real login page is plain ISO-8859-1.
+- The database pool keeps up to 10 connections open, where Go closed idle ones after 5 minutes.
+- The `User-Agent` is `sei-monitor/<version>`.
+
 ## Development
 
-- `make check` runs gofmt, go vet, golangci-lint and the tests with the race detector.
-- The database tests run on Postgres. Point `TEST_DATABASE_URL` at a server, or install `initdb`
-  and `postgres` and the tests start a throwaway one. With `CI` set, a missing Postgres fails the
-  tests instead of skipping them.
-- The queries are in `sql/queries` and the migrations in `sql/schema`. `make generate` runs sqlc,
-  which writes `internal/db`, so don't edit that folder by hand. To change the schema, add a new
-  migration file instead of editing an old one.
-- The AMQP channel tests need a RabbitMQ: point `TEST_AMQP_URL` at one, such as
-  `amqp://guest:guest@localhost:5672/`. Without it they are skipped, and with `CI` set they fail.
-- `make openapi` regenerates `docs/openapi.json`, and a test fails while the file lags behind the
-  code.
+- `make check` runs `cargo fmt --check`, clippy and the tests. `make up` starts a development
+  Postgres on `127.0.0.1:5432` from `compose.yaml`; copy `.env.example` to `.env` first and set
+  `POSTGRES_PASSWORD`.
+- The database tests use `TEST_DATABASE_URL` when it is set, and otherwise start a throwaway
+  Postgres from `initdb` and `postgres` on `PATH`, on a local TCP port. To use the compose
+  Postgres, export `TEST_DATABASE_URL` in your shell, with the same password as
+  `POSTGRES_PASSWORD`; that URL needs a password, as `DATABASE_URL` does. The conformance test
+  runs the program named by `MONITOR_CONFORMANCE`, or else installs `monitor-conformance` with `go`.
+  With `CI` set, a missing tool fails the tests instead of skipping them.
 - `git config core.hooksPath .githooks` turns on the hooks: Conventional Commits messages, and
-  gofmt plus the tests before each commit.
-- No test talks to a real SEI. `internal/sei/seitest` plays its part.
+  `cargo fmt --check` plus the tests before each commit. The hook and `make` run cargo through
+  `rustup run` with the toolchain in `rust-toolchain.toml` when `rustup` is installed, so another
+  cargo earlier on `PATH` is never used by accident.
+- No test talks to a real SEI. A fake server in `tests/support/` plays its part.
+- To run the operator commands from a checkout, export the plain variables and run
+  `cargo run -- test-login`. The binary never reads `.env`.
 
 ## License
 

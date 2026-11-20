@@ -1,0 +1,3303 @@
+[
+  {
+    "name": "fixture processo_listar.json on processes with HTTP 200",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJzdGF0dXMiOiJQIiwic2VpTnVtTWF4RG9jc1Bhc3RhIjoiMjAiLCJhdHJpYnV0b3MiOnsiaWRQcm9jZWRpbWVudG8iOiI5MDAxIiwiaWRQcm90b2NvbG8iOiI5MDAxIiwibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAiLCJ0aXBvUHJvY2Vzc28iOiJBZG1pbmlzdHJhJmNjZWRpbDsmYXRpbGRlO286IERpJmFhY3V0ZTtyaWFzIiwiZGVzY3JpY2FvIjoiUGVkaWRvIGRlIGRpJmFhY3V0ZTtyaWFzICZxdW90O3ZpYWdlbSZxdW90OyIsInVzdWFyaW9BdHJpYnVpZG8iOnsiaWRBdGl2aWRhZGUiOiI3MDAiLCJpZFVzdWFyaW8iOiIxMDEiLCJzaWdsYSI6ImZ1bGFuby50YWwiLCJub21lIjoiRnVsYW5vIGRlIFRhbCIsIm5vbWVmb3JtYXRhZG8iOiJmdWxhbm8udGFsIC0gRnVsYW5vIGRlIFRhbCJ9LCJ1bmlkYWRlIjp7ImlkVW5pZGFkZSI6IjE1MDAiLCJzaWdsYSI6IlNFREVNTy9QUk9UT0NPTE8ifSwiY2llbmNpYXMiOltdLCJtYXJjYWRvciI6W10sImRhZG9zQWJlcnR1cmEiOltdLCJhbm90YWNvZXMiOltdLCJzdGF0dXMiOnsiZG9jdW1lbnRvU2lnaWxvc28iOiIiLCJkb2N1bWVudG9SZXN0cml0byI6Ik4iLCJkb2N1bWVudG9Ob3ZvIjoiUyIsImRvY3VtZW50b1B1YmxpY2FkbyI6Ik4iLCJhbm90YWNhbyI6Ik4iLCJhbm90YWNhb1ByaW9yaWRhZGUiOiJOIiwiY2llbmNpYSI6Ik4iLCJyZXRvcm5vUHJvZ3JhbWFkbyI6IlMiLCJyZXRvcm5vRGF0YSI6eyJkYXRhUHJvZ3JhbWFkYSI6IjA2LzExLzIwMjYiLCJ1bmlkYWRlIjoiU0VERU1PL0dBQiJ9LCJyZXRvcm5vQXRyYXNhZG8iOiJOIiwicHJvY2Vzc29BY2Vzc2Fkb1VzdWFyaW8iOiJOIiwicHJvY2Vzc29BY2Vzc2Fkb1VuaWRhZGUiOiJOIiwicHJvY2Vzc29SZW1vY2FvU29icmVzdGFtZW50byI6Ik4iLCJwcm9jZXNzb0Jsb3F1ZWFkbyI6Ik4iLCJwcm9jZXNzb0RvY3VtZW50b0luY2x1aWRvQXNzaW5hZG8iOiJOIiwicHJvY2Vzc29QdWJsaWNhZG8iOiJOIiwibml2ZWxBY2Vzc29HbG9iYWwiOiIwIiwicG9kZUdlcmVuY2lhckNyZWRlbmNpYWlzIjoiTiIsInByb2Nlc3NvQWJlcnRvIjoiUyIsInByb2Nlc3NvRW1UcmFtaXRhY2FvIjoiTiIsInByb2Nlc3NvU29icmVzdGFkbyI6Ik4iLCJwcm9jZXNzb0FuZXhhZG8iOiJOIiwicG9kZVJlYWJyaXJQcm9jZXNzbyI6Ik4iLCJwb2RlUmVnaXN0cmFyQW5vdGFjYW8iOiJTIiwicG9kZVJlbW92ZXJTb2JyZXN0YW1lbnRvIjoiTiIsInRpcG8iOm51bGwsInByb2Nlc3NvR2VyYWRvUmVjZWJpZG8iOiJSIn19fSx7ImlkIjoiOTAwMiIsInN0YXR1cyI6IlAiLCJzZWlOdW1NYXhEb2NzUGFzdGEiOiIyMCIsImF0cmlidXRvcyI6eyJpZFByb2NlZGltZW50byI6IjkwMDIiLCJpZFByb3RvY29sbyI6IjkwMDIiLCJudW1lcm8iOiIwMDAwMC4wMDAwMDIvMjAyNi0wMCIsInRpcG9Qcm9jZXNzbyI6IkNvbnRyYXRvIiwiZGVzY3JpY2FvIjoiIiwidXN1YXJpb0F0cmlidWlkbyI6bnVsbCwidW5pZGFkZSI6eyJpZFVuaWRhZGUiOiIxMDAxIiwic2lnbGEiOiJTRURFTU8vTlVQUk9DIn0sImNpZW5jaWFzIjpbXSwibWFyY2Fkb3IiOltdLCJkYWRvc0FiZXJ0dXJhIjpbXSwiYW5vdGFjb2VzIjpbXSwic3RhdHVzIjp7ImRvY3VtZW50b1NpZ2lsb3NvIjoiIiwiZG9jdW1lbnRvUmVzdHJpdG8iOiJOIiwiZG9jdW1lbnRvTm92byI6Ik4iLCJkb2N1bWVudG9QdWJsaWNhZG8iOiJOIiwiYW5vdGFjYW8iOiJOIiwiYW5vdGFjYW9QcmlvcmlkYWRlIjoiTiIsImNpZW5jaWEiOiJOIiwicmV0b3Jub1Byb2dyYW1hZG8iOiJOIiwicmV0b3Jub0RhdGEiOnsiZGF0YVByb2dyYW1hZGEiOiIwNi8xMS8yMDI2IiwidW5pZGFkZSI6IlNFREVNTy9HQUIifSwicmV0b3Jub0F0cmFzYWRvIjoiTiIsInByb2Nlc3NvQWNlc3NhZG9Vc3VhcmlvIjoiUyIsInByb2Nlc3NvQWNlc3NhZG9VbmlkYWRlIjoiUyIsInByb2Nlc3NvUmVtb2Nhb1NvYnJlc3RhbWVudG8iOiJOIiwicHJvY2Vzc29CbG9xdWVhZG8iOiJOIiwicHJvY2Vzc29Eb2N1bWVudG9JbmNsdWlkb0Fzc2luYWRvIjoiTiIsInByb2Nlc3NvUHVibGljYWRvIjoiTiIsIm5pdmVsQWNlc3NvR2xvYmFsIjoiMCIsInBvZGVHZXJlbmNpYXJDcmVkZW5jaWFpcyI6Ik4iLCJwcm9jZXNzb0FiZXJ0byI6IlMiLCJwcm9jZXNzb0VtVHJhbWl0YWNhbyI6Ik4iLCJwcm9jZXNzb1NvYnJlc3RhZG8iOiJOIiwicHJvY2Vzc29BbmV4YWRvIjoiTiIsInBvZGVSZWFicmlyUHJvY2Vzc28iOiJOIiwicG9kZVJlZ2lzdHJhckFub3RhY2FvIjoiUyIsInBvZGVSZW1vdmVyU29icmVzdGFtZW50byI6Ik4iLCJ0aXBvIjpudWxsLCJwcm9jZXNzb0dlcmFkb1JlY2ViaWRvIjoiRyJ9fX0seyJpZCI6OTAwMywic3RhdHVzIjoiUCIsInNlaU51bU1heERvY3NQYXN0YSI6MjAsImF0cmlidXRvcyI6eyJpZFByb2NlZGltZW50byI6OTAwMywiaWRQcm90b2NvbG8iOjkwMDMsIm51bWVybyI6IjAwMDAwLjAwMDAwMy8yMDI2LTAwIiwidGlwb1Byb2Nlc3NvIjoiT2YmaWFjdXRlO2NpbyIsImRlc2NyaWNhbyI6IlJlc3Bvc3RhIGFvIG9mJmlhY3V0ZTtjaW8gbiZvcmRtOyAxMiIsInVzdWFyaW9BdHJpYnVpZG8iOm51bGwsInVuaWRhZGUiOnsiaWRVbmlkYWRlIjoxNTAwLCJzaWdsYSI6IlNFREVNTy9QUk9UT0NPTE8ifSwiY2llbmNpYXMiOltdLCJtYXJjYWRvciI6W10sImRhZG9zQWJlcnR1cmEiOltdLCJhbm90YWNvZXMiOltdLCJzdGF0dXMiOnsiZG9jdW1lbnRvU2lnaWxvc28iOiIiLCJkb2N1bWVudG9SZXN0cml0byI6Ik4iLCJkb2N1bWVudG9Ob3ZvIjoiTiIsImRvY3VtZW50b1B1YmxpY2FkbyI6Ik4iLCJhbm90YWNhbyI6Ik4iLCJhbm90YWNhb1ByaW9yaWRhZGUiOiJOIiwiY2llbmNpYSI6Ik4iLCJyZXRvcm5vUHJvZ3JhbWFkbyI6IlMiLCJyZXRvcm5vRGF0YSI6eyJkYXRhUHJvZ3JhbWFkYSI6IjMwLzEwLzIwMjYiLCJ1bmlkYWRlIjoiU0VERU1PL0dBQiJ9LCJyZXRvcm5vQXRyYXNhZG8iOiJTIiwicHJvY2Vzc29BY2Vzc2Fkb1VzdWFyaW8iOiJOIiwicHJvY2Vzc29BY2Vzc2Fkb1VuaWRhZGUiOiJOIiwicHJvY2Vzc29SZW1vY2FvU29icmVzdGFtZW50byI6Ik4iLCJwcm9jZXNzb0Jsb3F1ZWFkbyI6Ik4iLCJwcm9jZXNzb0RvY3VtZW50b0luY2x1aWRvQXNzaW5hZG8iOiJOIiwicHJvY2Vzc29QdWJsaWNhZG8iOiJOIiwibml2ZWxBY2Vzc29HbG9iYWwiOiIwIiwicG9kZUdlcmVuY2lhckNyZWRlbmNpYWlzIjoiTiIsInByb2Nlc3NvQWJlcnRvIjoiUyIsInByb2Nlc3NvRW1UcmFtaXRhY2FvIjoiTiIsInByb2Nlc3NvU29icmVzdGFkbyI6Ik4iLCJwcm9jZXNzb0FuZXhhZG8iOiJOIiwicG9kZVJlYWJyaXJQcm9jZXNzbyI6Ik4iLCJwb2RlUmVnaXN0cmFyQW5vdGFjYW8iOiJTIiwicG9kZVJlbW92ZXJTb2JyZXN0YW1lbnRvIjoiTiIsInRpcG8iOm51bGwsInByb2Nlc3NvR2VyYWRvUmVjZWJpZG8iOiJSIn19fV0sInRvdGFsIjoiMyJ9Cg==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "00000.000001/2026-00",
+          "type": "Administração: Diárias",
+          "description": "Pedido de diárias \"viagem\"",
+          "assignee": {
+            "id": 101,
+            "acronym": "fulano.tal",
+            "name": "Fulano de Tal"
+          },
+          "return_date": "2026-11-06",
+          "return_overdue": false,
+          "origin": "R"
+        },
+        {
+          "procedure_id": 9002,
+          "number": "00000.000002/2026-00",
+          "type": "Contrato",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": "G"
+        },
+        {
+          "procedure_id": 9003,
+          "number": "00000.000003/2026-00",
+          "type": "Ofício",
+          "description": "Resposta ao ofício nº 12",
+          "assignee": null,
+          "return_date": "2026-10-30",
+          "return_overdue": true,
+          "origin": "R"
+        }
+      ],
+      "total": 3
+    },
+    "error": null
+  },
+  {
+    "name": "fixture lista_vazia.json on processes with HTTP 200",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJ0b3RhbCI6IjAifQo=",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "fixture erro_entidade.json on processes with HTTP 200",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJPIHByb2Nlc3NvIG4mIzAzOTtmb2kgZW5jb250cmFkbyBuYSB1bmlkYWRlLiIsImV4Y2VwdGlvbiI6IiMwIC9vcHQvc2VpL3dlYi9tb2R1bG9zL3dzc2VpL3JuL01kV3NTZWlQcm9jZWRpbWVudG9STi5waHAoMTA4Nyk6IFNFTEVDVCAqIEZST00gcHJvY2VkaW1lbnRvIFdIRVJFIGlkX3Byb2NlZGltZW50byA9IDEifQo=",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar: O processo n'foi encontrado na unidade."
+    }
+  },
+  {
+    "name": "fixture erro_lista.json on processes with HTTP 200",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOlsiSW5mb3JtZSBvIGxpbWl0ZS4iLCJJbmZvcm1lIGEgcCZhYWN1dGU7Z2luYS4iXSwiZXhjZXB0aW9uIjoiRXhjZcOnw6NvIHNhbHZhIG5vIFNFSSJ9Cg==",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar: Informe o limite.; Informe a página."
+    }
+  },
+  {
+    "name": "fixture token_invalido.json on processes with HTTP 401",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 401,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJUb2tlbiBpbnbDoWxpZG8hIiwiZXhjZXB0aW9uIjoiRXhjZcOnw6NvIHNhbHZhIG5vIFNFSSJ9Cg==",
+    "result": null,
+    "error": {
+      "kind": "unauthorized",
+      "message": "sei: /processo/listar: Token inválido!"
+    }
+  },
+  {
+    "name": "fixture acesso_negado.json on processes with HTTP 403",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 403,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJBY2Vzc28gbmVnYWRvISIsImV4Y2VwdGlvbiI6IkV4Y2XDp8OjbyBzYWx2YSBubyBTRUkifQo=",
+    "result": null,
+    "error": {
+      "kind": "unauthorized",
+      "message": "sei: /processo/listar: Acesso negado!"
+    }
+  },
+  {
+    "name": "fixture modulo_inativo.json on processes with HTTP 200",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJNw7NkdWxvIGluYXRpdm8uIiwiZXhjZXB0aW9uIjpudWxsfQo=",
+    "result": null,
+    "error": {
+      "kind": "module_unavailable",
+      "message": "sei: /processo/listar: Módulo inativo."
+    }
+  },
+  {
+    "name": "fixture login.html on processes with HTTP 200",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "PCFET0NUWVBFIGh0bWwgUFVCTElDICItLy9XM0MvL0RURCBIVE1MIDQuMDEvL0VOIj4KPGh0bWw+PGhlYWQ+PG1ldGEgaHR0cC1lcXVpdj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9aXNvLTg4NTktMSI+PHRpdGxlPlNJUCAtIEF1dGVudGljYefjbyBkZSBVc3XhcmlvPC90aXRsZT48L2hlYWQ+Cjxib2R5Pjxmb3JtIGlkPSJmcm1Mb2dpbiIgbWV0aG9kPSJwb3N0IiBhY3Rpb249ImxvZ2luLnBocCI+CjxsYWJlbCBmb3I9InR4dFVzdWFyaW8iPlVzdeFyaW86PC9sYWJlbD48aW5wdXQgdHlwZT0idGV4dCIgaWQ9InR4dFVzdWFyaW8iIG5hbWU9InR4dFVzdWFyaW8iPgo8c2VsZWN0IGlkPSJzZWxPcmdhbyIgbmFtZT0ic2VsT3JnYW8iIGNsYXNzPSJpbmZyYVNlbGVjdCI+CjxvcHRpb24gdmFsdWU9Im51bGwiPiZuYnNwOzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSIzNCI+QURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNDgiPkJERU1PPC9vcHRpb24+CjxvcHRpb24gdmFsdWU9IjEyIj5DREVNTzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSI2MyIgc2VsZWN0ZWQ9InNlbGVjdGVkIj5TRURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNzciPtNSR8NPREVNTzwvb3B0aW9uPgo8L3NlbGVjdD48L2Zvcm0+PC9ib2R5PjwvaHRtbD4K",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "fixture atividade_listar.json on activities with HTTP 200",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAzIiwiYXRyaWJ1dG9zIjp7ImlkUHJvY2Vzc28iOiI5MDAxIiwidXN1YXJpbyI6ImZ1bGFuby50YWwiLCJkYXRhIjoiMDQvMTEvMjAyNiIsImhvcmEiOiIxMzoxMzowNSIsInVuaWRhZGUiOiJTRURFTU8vTlVQUk9DIiwiaW5mb3JtYWNhbyI6IlByb2Nlc3NvIHJlY2ViaWRvIG5hIHVuaWRhZGUifX0seyJpZCI6IjUwMDAyIiwiYXRyaWJ1dG9zIjp7ImlkUHJvY2Vzc28iOiI5MDAxIiwidXN1YXJpbyI6bnVsbCwiZGF0YSI6IjAzLzExLzIwMjYiLCJob3JhIjoiMDk6MDA6MDAiLCJ1bmlkYWRlIjoiU0VERU1PL1BST1RPQ09MTyIsImluZm9ybWFjYW8iOiJQcm9jZXNzbyByZW1ldGlkbyBwZWxhIHVuaWRhZGUgU0VERU1PL1BST1RPQ09MTyJ9fSx7ImlkIjo1MDAwMSwiYXRyaWJ1dG9zIjp7ImlkUHJvY2Vzc28iOiI5MDAxIiwidXN1YXJpbyI6ImJlbHRyYW5vIiwiZGF0YSI6IjAxLzExLzIwMjYiLCJob3JhIjoiMTc6NDU6MzAiLCJ1bmlkYWRlIjoiU0VERU1PL1BST1RPQ09MTyIsImluZm9ybWFjYW8iOiJEb2N1bWVudG8gJnF1b3Q7T2YmaWFjdXRlO2NpbyZxdW90OyBhc3NpbmFkbyJ9fV0sInRvdGFsIjoiMyJ9Cg==",
+    "result": {
+      "items": [
+        {
+          "id": 50003,
+          "procedure_id": 9001,
+          "user": "fulano.tal",
+          "unit": "SEDEMO/NUPROC",
+          "text": "Processo recebido na unidade",
+          "at": "2026-11-04T17:13:05Z"
+        },
+        {
+          "id": 50002,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "SEDEMO/PROTOCOLO",
+          "text": "Processo remetido pela unidade SEDEMO/PROTOCOLO",
+          "at": "2026-11-03T13:00:00Z"
+        },
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "beltrano",
+          "unit": "SEDEMO/PROTOCOLO",
+          "text": "Documento \"Ofício\" assinado",
+          "at": "2026-11-01T21:45:30Z"
+        }
+      ],
+      "total": 3
+    },
+    "error": null
+  },
+  {
+    "name": "fixture documento_listar.json on documents with HTTP 200",
+    "route": "documents",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjgwMDAxIiwiYXRyaWJ1dG9zIjp7ImlkUHJvY2VkaW1lbnRvIjoiOTAwMSIsImlkUHJvdG9jb2xvIjoiODAwMDEiLCJwcm90b2NvbG9Gb3JtYXRhZG8iOiIwMDEyMzQ1Iiwibm9tZSI6bnVsbCwidGl0dWxvIjoiMTIiLCJ0aXBvIjoiT2YmaWFjdXRlO2NpbyIsInRpcG9Eb2N1bWVudG8iOiJJIiwibWltZVR5cGUiOiJodG1sIiwiaW5mb3JtYWNhbyI6bnVsbCwidGFtYW5obyI6bnVsbCwiaWRVbmlkYWRlIjoiMTUwMCIsInNpZ2xhVW5pZGFkZSI6IlNFREVNTy9QUk9UT0NPTE8iLCJub21lQ29tcG9zdG8iOiJPZiZpYWN1dGU7Y2lvIDEyICgwMDEyMzQ1KSIsInRpcG9Db25mZXJlbmNpYSI6bnVsbCwic3RhdHVzIjp7InNpbkJsb3F1ZWFkbyI6Ik4iLCJkb2N1bWVudG9TaWdpbG9zbyI6Ik4iLCJkb2N1bWVudG9SZXN0cml0byI6Ik4iLCJkb2N1bWVudG9QdWJsaWNhZG8iOiJOIiwiZG9jdW1lbnRvQXNzaW5hZG8iOiJTIiwiY2llbmNpYSI6Ik4ifX19LHsiaWQiOiI4MDAwMiIsImF0cmlidXRvcyI6eyJpZFByb2NlZGltZW50byI6IjkwMDEiLCJpZFByb3RvY29sbyI6IjgwMDAyIiwicHJvdG9jb2xvRm9ybWF0YWRvIjoiMDAxMjM0NiIsIm5vbWUiOiJwbGFuaWxoYS5wZGYiLCJ0aXR1bG8iOiIiLCJ0aXBvIjoiQW5leG8iLCJ0aXBvRG9jdW1lbnRvIjoiWCIsIm1pbWVUeXBlIjoicGRmIiwiaW5mb3JtYWNhbyI6bnVsbCwidGFtYW5obyI6IjUyIEtiIiwiaWRVbmlkYWRlIjoiMTAwMSIsInNpZ2xhVW5pZGFkZSI6IlNFREVNTy9OVVBST0MiLCJub21lQ29tcG9zdG8iOiIiLCJ0aXBvQ29uZmVyZW5jaWEiOiIxIiwic3RhdHVzIjp7InNpbkJsb3F1ZWFkbyI6Ik4iLCJkb2N1bWVudG9TaWdpbG9zbyI6Ik4iLCJkb2N1bWVudG9SZXN0cml0byI6Ik4iLCJkb2N1bWVudG9QdWJsaWNhZG8iOiJOIiwiZG9jdW1lbnRvQXNzaW5hZG8iOiJOIiwiY2llbmNpYSI6Ik4ifX19XSwidG90YWwiOiIyIn0K",
+    "result": {
+      "items": [
+        {
+          "id": 80001,
+          "procedure_id": 9001,
+          "protocol": "0012345",
+          "type": "Ofício",
+          "name": "Ofício 12 (0012345)"
+        },
+        {
+          "id": 80002,
+          "procedure_id": 9001,
+          "protocol": "0012346",
+          "type": "Anexo",
+          "name": "Anexo"
+        }
+      ],
+      "total": 2
+    },
+    "error": null
+  },
+  {
+    "name": "fixture versao.json on version with HTTP 200",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InNlaSI6IjUuMC41Iiwid3NzZWkiOiIzLjAuNCJ9fQo=",
+    "result": {
+      "sei": "5.0.5",
+      "module": "3.0.4"
+    },
+    "error": null
+  },
+  {
+    "name": "fixture acesso_negado.json on version with HTTP 401",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 401,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJBY2Vzc28gbmVnYWRvISIsImV4Y2VwdGlvbiI6IkV4Y2XDp8OjbyBzYWx2YSBubyBTRUkifQo=",
+    "result": null,
+    "error": {
+      "kind": "unauthorized",
+      "message": "sei: /versao: Acesso negado!"
+    }
+  },
+  {
+    "name": "fixture autenticar.json on login with HTTP 200",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7ImxvZ2luRGF0YSI6eyJJZFNpc3RlbWEiOiIxMDAwMDAxMDAiLCJJZENvbnRleHRvIjpudWxsLCJJZFVzdWFyaW8iOiIxMDEiLCJJZFVuaWRhZGVBdHVhbCI6IjEwMDEiLCJzaWdsYSI6ImZ1bGFuby50YWwiLCJub21lIjoiRnVsYW5vIGRlIFRhbCIsImlkVWx0aW1vQ2FyZ29Bc3NpbmF0dXJhIjpudWxsLCJ1bHRpbW9DYXJnb0Fzc2luYXR1cmEiOm51bGx9LCJwZXJmaXMiOlt7IklkUGVyZmlsIjoiMTAwMDAwOTM4IiwiTm9tZSI6IkImYWFjdXRlO3NpY28ifV0sInVuaWRhZGVzIjpbeyJpZCI6IjEwMDEiLCJzaWdsYSI6IlNFREVNTy9OVVBST0MiLCJkZXNjcmljYW8iOiJOJnVhY3V0ZTtjbGVvIGRlIFByb2Nlc3NvcyJ9LHsiaWQiOiIxMDAyIiwic2lnbGEiOiJTRURFTU8vR0FCIiwiZGVzY3JpY2FvIjoiR2FiaW5ldGUifV0sImlkZW50aWZpY2Fkb3IiOiJmdWxhbm8udGFsQFNFREVNTyIsInRva2VuIjoiZEc5clpXNHRaR1V0ZEdWemRHVT0ifX0K",
+    "result": {
+      "user_id": 101,
+      "user_acronym": "fulano.tal",
+      "user_name": "Fulano de Tal",
+      "current_unit_id": 1001,
+      "units": [
+        {
+          "id": 1001,
+          "acronym": "SEDEMO/NUPROC",
+          "description": "Núcleo de Processos"
+        },
+        {
+          "id": 1002,
+          "acronym": "SEDEMO/GAB",
+          "description": "Gabinete"
+        }
+      ]
+    },
+    "error": null
+  },
+  {
+    "name": "fixture login_recusado.json on login with HTTP 200",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJVc3XDoXJpbyBvdSBTZW5oYSBJbnbDoWxpZGEuIiwiZXhjZXB0aW9uIjoiRXhjZcOnw6NvIHNhbHZhIG5vIFNFSSJ9Cg==",
+    "result": null,
+    "error": {
+      "kind": "invalid_credentials",
+      "message": "sei: /autenticar: Usuário ou Senha Inválida."
+    }
+  },
+  {
+    "name": "fixture modulo_inativo.json on login with HTTP 401",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 401,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJNw7NkdWxvIGluYXRpdm8uIiwiZXhjZXB0aW9uIjpudWxsfQo=",
+    "result": null,
+    "error": {
+      "kind": "module_unavailable",
+      "message": "sei: /autenticar: Módulo inativo."
+    }
+  },
+  {
+    "name": "fixture login.html on login with HTTP 200",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "PCFET0NUWVBFIGh0bWwgUFVCTElDICItLy9XM0MvL0RURCBIVE1MIDQuMDEvL0VOIj4KPGh0bWw+PGhlYWQ+PG1ldGEgaHR0cC1lcXVpdj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9aXNvLTg4NTktMSI+PHRpdGxlPlNJUCAtIEF1dGVudGljYefjbyBkZSBVc3XhcmlvPC90aXRsZT48L2hlYWQ+Cjxib2R5Pjxmb3JtIGlkPSJmcm1Mb2dpbiIgbWV0aG9kPSJwb3N0IiBhY3Rpb249ImxvZ2luLnBocCI+CjxsYWJlbCBmb3I9InR4dFVzdWFyaW8iPlVzdeFyaW86PC9sYWJlbD48aW5wdXQgdHlwZT0idGV4dCIgaWQ9InR4dFVzdWFyaW8iIG5hbWU9InR4dFVzdWFyaW8iPgo8c2VsZWN0IGlkPSJzZWxPcmdhbyIgbmFtZT0ic2VsT3JnYW8iIGNsYXNzPSJpbmZyYVNlbGVjdCI+CjxvcHRpb24gdmFsdWU9Im51bGwiPiZuYnNwOzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSIzNCI+QURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNDgiPkJERU1PPC9vcHRpb24+CjxvcHRpb24gdmFsdWU9IjEyIj5DREVNTzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSI2MyIgc2VsZWN0ZWQ9InNlbGVjdGVkIj5TRURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNzciPtNSR8NPREVNTzwvb3B0aW9uPgo8L3NlbGVjdD48L2Zvcm0+PC9ib2R5PjwvaHRtbD4K",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /autenticar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "fixture login.html on login with HTTP 502",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 502,
+    "body_base64": "PCFET0NUWVBFIGh0bWwgUFVCTElDICItLy9XM0MvL0RURCBIVE1MIDQuMDEvL0VOIj4KPGh0bWw+PGhlYWQ+PG1ldGEgaHR0cC1lcXVpdj0iQ29udGVudC1UeXBlIiBjb250ZW50PSJ0ZXh0L2h0bWw7IGNoYXJzZXQ9aXNvLTg4NTktMSI+PHRpdGxlPlNJUCAtIEF1dGVudGljYefjbyBkZSBVc3XhcmlvPC90aXRsZT48L2hlYWQ+Cjxib2R5Pjxmb3JtIGlkPSJmcm1Mb2dpbiIgbWV0aG9kPSJwb3N0IiBhY3Rpb249ImxvZ2luLnBocCI+CjxsYWJlbCBmb3I9InR4dFVzdWFyaW8iPlVzdeFyaW86PC9sYWJlbD48aW5wdXQgdHlwZT0idGV4dCIgaWQ9InR4dFVzdWFyaW8iIG5hbWU9InR4dFVzdWFyaW8iPgo8c2VsZWN0IGlkPSJzZWxPcmdhbyIgbmFtZT0ic2VsT3JnYW8iIGNsYXNzPSJpbmZyYVNlbGVjdCI+CjxvcHRpb24gdmFsdWU9Im51bGwiPiZuYnNwOzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSIzNCI+QURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNDgiPkJERU1PPC9vcHRpb24+CjxvcHRpb24gdmFsdWU9IjEyIj5DREVNTzwvb3B0aW9uPgo8b3B0aW9uIHZhbHVlPSI2MyIgc2VsZWN0ZWQ9InNlbGVjdGVkIj5TRURFTU88L29wdGlvbj4KPG9wdGlvbiB2YWx1ZT0iNzciPtNSR8NPREVNTzwvb3B0aW9uPgo8L3NlbGVjdD48L2Zvcm0+PC9ib2R5PjwvaHRtbD4K",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /autenticar: answer outside the API format (HTTP 502)"
+    }
+  },
+  {
+    "name": "fixture token_invalido.json on login with HTTP 401",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 401,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJUb2tlbiBpbnbDoWxpZG8hIiwiZXhjZXB0aW9uIjoiRXhjZcOnw6NvIHNhbHZhIG5vIFNFSSJ9Cg==",
+    "result": null,
+    "error": {
+      "kind": "invalid_credentials",
+      "message": "sei: /autenticar: Token inválido!"
+    }
+  },
+  {
+    "name": "process id 9001",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6OTAwMSwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"9001\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IiIsImF0cmlidXRvcyI6eyJudW1lcm8iOiIwMDAwMC4wMDAwMDEvMjAyNi0wMCJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 0,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id null",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6bnVsbCwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 0,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \" 7 \"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IiA3ICIsImF0cmlidXRvcyI6eyJudW1lcm8iOiIwMDAwMC4wMDAwMDEvMjAyNi0wMCJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 7,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"12.0\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjEyLjAiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 12,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"12.5\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjEyLjUiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "process id \"1e3\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjFlMyIsImF0cmlidXRvcyI6eyJudW1lcm8iOiIwMDAwMC4wMDAwMDEvMjAyNi0wMCJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 1000,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"abc\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6ImFiYyIsImF0cmlidXRvcyI6eyJudW1lcm8iOiIwMDAwMC4wMDAwMDEvMjAyNi0wMCJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "process id 9.3e18",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6OS4zZTE4LCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "process id 9.2e18",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6OS4yZTE4LCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9200000000000000000,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id -9.3e18",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6LTkuM2UxOCwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "process id \"9223372036854775807\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkyMjMzNzIwMzY4NTQ3NzU4MDciLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9223372036854775807,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"-9223372036854775809\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6Ii05MjIzMzcyMDM2ODU0Nzc1ODA5IiwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": -9223372036854775808,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id true",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6dHJ1ZSwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "process id [1]",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6WzFdLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "process id {}",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6e30sImF0cmlidXRvcyI6eyJudW1lcm8iOiIwMDAwMC4wMDAwMDEvMjAyNi0wMCJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "process id \"0x1p4\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjB4MXA0IiwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 16,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"NaN\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6Ik5hTiIsImF0cmlidXRvcyI6eyJudW1lcm8iOiIwMDAwMC4wMDAwMDEvMjAyNi0wMCJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "process id \"Infinity\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IkluZmluaXR5IiwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "process id \"+5\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6Iis1IiwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 5,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"12\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjEyIiwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 12,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"1_000\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjFfMDAwIiwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 1000,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id 12.0",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6MTIuMCwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 12,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id 1e3",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6MWUzLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 1000,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id -0",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6LTAsImF0cmlidXRvcyI6eyJudW1lcm8iOiIwMDAwMC4wMDAwMDEvMjAyNi0wMCJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 0,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \"-7\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6Ii03IiwiYXRyaWJ1dG9zIjp7Im51bWVybyI6IjAwMDAwLjAwMDAwMS8yMDI2LTAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": -7,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process id \" \"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IiAiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 0,
+          "number": "00000.000001/2026-00",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "idProcedimento wins over id",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsiaWRQcm9jZWRpbWVudG8iOiI5MDAyIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9002,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "idProcedimento zero falls back to id",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsiaWRQcm9jZWRpbWVudG8iOiIwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "idProcedimento invalid",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsiaWRQcm9jZWRpbWVudG8iOiJ4In19XSwidG90YWwiOiIxIn0=",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "idProcedimento and id both missing",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJhdHJpYnV0b3MiOnsibnVtZXJvIjoiMSJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 0,
+          "number": "1",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "process without atributos",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEifV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "total \"3\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOiIzIn0=",
+    "result": {
+      "items": [],
+      "total": 3
+    },
+    "error": null
+  },
+  {
+    "name": "total 3",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOjN9",
+    "result": {
+      "items": [],
+      "total": 3
+    },
+    "error": null
+  },
+  {
+    "name": "total \"abc\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOiJhYmMifQ==",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "total \"12.5\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOiIxMi41In0=",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "total null",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOm51bGx9",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "total \" 4 \"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOiIgNCAifQ==",
+    "result": {
+      "items": [],
+      "total": 4
+    },
+    "error": null
+  },
+  {
+    "name": "total 2.0",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOjIuMH0=",
+    "result": {
+      "items": [],
+      "total": 2
+    },
+    "error": null
+  },
+  {
+    "name": "total \"\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOiIifQ==",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "total -1",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOi0xfQ==",
+    "result": {
+      "items": [],
+      "total": -1
+    },
+    "error": null
+  },
+  {
+    "name": "total \"1e2\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOiIxZTIifQ==",
+    "result": {
+      "items": [],
+      "total": 100
+    },
+    "error": null
+  },
+  {
+    "name": "total true",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOnRydWV9",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "total missing",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXX0=",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "data null",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpudWxsLCJ0b3RhbCI6IjAifQ==",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "data false",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpmYWxzZSwidG90YWwiOiIwIn0=",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "data \"\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjoiIiwidG90YWwiOiIwIn0=",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "data []",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXSwidG90YWwiOiIwIn0=",
+    "result": {
+      "items": [],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "data {}",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7fSwidG90YWwiOiIwIn0=",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "data 0",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjowLCJ0b3RhbCI6IjAifQ==",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "data true",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp0cnVlLCJ0b3RhbCI6IjAifQ==",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "data \" \"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjoiICIsInRvdGFsIjoiMCJ9",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "data \"x\"",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjoieCIsInRvdGFsIjoiMCJ9",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "data [null]",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbbnVsbF0sInRvdGFsIjoiMCJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 0,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 0
+    },
+    "error": null
+  },
+  {
+    "name": "data [[]]",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbW11dLCJ0b3RhbCI6IjAifQ==",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "data [1]",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbMV0sInRvdGFsIjoiMCJ9",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "sucesso missing",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJkYXRhIjpbXX0=",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "sucesso as text",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjoidHJ1ZSIsImRhdGEiOltdfQ==",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "sucesso null",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpudWxsLCJkYXRhIjpbXX0=",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "sucesso as number",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjoxLCJkYXRhIjpbXX0=",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "sucesso false with 200",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJGYWxoYS4ifQ==",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar: Falha."
+    }
+  },
+  {
+    "name": "sucesso false without mensagem",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZX0=",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar answered HTTP 200"
+    }
+  },
+  {
+    "name": "upper-case keys",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJTVUNFU1NPIjp0cnVlLCJEQVRBIjpbeyJJRCI6IjkwMDEiLCJBdHJpYnV0b3MiOnsiSWRQcm9jZWRpbWVudG8iOiI5MDA1IiwiTlVNRVJPIjoiMSJ9fV0sIlRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9005,
+          "number": "1",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "repeated key, last wins",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwic3VjZXNzbyI6dHJ1ZSwiZGF0YSI6W10sInRvdGFsIjoiMSIsInRvdGFsIjoiMiJ9",
+    "result": {
+      "items": [],
+      "total": 2
+    },
+    "error": null
+  },
+  {
+    "name": "repeated key in another case, last wins",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJTVUNFU1NPIjpmYWxzZSwibWVuc2FnZW0iOiJGYWxoYS4ifQ==",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar: Falha."
+    }
+  },
+  {
+    "name": "empty object",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "e30=",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "empty body",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "JSON array",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "W10=",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "trailing garbage",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXX0geA==",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 200)"
+    }
+  },
+  {
+    "name": "redirect",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 302,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXX0=",
+    "result": null,
+    "error": {
+      "kind": "redirect",
+      "message": "sei: /processo/listar: SEI answered with a redirect, which sei-monitor does not follow on API calls; check SEI_URL and SEI_API_URL"
+    }
+  },
+  {
+    "name": "401 with envelope",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 401,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJUb2tlbiBpbnbDoWxpZG8hIn0=",
+    "result": null,
+    "error": {
+      "kind": "unauthorized",
+      "message": "sei: /processo/listar: Token inválido!"
+    }
+  },
+  {
+    "name": "401 without envelope",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 401,
+    "body_base64": "VW5hdXRob3JpemVk",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 401)"
+    }
+  },
+  {
+    "name": "401 with sucesso true",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 401,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXX0=",
+    "result": null,
+    "error": {
+      "kind": "unauthorized",
+      "message": "sei: /processo/listar answered HTTP 401"
+    }
+  },
+  {
+    "name": "403 with envelope",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 403,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJBY2Vzc28gbmVnYWRvISJ9",
+    "result": null,
+    "error": {
+      "kind": "unauthorized",
+      "message": "sei: /processo/listar: Acesso negado!"
+    }
+  },
+  {
+    "name": "403 without envelope",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 403,
+    "body_base64": "PGh0bWw+Rm9yYmlkZGVuPC9odG1sPg==",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 403)"
+    }
+  },
+  {
+    "name": "404 without envelope",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 404,
+    "body_base64": "Tm90IEZvdW5k",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 404)"
+    }
+  },
+  {
+    "name": "500 with envelope",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 500,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJFcnJvIGludGVybm8uIn0=",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /processo/listar: Erro interno."
+    }
+  },
+  {
+    "name": "500 with sucesso true",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 500,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXX0=",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /processo/listar answered HTTP 500"
+    }
+  },
+  {
+    "name": "500 without envelope",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 500,
+    "body_base64": "PGh0bWw+SW50ZXJuYWwgU2VydmVyIEVycm9yPC9odG1sPg==",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 500)"
+    }
+  },
+  {
+    "name": "502 with envelope",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 502,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJCYWQgZ2F0ZXdheSJ9",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /processo/listar: Bad gateway"
+    }
+  },
+  {
+    "name": "502 without envelope",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 502,
+    "body_base64": "",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 502)"
+    }
+  },
+  {
+    "name": "204 without body",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 204,
+    "body_base64": "",
+    "result": null,
+    "error": {
+      "kind": "unexpected_response",
+      "message": "sei: /processo/listar: answer outside the API format (HTTP 204)"
+    }
+  },
+  {
+    "name": "mensagem with entities and spaces",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiIgIEVycm8gJmFtcDsgYXZpc28mbmJzcDsgIn0=",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar: Erro & aviso "
+    }
+  },
+  {
+    "name": "mensagem list",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOlsiICBhICZsdDtiJmd0OyAiLCJjJmFtcDsiLCIiXX0=",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar: a <b>; c&; "
+    }
+  },
+  {
+    "name": "mensagem number",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOjQyfQ==",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar answered HTTP 200"
+    }
+  },
+  {
+    "name": "mensagem null",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOm51bGx9",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar answered HTTP 200"
+    }
+  },
+  {
+    "name": "mensagem empty list",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOltdfQ==",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar answered HTTP 200"
+    }
+  },
+  {
+    "name": "mensagem list with a number",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOlsiYSIsMV19",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar answered HTTP 200"
+    }
+  },
+  {
+    "name": "mensagem object",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOnsiYSI6ImIifX0=",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar answered HTTP 200"
+    }
+  },
+  {
+    "name": "mensagem with multi-byte text before an entity",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiLDp8OjbyAmYW1wOyDDp8OjbyAmIzAzOTsifQ==",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar: ção & ção '"
+    }
+  },
+  {
+    "name": "mensagem token after entities",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJUJm9jaXJjO2tlbiBleHBpcmFkbyJ9",
+    "result": null,
+    "error": {
+      "kind": "unauthorized",
+      "message": "sei: /processo/listar: Tôken expirado"
+    }
+  },
+  {
+    "name": "mensagem module after entities",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJNJm9hY3V0ZTtkdWxvIGluYXRpdm8uIn0=",
+    "result": null,
+    "error": {
+      "kind": "module_unavailable",
+      "message": "sei: /processo/listar: Módulo inativo."
+    }
+  },
+  {
+    "name": "mensagem module with 200 and sucesso false",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJNw7NkdWxvIGluYXRpdm8uIn0=",
+    "result": null,
+    "error": {
+      "kind": "module_unavailable",
+      "message": "sei: /processo/listar: Módulo inativo."
+    }
+  },
+  {
+    "name": "mensagem unit not allowed",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJVbmlkYWRlIG7Do28gcGVybWl0aWRhIHBhcmEgbyB1c3XDoXJpby4ifQ==",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar: Unidade não permitida para o usuário."
+    }
+  },
+  {
+    "name": "mensagem with invalid bytes",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJh/2LigmMifQ==",
+    "result": null,
+    "error": {
+      "kind": "refused",
+      "message": "sei: /processo/listar: a�b��c"
+    }
+  },
+  {
+    "name": "scheduled return carried from the previous item",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjp7ImRhdGFQcm9ncmFtYWRhIjoiMDYvMTEvMjAyNiJ9fX19LHsiaWQiOiI5MDAyIiwiYXRyaWJ1dG9zIjp7InN0YXR1cyI6eyJyZXRvcm5vUHJvZ3JhbWFkbyI6Ik4iLCJyZXRvcm5vRGF0YSI6eyJkYXRhUHJvZ3JhbWFkYSI6IjA2LzExLzIwMjYifX19fV0sInRvdGFsIjoiMiJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "2026-11-06",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9002,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 2
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData as text",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjoiMDYvMTEvMjAyNiJ9fX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "2026-11-06",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData 31/02/2026",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjp7ImRhdGFQcm9ncmFtYWRhIjoiMzEvMDIvMjAyNiJ9fX19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData 5/11/2026",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjoiNS8xMS8yMDI2In19fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData with spaces",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjp7ImRhdGFQcm9ncmFtYWRhIjoiIDA2LzExLzIwMjYgIn19fX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "2026-11-06",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData empty dataProgramada",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjp7ImRhdGFQcm9ncmFtYWRhIjoiIn19fX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData null",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjpudWxsfX19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData number",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjo2MTEyMDI2fX19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData dataProgramada number",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjp7ImRhdGFQcm9ncmFtYWRhIjo2MTEyMDI2fX19fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData ISO date",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyIsInJldG9ybm9EYXRhIjoiMjAyNi0xMS0wNiJ9fX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoData missing",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiUyJ9fX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoProgramado lower-case s",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoicyIsInJldG9ybm9EYXRhIjoiMDYvMTEvMjAyNiJ9fX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "retornoProgramado boolean",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjp0cnVlfX19XSwidG90YWwiOiIxIn0=",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "retornoAtrasado values",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9BdHJhc2FkbyI6IlMifX19LHsiaWQiOiI5MDAyIiwiYXRyaWJ1dG9zIjp7InN0YXR1cyI6eyJyZXRvcm5vQXRyYXNhZG8iOiJzIn19fSx7ImlkIjoiOTAwMyIsImF0cmlidXRvcyI6eyJzdGF0dXMiOnsicmV0b3Jub0F0cmFzYWRvIjoiTiJ9fX0seyJpZCI6IjkwMDQiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7fX19LHsiaWQiOiI5MDA1IiwiYXRyaWJ1dG9zIjp7InN0YXR1cyI6eyJyZXRvcm5vQXRyYXNhZG8iOiIgUyAifX19XSwidG90YWwiOiI1In0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": true,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9002,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9003,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9004,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9005,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 5
+    },
+    "error": null
+  },
+  {
+    "name": "overdue without a date",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsic3RhdHVzIjp7InJldG9ybm9Qcm9ncmFtYWRvIjoiTiIsInJldG9ybm9BdHJhc2FkbyI6IlMifX19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": true,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "usuarioAtribuido variants",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsidXN1YXJpb0F0cmlidWlkbyI6bnVsbH19LHsiaWQiOiI5MDAyIiwiYXRyaWJ1dG9zIjp7InVzdWFyaW9BdHJpYnVpZG8iOnt9fX0seyJpZCI6IjkwMDMiLCJhdHJpYnV0b3MiOnsidXN1YXJpb0F0cmlidWlkbyI6eyJpZFVzdWFyaW8iOiIwIiwic2lnbGEiOiIifX19LHsiaWQiOiI5MDA0IiwiYXRyaWJ1dG9zIjp7InVzdWFyaW9BdHJpYnVpZG8iOnsic2lnbGEiOiIgZnVsYW5vLnRhbCAifX19LHsiaWQiOiI5MDA1IiwiYXRyaWJ1dG9zIjp7InVzdWFyaW9BdHJpYnVpZG8iOnsiaWRVc3VhcmlvIjoiNyIsInNpZ2xhIjoxMn19fSx7ImlkIjoiOTAwNiIsImF0cmlidXRvcyI6eyJ1c3VhcmlvQXRyaWJ1aWRvIjoiIn19LHsiaWQiOiI5MDA3IiwiYXRyaWJ1dG9zIjp7InVzdWFyaW9BdHJpYnVpZG8iOmZhbHNlfX0seyJpZCI6IjkwMDgiLCJhdHJpYnV0b3MiOnsidXN1YXJpb0F0cmlidWlkbyI6W119fSx7ImlkIjoiOTAwOSIsImF0cmlidXRvcyI6eyJ1c3VhcmlvQXRyaWJ1aWRvIjp7ImlkVXN1YXJpbyI6ImFiYyIsInNpZ2xhIjoieCJ9fX0seyJpZCI6IjkwMTAiLCJhdHJpYnV0b3MiOnsidXN1YXJpb0F0cmlidWlkbyI6eyJpZFVzdWFyaW8iOiI3Iiwic2lnbGEiOiIiLCJub21lIjoiIEZ1bGFubyAmYW1wOyBUYWwgIn19fSx7ImlkIjoiOTAxMSIsImF0cmlidXRvcyI6eyJ1c3VhcmlvQXRyaWJ1aWRvIjp7ImlkVXN1YXJpbyI6MCwic2lnbGEiOiIgICJ9fX0seyJpZCI6IjkwMTIiLCJhdHJpYnV0b3MiOnsidXN1YXJpb0F0cmlidWlkbyI6eyJJRFVTVUFSSU8iOiI4IiwiU0lHTEEiOiJiZWx0cmFubyIsIk5PTUUiOiJCZWx0cmFubyJ9fX0seyJpZCI6IjkwMTMiLCJhdHJpYnV0b3MiOnsidXN1YXJpb0F0cmlidWlkbyI6ImZ1bGFuby50YWwifX0seyJpZCI6IjkwMTQiLCJhdHJpYnV0b3MiOnsidXN1YXJpb0F0cmlidWlkbyI6eyJpZFVzdWFyaW8iOiI5Iiwic2lnbGEiOm51bGwsIm5vbWUiOm51bGx9fX1dLCJ0b3RhbCI6IjE0In0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9002,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9003,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9004,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": {
+            "id": 0,
+            "acronym": "fulano.tal",
+            "name": ""
+          },
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9005,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9006,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9007,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9008,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9009,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9010,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": {
+            "id": 7,
+            "acronym": "",
+            "name": "Fulano & Tal"
+          },
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9011,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9012,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": {
+            "id": 8,
+            "acronym": "beltrano",
+            "name": "Beltrano"
+          },
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9013,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        },
+        {
+          "procedure_id": 9014,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": {
+            "id": 9,
+            "acronym": "",
+            "name": ""
+          },
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 14
+    },
+    "error": null
+  },
+  {
+    "name": "entities and spaces in every process field",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiIDAwMDAwLjAwMDAwMS8yMDI2LTAwICZhbXA7ICIsInRpcG9Qcm9jZXNzbyI6IiBBZG1pbmlzdHJhJmNjZWRpbDsmYXRpbGRlO28gJmFtcDsgRGkmYWFjdXRlO3JpYXMgIiwiZGVzY3JpY2FvIjoiIFBlZGlkbyAmYW1wOyAmcXVvdDt2aWFnZW0mcXVvdDsgIiwidXN1YXJpb0F0cmlidWlkbyI6eyJpZFVzdWFyaW8iOiIxMDEiLCJzaWdsYSI6IiBmdWxhbm8mYW1wO3RhbCAiLCJub21lIjoiIEZ1bGFubyAmYW1wOyBUYWwgIn0sInN0YXR1cyI6eyJyZXRvcm5vUHJvZ3JhbWFkbyI6IlMiLCJyZXRvcm5vRGF0YSI6eyJkYXRhUHJvZ3JhbWFkYSI6IjA2LzExLzIwMjYifSwicmV0b3Jub0F0cmFzYWRvIjoiTiIsInByb2Nlc3NvR2VyYWRvUmVjZWJpZG8iOiIgUiZhbXA7ICJ9fX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "00000.000001/2026-00 &amp;",
+          "type": "Administração & Diárias",
+          "description": "Pedido & \"viagem\"",
+          "assignee": {
+            "id": 101,
+            "acronym": "fulano&amp;tal",
+            "name": "Fulano & Tal"
+          },
+          "return_date": "2026-11-06",
+          "return_overdue": false,
+          "origin": " R&amp; "
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "invalid bytes in strings",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiYf9iIiwiZGVzY3JpY2FvIjoieOKCeSIsInRpcG9Qcm9jZXNzbyI6IuKC/yJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "a�b",
+          "type": "���",
+          "description": "x��y",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "number where text is expected",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoxMjN9fV0sInRvdGFsIjoiMSJ9",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /processo/listar answer: "
+    }
+  },
+  {
+    "name": "null text fields",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjpudWxsLCJ0aXBvUHJvY2Vzc28iOm51bGwsImRlc2NyaWNhbyI6bnVsbH19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "repeated attribute key, last wins",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsibnVtZXJvIjoiZmlyc3QiLCJudW1lcm8iOiJzZWNvbmQifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "second",
+          "type": "",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "multi-byte text before entities",
+    "route": "processes",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJhdHJpYnV0b3MiOnsiZGVzY3JpY2FvIjoiw6fDo28gw6fDo28gJmFtcDsmIzgyMTE7Jm5kYXNoIMOnw6NvIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "",
+          "type": "",
+          "description": "ção ção &–&ndash ção",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": ""
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity without hora",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImlkUHJvY2Vzc28iOiI5MDAxIiwidXN1YXJpbyI6ImZ1bGFuby50YWwiLCJkYXRhIjoiMDQvMTEvMjAyNiIsInVuaWRhZGUiOiJTRURFTU8vTlVQUk9DIiwiaW5mb3JtYWNhbyI6IngifX1dLCJ0b3RhbCI6IjEifQ==",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "fulano.tal",
+          "unit": "SEDEMO/NUPROC",
+          "text": "x",
+          "at": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity in the 2018 gap in Sao Paulo",
+    "route": "activities",
+    "zone": "America/Sao_Paulo",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiIwNC8xMS8yMDE4IiwiaG9yYSI6IjAwOjMwOjAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2018-11-04T02:30:00Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity in the 2019 overlap in Sao Paulo",
+    "route": "activities",
+    "zone": "America/Sao_Paulo",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiIxNi8wMi8yMDE5IiwiaG9yYSI6IjIzOjMwOjAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2019-02-17T01:30:00Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity in the 2018 gap in Boa Vista",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiIwNC8xMS8yMDE4IiwiaG9yYSI6IjAwOjMwOjAwIn19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2018-11-04T04:30:00Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity at the last second of the year in Boa Vista",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiIzMS8xMi8yMDI2IiwiaG9yYSI6IjIzOjU5OjU5In19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2027-01-01T03:59:59Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity in UTC",
+    "route": "activities",
+    "zone": "UTC",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiIzMS8xMi8yMDI2IiwiaG9yYSI6IjIzOjU5OjU5In19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2026-12-31T23:59:59Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity with usuario null",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7InVzdWFyaW8iOm51bGwsImRhdGEiOiIwNC8xMS8yMDI2IiwiaG9yYSI6IjEzOjEzOjA1In19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2026-11-04T17:13:05Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity procedure ids",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiIwNC8xMS8yMDI2IiwiaG9yYSI6IjEzOjEzOjA1In19LHsiaWQiOiI1MDAwMiIsImF0cmlidXRvcyI6eyJpZFByb2Nlc3NvIjoiMCIsImRhdGEiOiIwNC8xMS8yMDI2IiwiaG9yYSI6IjEzOjEzOjA1In19LHsiaWQiOiI1MDAwMyIsImF0cmlidXRvcyI6eyJpZFByb2Nlc3NvIjoiMTIzIiwiZGF0YSI6IjA0LzExLzIwMjYiLCJob3JhIjoiMTM6MTM6MDUifX1dLCJ0b3RhbCI6IjMifQ==",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2026-11-04T17:13:05Z"
+        },
+        {
+          "id": 50002,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2026-11-04T17:13:05Z"
+        },
+        {
+          "id": 50003,
+          "procedure_id": 123,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2026-11-04T17:13:05Z"
+        }
+      ],
+      "total": 3
+    },
+    "error": null
+  },
+  {
+    "name": "activity date and time with spaces",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiIgMDQvMTEvMjAyNiAiLCJob3JhIjoiIDEzOjEzOjA1ICJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2026-11-04T17:13:05Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity date and time that do not parse",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiI0LzExLzIwMjYiLCJob3JhIjoiMTM6MTM6MDUifX0seyJpZCI6IjUwMDAyIiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiIwNC8xMS8yMDI2IiwiaG9yYSI6IjEzOjEzIn19LHsiaWQiOiI1MDAwMyIsImF0cmlidXRvcyI6eyJkYXRhIjoiMDQvMTEvMjAyNiIsImhvcmEiOiIyNDowMDowMCJ9fSx7ImlkIjoiNTAwMDQiLCJhdHJpYnV0b3MiOnsiZGF0YSI6IjI5LzAyLzIwMjUiLCJob3JhIjoiMTA6MDA6MDAifX0seyJpZCI6IjUwMDA1IiwiYXRyaWJ1dG9zIjp7ImRhdGEiOiIyMDI2LTExLTA0IiwiaG9yYSI6IjEwOjAwOjAwIn19LHsiaWQiOiI1MDAwNiIsImF0cmlidXRvcyI6eyJkYXRhIjoiMDQvMTEvMjAyNiIsImhvcmEiOiI5OjAwOjAwIn19LHsiaWQiOiI1MDAwNyIsImF0cmlidXRvcyI6eyJkYXRhIjoiMDQvMTEvMjAyNiIsImhvcmEiOiIwOTowMDowMC41In19XSwidG90YWwiOiI3In0=",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "0001-01-01T00:00:00Z"
+        },
+        {
+          "id": 50002,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "0001-01-01T00:00:00Z"
+        },
+        {
+          "id": 50003,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "0001-01-01T00:00:00Z"
+        },
+        {
+          "id": 50004,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "0001-01-01T00:00:00Z"
+        },
+        {
+          "id": 50005,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "0001-01-01T00:00:00Z"
+        },
+        {
+          "id": 50006,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2026-11-04T13:00:00Z"
+        },
+        {
+          "id": 50007,
+          "procedure_id": 9001,
+          "user": "",
+          "unit": "",
+          "text": "",
+          "at": "2026-11-04T13:00:00.5Z"
+        }
+      ],
+      "total": 7
+    },
+    "error": null
+  },
+  {
+    "name": "entities and spaces in every activity field",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7InVzdWFyaW8iOiIgZnVsYW5vJmFtcDt0YWwgIiwidW5pZGFkZSI6IiBTRURFTU8mYW1wO05VUFJPQyAiLCJpbmZvcm1hY2FvIjoiIERvY3VtZW50byAmcXVvdDtPZiZpYWN1dGU7Y2lvJnF1b3Q7ICZhbXA7IGFuZXhvICIsImRhdGEiOiIwNC8xMS8yMDI2IiwiaG9yYSI6IjEzOjEzOjA1In19XSwidG90YWwiOiIxIn0=",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "fulano&amp;tal",
+          "unit": "SEDEMO&amp;NUPROC",
+          "text": "Documento \"Ofício\" & anexo",
+          "at": "2026-11-04T17:13:05Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity with invalid bytes",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7ImluZm9ybWFjYW8iOiJh/2LigiIsInVzdWFyaW8iOiLigiJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "id": 50001,
+          "procedure_id": 9001,
+          "user": "��",
+          "unit": "",
+          "text": "a�b��",
+          "at": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "activity number where text is expected",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjUwMDAxIiwiYXRyaWJ1dG9zIjp7InVzdWFyaW8iOjd9fV0sInRvdGFsIjoiMSJ9",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /atividade/listar answer: "
+    }
+  },
+  {
+    "name": "document names",
+    "route": "documents",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjgwMDAxIiwiYXRyaWJ1dG9zIjp7InByb3RvY29sb0Zvcm1hdGFkbyI6IjAwMTIzNDUiLCJ0aXBvIjoiT2YmaWFjdXRlO2NpbyIsInRpdHVsbyI6IjEyIiwibm9tZSI6Im9maWNpby5wZGYiLCJub21lQ29tcG9zdG8iOiJPZiZpYWN1dGU7Y2lvIDEyICgwMDEyMzQ1KSJ9fSx7ImlkIjoiODAwMDIiLCJhdHJpYnV0b3MiOnsicHJvdG9jb2xvRm9ybWF0YWRvIjoiMDAxMjM0NiIsInRpcG8iOiIgT2YmaWFjdXRlO2NpbyAiLCJ0aXR1bG8iOiIgMTIgIiwibm9tZSI6Im9maWNpby5wZGYiLCJub21lQ29tcG9zdG8iOiIgICJ9fSx7ImlkIjoiODAwMDMiLCJhdHJpYnV0b3MiOnsicHJvdG9jb2xvRm9ybWF0YWRvIjoiMDAxMjM0NyIsInRpcG8iOiIiLCJ0aXR1bG8iOiIiLCJub21lIjoiIHBsYW5pbGhhLnBkZiAifX0seyJpZCI6IjgwMDA0IiwiYXRyaWJ1dG9zIjp7InByb3RvY29sb0Zvcm1hdGFkbyI6IjAwMTIzNDgiLCJ0aXBvIjoiIiwidGl0dWxvIjoiMTIifX0seyJpZCI6IjgwMDA1IiwiYXRyaWJ1dG9zIjp7InByb3RvY29sb0Zvcm1hdGFkbyI6IjAwMTIzNDkiLCJ0aXBvIjoiQW5leG8iLCJ0aXR1bG8iOiIifX0seyJpZCI6IjgwMDA2IiwiYXRyaWJ1dG9zIjp7InByb3RvY29sb0Zvcm1hdGFkbyI6IjAwMTIzNTAifX0seyJpZCI6IjgwMDA3IiwiYXRyaWJ1dG9zIjp7InByb3RvY29sb0Zvcm1hdGFkbyI6IjAwMTIzNTEiLCJub21lIjpudWxsLCJ0aXR1bG8iOm51bGwsInRpcG8iOm51bGwsIm5vbWVDb21wb3N0byI6bnVsbH19XSwidG90YWwiOiI3In0=",
+    "result": {
+      "items": [
+        {
+          "id": 80001,
+          "procedure_id": 9001,
+          "protocol": "0012345",
+          "type": "Ofício",
+          "name": "Ofício 12 (0012345)"
+        },
+        {
+          "id": 80002,
+          "procedure_id": 9001,
+          "protocol": "0012346",
+          "type": "Ofício",
+          "name": "Ofício 12"
+        },
+        {
+          "id": 80003,
+          "procedure_id": 9001,
+          "protocol": "0012347",
+          "type": "",
+          "name": "planilha.pdf"
+        },
+        {
+          "id": 80004,
+          "procedure_id": 9001,
+          "protocol": "0012348",
+          "type": "",
+          "name": "12"
+        },
+        {
+          "id": 80005,
+          "procedure_id": 9001,
+          "protocol": "0012349",
+          "type": "Anexo",
+          "name": "Anexo"
+        },
+        {
+          "id": 80006,
+          "procedure_id": 9001,
+          "protocol": "0012350",
+          "type": "",
+          "name": ""
+        },
+        {
+          "id": 80007,
+          "procedure_id": 9001,
+          "protocol": "0012351",
+          "type": "",
+          "name": ""
+        }
+      ],
+      "total": 7
+    },
+    "error": null
+  },
+  {
+    "name": "entities and spaces in every document field",
+    "route": "documents",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjgwMDAxIiwiYXRyaWJ1dG9zIjp7InByb3RvY29sb0Zvcm1hdGFkbyI6IiAwMDEyMyZhbXA7NDUgIiwidGlwbyI6IiBPZiZpYWN1dGU7Y2lvICZhbXA7ICIsInRpdHVsbyI6IiAxMiZhbXA7ICIsIm5vbWUiOiIgYSZhbXA7Yi5wZGYgIiwibm9tZUNvbXBvc3RvIjoiIE9mJmlhY3V0ZTtjaW8gJmFtcDsgMTIgIn19LHsiaWQiOiI4MDAwMiIsImF0cmlidXRvcyI6eyJwcm90b2NvbG9Gb3JtYXRhZG8iOiIxIiwidGlwbyI6IiBPZiZpYWN1dGU7Y2lvICZhbXA7ICIsInRpdHVsbyI6IiAxMiZhbXA7ICIsIm5vbWUiOiIgYSZhbXA7Yi5wZGYgIn19LHsiaWQiOiI4MDAwMyIsImF0cmlidXRvcyI6eyJwcm90b2NvbG9Gb3JtYXRhZG8iOiIyIiwibm9tZSI6IiBhJmFtcDtiLnBkZiAifX1dLCJ0b3RhbCI6IjMifQ==",
+    "result": {
+      "items": [
+        {
+          "id": 80001,
+          "procedure_id": 9001,
+          "protocol": "00123&amp;45",
+          "type": "Ofício &",
+          "name": "Ofício & 12"
+        },
+        {
+          "id": 80002,
+          "procedure_id": 9001,
+          "protocol": "1",
+          "type": "Ofício &",
+          "name": "Ofício & 12&"
+        },
+        {
+          "id": 80003,
+          "procedure_id": 9001,
+          "protocol": "2",
+          "type": "",
+          "name": "a&b.pdf"
+        }
+      ],
+      "total": 3
+    },
+    "error": null
+  },
+  {
+    "name": "document procedure ids",
+    "route": "documents",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjgwMDAxIiwiYXRyaWJ1dG9zIjp7ImlkUHJvY2VkaW1lbnRvIjoiOTAwMiJ9fSx7ImlkIjoiODAwMDIiLCJhdHJpYnV0b3MiOnsiaWRQcm9jZWRpbWVudG8iOiIwIn19LHsiaWQiOiI4MDAwMyIsImF0cmlidXRvcyI6e319XSwidG90YWwiOiIzIn0=",
+    "result": {
+      "items": [
+        {
+          "id": 80001,
+          "procedure_id": 9002,
+          "protocol": "",
+          "type": "",
+          "name": ""
+        },
+        {
+          "id": 80002,
+          "procedure_id": 9001,
+          "protocol": "",
+          "type": "",
+          "name": ""
+        },
+        {
+          "id": 80003,
+          "procedure_id": 9001,
+          "protocol": "",
+          "type": "",
+          "name": ""
+        }
+      ],
+      "total": 3
+    },
+    "error": null
+  },
+  {
+    "name": "document with invalid bytes",
+    "route": "documents",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjgwMDAxIiwiYXRyaWJ1dG9zIjp7InRpcG8iOiJh/yIsInRpdHVsbyI6IuKCYiJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": {
+      "items": [
+        {
+          "id": 80001,
+          "procedure_id": 9001,
+          "protocol": "",
+          "type": "a�",
+          "name": "a� ��b"
+        }
+      ],
+      "total": 1
+    },
+    "error": null
+  },
+  {
+    "name": "document number where text is expected",
+    "route": "documents",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjgwMDAxIiwiYXRyaWJ1dG9zIjp7InRpdHVsbyI6MTJ9fV0sInRvdGFsIjoiMSJ9",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /documento/listar answer: "
+    }
+  },
+  {
+    "name": "version data missing",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlfQ==",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /versao answer: "
+    }
+  },
+  {
+    "name": "version data null",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpudWxsfQ==",
+    "result": {
+      "sei": "",
+      "module": ""
+    },
+    "error": null
+  },
+  {
+    "name": "version data empty object",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7fX0=",
+    "result": {
+      "sei": "",
+      "module": ""
+    },
+    "error": null
+  },
+  {
+    "name": "version with entities and spaces",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InNlaSI6IiA1LjAuNSAmYW1wOyAiLCJ3c3NlaSI6IjMuMC40Jmx0OyJ9fQ==",
+    "result": {
+      "sei": " 5.0.5 &amp; ",
+      "module": "3.0.4&lt;"
+    },
+    "error": null
+  },
+  {
+    "name": "version number",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InNlaSI6IjUuMC41Iiwid3NzZWkiOjN9fQ==",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /versao answer: "
+    }
+  },
+  {
+    "name": "version upper-case keys",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7IlNFSSI6IjUuMC41IiwiV1NTRUkiOiIzLjAuNCJ9fQ==",
+    "result": {
+      "sei": "5.0.5",
+      "module": "3.0.4"
+    },
+    "error": null
+  },
+  {
+    "name": "version data as list",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbXX0=",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /versao answer: "
+    }
+  },
+  {
+    "name": "login without token",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7ImxvZ2luRGF0YSI6eyJJZFVzdWFyaW8iOiIxMDEifX19",
+    "result": null,
+    "error": {
+      "kind": "no_token",
+      "message": "sei: /autenticar: SEI did not return a session token"
+    }
+  },
+  {
+    "name": "login with empty token",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InRva2VuIjoiIn19",
+    "result": null,
+    "error": {
+      "kind": "no_token",
+      "message": "sei: /autenticar: SEI did not return a session token"
+    }
+  },
+  {
+    "name": "login data null",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpudWxsfQ==",
+    "result": null,
+    "error": {
+      "kind": "no_token",
+      "message": "sei: /autenticar: SEI did not return a session token"
+    }
+  },
+  {
+    "name": "login data missing",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlfQ==",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /autenticar answer: "
+    }
+  },
+  {
+    "name": "login token as number",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InRva2VuIjo3fX0=",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /autenticar answer: "
+    }
+  },
+  {
+    "name": "login IdUsuario invalid",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InRva2VuIjoidCIsImxvZ2luRGF0YSI6eyJJZFVzdWFyaW8iOiJhYmMifX19",
+    "result": null,
+    "error": {
+      "kind": "decode",
+      "message": "sei: read the /autenticar answer: "
+    }
+  },
+  {
+    "name": "login unidades null",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InRva2VuIjoidCIsImxvZ2luRGF0YSI6eyJJZFVzdWFyaW8iOjEwMSwiSWRVbmlkYWRlQXR1YWwiOiIxMDAxIiwic2lnbGEiOiJ1c2VyLm5hbWUiLCJub21lIjoiVXNlciBOYW1lIn0sInVuaWRhZGVzIjpudWxsfX0=",
+    "result": {
+      "user_id": 101,
+      "user_acronym": "user.name",
+      "user_name": "User Name",
+      "current_unit_id": 1001,
+      "units": []
+    },
+    "error": null
+  },
+  {
+    "name": "login upper-case keys",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7IlRPS0VOIjoidCIsIkxPR0lOREFUQSI6eyJpZHVzdWFyaW8iOiIxMDEiLCJJRFVOSURBREVBVFVBTCI6IjEwMDEiLCJTSUdMQSI6InVzZXIubmFtZSIsIk5PTUUiOiJVc2VyIE5hbWUifSwiVU5JREFERVMiOlt7IklEIjoiMTAwMSIsIlNJR0xBIjoiU0VERU1PL05VUFJPQyIsIkRFU0NSSUNBTyI6Ik51Y2xlbyJ9XX19",
+    "result": {
+      "user_id": 101,
+      "user_acronym": "user.name",
+      "user_name": "User Name",
+      "current_unit_id": 1001,
+      "units": [
+        {
+          "id": 1001,
+          "acronym": "SEDEMO/NUPROC",
+          "description": "Nucleo"
+        }
+      ]
+    },
+    "error": null
+  },
+  {
+    "name": "login with entities and spaces everywhere",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InRva2VuIjoidCIsImxvZ2luRGF0YSI6eyJJZFVzdWFyaW8iOiIxMDEiLCJJZFVuaWRhZGVBdHVhbCI6IjEwMDEiLCJzaWdsYSI6IiB1c2VyJmFtcDtuYW1lICIsIm5vbWUiOiIgVXNlciAmYW1wOyBOYW1lICJ9LCJ1bmlkYWRlcyI6W3siaWQiOiIxMDAxIiwic2lnbGEiOiIgU0VERU1PJmFtcDtOVVBST0MgIiwiZGVzY3JpY2FvIjoiIE4mdWFjdXRlO2NsZW8gJmFtcDsgR2FiaW5ldGUgIn1dfX0=",
+    "result": {
+      "user_id": 101,
+      "user_acronym": " user&amp;name ",
+      "user_name": " User & Name ",
+      "current_unit_id": 1001,
+      "units": [
+        {
+          "id": 1001,
+          "acronym": " SEDEMO&amp;NUPROC ",
+          "description": " Núcleo & Gabinete "
+        }
+      ]
+    },
+    "error": null
+  },
+  {
+    "name": "login redirect",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 302,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InRva2VuIjoidCJ9fQ==",
+    "result": null,
+    "error": {
+      "kind": "redirect",
+      "message": "sei: /autenticar: SEI answered with a redirect, which sei-monitor does not follow on API calls; check SEI_URL and SEI_API_URL"
+    }
+  },
+  {
+    "name": "login 500 with envelope",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 500,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJFcnJvIGludGVybm8uIn0=",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /autenticar: Erro interno."
+    }
+  },
+  {
+    "name": "login 403 with envelope",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 403,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZSwibWVuc2FnZW0iOiJBY2Vzc28gbmVnYWRvISJ9",
+    "result": null,
+    "error": {
+      "kind": "invalid_credentials",
+      "message": "sei: /autenticar: Acesso negado!"
+    }
+  },
+  {
+    "name": "login 200 with sucesso false and no message",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjpmYWxzZX0=",
+    "result": null,
+    "error": {
+      "kind": "invalid_credentials",
+      "message": "sei: /autenticar answered HTTP 200"
+    }
+  },
+  {
+    "name": "login with invalid bytes",
+    "route": "login",
+    "zone": "America/Boa_Vista",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjp7InRva2VuIjoidCIsImxvZ2luRGF0YSI6eyJub21lIjoiYf9i4oJjIn19fQ==",
+    "result": {
+      "user_id": 0,
+      "user_acronym": "",
+      "user_name": "a�b��c",
+      "current_unit_id": 0,
+      "units": []
+    },
+    "error": null
+  },
+  {
+    "name": "redirect on activities",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 302,
+    "body_base64": "",
+    "result": null,
+    "error": {
+      "kind": "redirect",
+      "message": "sei: /atividade/listar: SEI answered with a redirect, which sei-monitor does not follow on API calls; check SEI_URL and SEI_API_URL"
+    }
+  },
+  {
+    "name": "500 without envelope on activities",
+    "route": "activities",
+    "zone": "America/Boa_Vista",
+    "status": 500,
+    "body_base64": "b29wcw==",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /atividade/listar: answer outside the API format (HTTP 500)"
+    }
+  },
+  {
+    "name": "redirect on documents",
+    "route": "documents",
+    "zone": "America/Boa_Vista",
+    "status": 302,
+    "body_base64": "",
+    "result": null,
+    "error": {
+      "kind": "redirect",
+      "message": "sei: /documento/listar: SEI answered with a redirect, which sei-monitor does not follow on API calls; check SEI_URL and SEI_API_URL"
+    }
+  },
+  {
+    "name": "500 without envelope on documents",
+    "route": "documents",
+    "zone": "America/Boa_Vista",
+    "status": 500,
+    "body_base64": "b29wcw==",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /documento/listar: answer outside the API format (HTTP 500)"
+    }
+  },
+  {
+    "name": "redirect on version",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 302,
+    "body_base64": "",
+    "result": null,
+    "error": {
+      "kind": "redirect",
+      "message": "sei: /versao: SEI answered with a redirect, which sei-monitor does not follow on API calls; check SEI_URL and SEI_API_URL"
+    }
+  },
+  {
+    "name": "500 without envelope on version",
+    "route": "version",
+    "zone": "America/Boa_Vista",
+    "status": 500,
+    "body_base64": "b29wcw==",
+    "result": null,
+    "error": {
+      "kind": "server",
+      "message": "sei: /versao: answer outside the API format (HTTP 500)"
+    }
+  },
+  {
+    "name": "process page in America/Sao_Paulo",
+    "route": "processes",
+    "zone": "America/Sao_Paulo",
+    "status": 200,
+    "body_base64": "eyJzdWNlc3NvIjp0cnVlLCJkYXRhIjpbeyJpZCI6IjkwMDEiLCJzdGF0dXMiOiJQIiwic2VpTnVtTWF4RG9jc1Bhc3RhIjoiMjAiLCJhdHJpYnV0b3MiOnsiaWRQcm9jZWRpbWVudG8iOiI5MDAxIiwiaWRQcm90b2NvbG8iOiI5MDAxIiwibnVtZXJvIjoiMDAwMDAuMDAwMDAxLzIwMjYtMDAiLCJ0aXBvUHJvY2Vzc28iOiJBZG1pbmlzdHJhJmNjZWRpbDsmYXRpbGRlO286IERpJmFhY3V0ZTtyaWFzIiwiZGVzY3JpY2FvIjoiUGVkaWRvIGRlIGRpJmFhY3V0ZTtyaWFzICZxdW90O3ZpYWdlbSZxdW90OyIsInVzdWFyaW9BdHJpYnVpZG8iOnsiaWRBdGl2aWRhZGUiOiI3MDAiLCJpZFVzdWFyaW8iOiIxMDEiLCJzaWdsYSI6ImZ1bGFuby50YWwiLCJub21lIjoiRnVsYW5vIGRlIFRhbCIsIm5vbWVmb3JtYXRhZG8iOiJmdWxhbm8udGFsIC0gRnVsYW5vIGRlIFRhbCJ9LCJ1bmlkYWRlIjp7ImlkVW5pZGFkZSI6IjE1MDAiLCJzaWdsYSI6IlNFREVNTy9QUk9UT0NPTE8ifSwiY2llbmNpYXMiOltdLCJtYXJjYWRvciI6W10sImRhZG9zQWJlcnR1cmEiOltdLCJhbm90YWNvZXMiOltdLCJzdGF0dXMiOnsiZG9jdW1lbnRvU2lnaWxvc28iOiIiLCJkb2N1bWVudG9SZXN0cml0byI6Ik4iLCJkb2N1bWVudG9Ob3ZvIjoiUyIsImRvY3VtZW50b1B1YmxpY2FkbyI6Ik4iLCJhbm90YWNhbyI6Ik4iLCJhbm90YWNhb1ByaW9yaWRhZGUiOiJOIiwiY2llbmNpYSI6Ik4iLCJyZXRvcm5vUHJvZ3JhbWFkbyI6IlMiLCJyZXRvcm5vRGF0YSI6eyJkYXRhUHJvZ3JhbWFkYSI6IjA2LzExLzIwMjYiLCJ1bmlkYWRlIjoiU0VERU1PL0dBQiJ9LCJyZXRvcm5vQXRyYXNhZG8iOiJOIiwicHJvY2Vzc29BY2Vzc2Fkb1VzdWFyaW8iOiJOIiwicHJvY2Vzc29BY2Vzc2Fkb1VuaWRhZGUiOiJOIiwicHJvY2Vzc29SZW1vY2FvU29icmVzdGFtZW50byI6Ik4iLCJwcm9jZXNzb0Jsb3F1ZWFkbyI6Ik4iLCJwcm9jZXNzb0RvY3VtZW50b0luY2x1aWRvQXNzaW5hZG8iOiJOIiwicHJvY2Vzc29QdWJsaWNhZG8iOiJOIiwibml2ZWxBY2Vzc29HbG9iYWwiOiIwIiwicG9kZUdlcmVuY2lhckNyZWRlbmNpYWlzIjoiTiIsInByb2Nlc3NvQWJlcnRvIjoiUyIsInByb2Nlc3NvRW1UcmFtaXRhY2FvIjoiTiIsInByb2Nlc3NvU29icmVzdGFkbyI6Ik4iLCJwcm9jZXNzb0FuZXhhZG8iOiJOIiwicG9kZVJlYWJyaXJQcm9jZXNzbyI6Ik4iLCJwb2RlUmVnaXN0cmFyQW5vdGFjYW8iOiJTIiwicG9kZVJlbW92ZXJTb2JyZXN0YW1lbnRvIjoiTiIsInRpcG8iOm51bGwsInByb2Nlc3NvR2VyYWRvUmVjZWJpZG8iOiJSIn19fSx7ImlkIjoiOTAwMiIsInN0YXR1cyI6IlAiLCJzZWlOdW1NYXhEb2NzUGFzdGEiOiIyMCIsImF0cmlidXRvcyI6eyJpZFByb2NlZGltZW50byI6IjkwMDIiLCJpZFByb3RvY29sbyI6IjkwMDIiLCJudW1lcm8iOiIwMDAwMC4wMDAwMDIvMjAyNi0wMCIsInRpcG9Qcm9jZXNzbyI6IkNvbnRyYXRvIiwiZGVzY3JpY2FvIjoiIiwidXN1YXJpb0F0cmlidWlkbyI6bnVsbCwidW5pZGFkZSI6eyJpZFVuaWRhZGUiOiIxMDAxIiwic2lnbGEiOiJTRURFTU8vTlVQUk9DIn0sImNpZW5jaWFzIjpbXSwibWFyY2Fkb3IiOltdLCJkYWRvc0FiZXJ0dXJhIjpbXSwiYW5vdGFjb2VzIjpbXSwic3RhdHVzIjp7ImRvY3VtZW50b1NpZ2lsb3NvIjoiIiwiZG9jdW1lbnRvUmVzdHJpdG8iOiJOIiwiZG9jdW1lbnRvTm92byI6Ik4iLCJkb2N1bWVudG9QdWJsaWNhZG8iOiJOIiwiYW5vdGFjYW8iOiJOIiwiYW5vdGFjYW9QcmlvcmlkYWRlIjoiTiIsImNpZW5jaWEiOiJOIiwicmV0b3Jub1Byb2dyYW1hZG8iOiJOIiwicmV0b3Jub0RhdGEiOnsiZGF0YVByb2dyYW1hZGEiOiIwNi8xMS8yMDI2IiwidW5pZGFkZSI6IlNFREVNTy9HQUIifSwicmV0b3Jub0F0cmFzYWRvIjoiTiIsInByb2Nlc3NvQWNlc3NhZG9Vc3VhcmlvIjoiUyIsInByb2Nlc3NvQWNlc3NhZG9VbmlkYWRlIjoiUyIsInByb2Nlc3NvUmVtb2Nhb1NvYnJlc3RhbWVudG8iOiJOIiwicHJvY2Vzc29CbG9xdWVhZG8iOiJOIiwicHJvY2Vzc29Eb2N1bWVudG9JbmNsdWlkb0Fzc2luYWRvIjoiTiIsInByb2Nlc3NvUHVibGljYWRvIjoiTiIsIm5pdmVsQWNlc3NvR2xvYmFsIjoiMCIsInBvZGVHZXJlbmNpYXJDcmVkZW5jaWFpcyI6Ik4iLCJwcm9jZXNzb0FiZXJ0byI6IlMiLCJwcm9jZXNzb0VtVHJhbWl0YWNhbyI6Ik4iLCJwcm9jZXNzb1NvYnJlc3RhZG8iOiJOIiwicHJvY2Vzc29BbmV4YWRvIjoiTiIsInBvZGVSZWFicmlyUHJvY2Vzc28iOiJOIiwicG9kZVJlZ2lzdHJhckFub3RhY2FvIjoiUyIsInBvZGVSZW1vdmVyU29icmVzdGFtZW50byI6Ik4iLCJ0aXBvIjpudWxsLCJwcm9jZXNzb0dlcmFkb1JlY2ViaWRvIjoiRyJ9fX0seyJpZCI6OTAwMywic3RhdHVzIjoiUCIsInNlaU51bU1heERvY3NQYXN0YSI6MjAsImF0cmlidXRvcyI6eyJpZFByb2NlZGltZW50byI6OTAwMywiaWRQcm90b2NvbG8iOjkwMDMsIm51bWVybyI6IjAwMDAwLjAwMDAwMy8yMDI2LTAwIiwidGlwb1Byb2Nlc3NvIjoiT2YmaWFjdXRlO2NpbyIsImRlc2NyaWNhbyI6IlJlc3Bvc3RhIGFvIG9mJmlhY3V0ZTtjaW8gbiZvcmRtOyAxMiIsInVzdWFyaW9BdHJpYnVpZG8iOm51bGwsInVuaWRhZGUiOnsiaWRVbmlkYWRlIjoxNTAwLCJzaWdsYSI6IlNFREVNTy9QUk9UT0NPTE8ifSwiY2llbmNpYXMiOltdLCJtYXJjYWRvciI6W10sImRhZG9zQWJlcnR1cmEiOltdLCJhbm90YWNvZXMiOltdLCJzdGF0dXMiOnsiZG9jdW1lbnRvU2lnaWxvc28iOiIiLCJkb2N1bWVudG9SZXN0cml0byI6Ik4iLCJkb2N1bWVudG9Ob3ZvIjoiTiIsImRvY3VtZW50b1B1YmxpY2FkbyI6Ik4iLCJhbm90YWNhbyI6Ik4iLCJhbm90YWNhb1ByaW9yaWRhZGUiOiJOIiwiY2llbmNpYSI6Ik4iLCJyZXRvcm5vUHJvZ3JhbWFkbyI6IlMiLCJyZXRvcm5vRGF0YSI6eyJkYXRhUHJvZ3JhbWFkYSI6IjMwLzEwLzIwMjYiLCJ1bmlkYWRlIjoiU0VERU1PL0dBQiJ9LCJyZXRvcm5vQXRyYXNhZG8iOiJTIiwicHJvY2Vzc29BY2Vzc2Fkb1VzdWFyaW8iOiJOIiwicHJvY2Vzc29BY2Vzc2Fkb1VuaWRhZGUiOiJOIiwicHJvY2Vzc29SZW1vY2FvU29icmVzdGFtZW50byI6Ik4iLCJwcm9jZXNzb0Jsb3F1ZWFkbyI6Ik4iLCJwcm9jZXNzb0RvY3VtZW50b0luY2x1aWRvQXNzaW5hZG8iOiJOIiwicHJvY2Vzc29QdWJsaWNhZG8iOiJOIiwibml2ZWxBY2Vzc29HbG9iYWwiOiIwIiwicG9kZUdlcmVuY2lhckNyZWRlbmNpYWlzIjoiTiIsInByb2Nlc3NvQWJlcnRvIjoiUyIsInByb2Nlc3NvRW1UcmFtaXRhY2FvIjoiTiIsInByb2Nlc3NvU29icmVzdGFkbyI6Ik4iLCJwcm9jZXNzb0FuZXhhZG8iOiJOIiwicG9kZVJlYWJyaXJQcm9jZXNzbyI6Ik4iLCJwb2RlUmVnaXN0cmFyQW5vdGFjYW8iOiJTIiwicG9kZVJlbW92ZXJTb2JyZXN0YW1lbnRvIjoiTiIsInRpcG8iOm51bGwsInByb2Nlc3NvR2VyYWRvUmVjZWJpZG8iOiJSIn19fV0sInRvdGFsIjoiMyJ9Cg==",
+    "result": {
+      "items": [
+        {
+          "procedure_id": 9001,
+          "number": "00000.000001/2026-00",
+          "type": "Administração: Diárias",
+          "description": "Pedido de diárias \"viagem\"",
+          "assignee": {
+            "id": 101,
+            "acronym": "fulano.tal",
+            "name": "Fulano de Tal"
+          },
+          "return_date": "2026-11-06",
+          "return_overdue": false,
+          "origin": "R"
+        },
+        {
+          "procedure_id": 9002,
+          "number": "00000.000002/2026-00",
+          "type": "Contrato",
+          "description": "",
+          "assignee": null,
+          "return_date": "",
+          "return_overdue": false,
+          "origin": "G"
+        },
+        {
+          "procedure_id": 9003,
+          "number": "00000.000003/2026-00",
+          "type": "Ofício",
+          "description": "Resposta ao ofício nº 12",
+          "assignee": null,
+          "return_date": "2026-10-30",
+          "return_overdue": true,
+          "origin": "R"
+        }
+      ],
+      "total": 3
+    },
+    "error": null
+  }
+]

@@ -75,7 +75,8 @@ A signal never contacts SEI and never logs in. The hub answers it by reading wha
 in memory and in its database. It never starts a check because of a signal.
 
 When 30 seconds pass without a signal, the monitor sends one anyway, so the hub knows the call is
-alive. While the `Watch` call is down, the hub reads the monitor every 15 seconds until it opens the call again.
+alive. While the `Watch` call is down, the hub reads the monitor every 15 seconds until it opens
+the call again.
 
 ## Configuration
 

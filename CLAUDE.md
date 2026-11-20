@@ -318,9 +318,9 @@ tests/                      one file per area; tests/support/ holds the fake SEI
   through `status_scope`, which the `RunningGuard` holds, so a cancelled cycle signals its end too.
   The end of the first read calls `events_recorded` with the id of the newest stored event. Signals
   carry the id of a stored event, never the sequence's own value: an insert that meets the
-  `(account, kind, ref)` conflict still uses up a sequence value, and a signal above every stored event would
-  make the hub read `Events` on every signal until the next event. The first-read boundary and the
-  hub-ahead check keep using the highest position issued. A signal is a value in a channel inside
+  `(account, kind, ref)` conflict still uses up a sequence value, and a signal above every stored
+  event would make the hub read `Events` on every signal until the next event. The first-read
+  boundary and the hub-ahead check keep using the highest position issued. A signal is a value in a channel inside
   the process: the hub answers it with `Describe`, `Status` and maybe `Events`, never `Check`, so
   no signal calls SEI or logs in.
 - A stored event that cannot be read (unknown kind or a payload that does not decode) is skipped

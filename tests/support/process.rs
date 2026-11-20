@@ -72,7 +72,7 @@ pub struct Exited {
 
 pub fn spawn_plugin(env: &[(&str, &str)]) -> RunningPlugin {
     let temp = ShortTempDir::new();
-    let mut child = command(&["plugin"], &[COOKIE, ("TMPDIR", temp.text())], env)
+    let mut child = command(&["monitor"], &[COOKIE, ("TMPDIR", temp.text())], env)
         .spawn()
         .expect("start the plugin");
     let stdout = child.stdout.take().expect("piped stdout");

@@ -176,7 +176,7 @@ async fn next_watch_signal(
 
 #[test]
 fn without_the_cookie_explains_and_exits_1() {
-    let exited = run_to_exit(&["plugin"], &[], EXIT_LIMIT);
+    let exited = run_to_exit(&["monitor"], &[], EXIT_LIMIT);
 
     assert_eq!(exited.status.code(), Some(1), "{}", exited.stderr);
     assert_eq!(exited.stdout, "");
@@ -194,7 +194,7 @@ fn without_a_command_explains_and_exits_1() {
 
 #[test]
 fn usage_errors_exit_2_and_help_and_version_exit_0() {
-    let unknown = run_to_exit(&["plugn"], &[], EXIT_LIMIT);
+    let unknown = run_to_exit(&["monitr"], &[], EXIT_LIMIT);
     assert_eq!(unknown.status.code(), Some(2), "{}", unknown.stderr);
     assert!(
         unknown
@@ -211,12 +211,17 @@ fn usage_errors_exit_2_and_help_and_version_exit_0() {
 
     let help = run_to_exit(&["--help"], &[], EXIT_LIMIT);
     assert_eq!(help.status.code(), Some(0), "{}", help.stderr);
-    assert!(help.stdout.contains("plugin"), "{}", help.stdout);
+    assert!(
+        help.stdout
+            .contains("Serve the monitor-hub monitor protocol"),
+        "{}",
+        help.stdout
+    );
 }
 
 #[test]
 fn config_errors_exit_before_the_handshake() {
-    let exited = run_to_exit(&["plugin"], &[COOKIE, ("POLL_INTERVAL", "1m")], EXIT_LIMIT);
+    let exited = run_to_exit(&["monitor"], &[COOKIE, ("POLL_INTERVAL", "1m")], EXIT_LIMIT);
 
     assert_eq!(exited.status.code(), Some(1), "{}", exited.stderr);
     assert_eq!(exited.stdout, "");
@@ -241,7 +246,7 @@ async fn second_process_refuses_to_start() {
     let mut args = vec![COOKIE];
     args.extend(borrowed(&env));
 
-    let exited = run_to_exit(&["plugin"], &args, EXIT_LIMIT);
+    let exited = run_to_exit(&["monitor"], &args, EXIT_LIMIT);
 
     assert_eq!(exited.status.code(), Some(1), "{}", exited.stderr);
     assert_eq!(exited.stdout, "");
@@ -291,7 +296,7 @@ async fn a_database_url_without_a_password_stops_before_reading_pgpass() {
     let mut args = vec![COOKIE];
     args.extend(borrowed(&env));
 
-    let exited = run_to_exit(&["plugin"], &args, EXIT_LIMIT);
+    let exited = run_to_exit(&["monitor"], &args, EXIT_LIMIT);
 
     assert_eq!(exited.status.code(), Some(1), "{}", exited.stderr);
     assert!(!exited.stderr.contains(PGPASS_MARKER), "{}", exited.stderr);

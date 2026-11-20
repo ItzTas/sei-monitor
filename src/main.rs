@@ -32,7 +32,7 @@ fn main() -> ExitCode {
         Err(usage) => return usage_exit(usage),
     };
     match cli.command {
-        Some(Command::Plugin) => plugin(hardening.err()),
+        Some(Command::Monitor) => monitor(hardening.err()),
         Some(Command::TestLogin) => operate(|source, out| Box::pin(test_login(source, out))),
         Some(Command::Orgs) => operate(|source, out| Box::pin(orgs(source, out))),
         Some(Command::Diagnose) => operate(|source, out| Box::pin(diagnose(source, out))),
@@ -77,7 +77,7 @@ fn not_launched_by_hub() -> ExitCode {
     ExitCode::FAILURE
 }
 
-fn plugin(hardening: Option<io::Error>) -> ExitCode {
+fn monitor(hardening: Option<io::Error>) -> ExitCode {
     if !launched_by_hub() {
         return not_launched_by_hub();
     }

@@ -323,7 +323,8 @@ fn help_lists_every_command() {
     assert_eq!(help.status.code(), Some(0), "{}", help.stderr);
     assert_eq!(help.stderr, "");
     for text in [
-        "plugin",
+        "monitor",
+        "Serve the monitor-hub monitor protocol; the hub starts this command",
         "test-login",
         "Log in to SEI and show the versions and your units",
         "orgs",

@@ -58,7 +58,7 @@ async fn seed_one_event(database_url: &str, sei_url: &str) {
 
 fn plugin_conformance(sei_url: &str, database_url: &str, sockets: &ShortTempDir) -> Conformance {
     let mut conformance = Conformance::new(env!("CARGO_BIN_EXE_sei-monitor"));
-    conformance.command.push("plugin".to_owned());
+    conformance.command.push("monitor".to_owned());
     conformance.env = [
         ("SEI_URL", sei_url),
         ("SEI_USERNAME", USERNAME),

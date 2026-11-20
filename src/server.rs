@@ -389,7 +389,7 @@ mod tests {
             json!({
                 "protocol_version": 2,
                 "name": "sei",
-                "command": ["sei-monitor", "plugin"],
+                "command": ["sei-monitor", "monitor"],
                 "apk": [],
             })
         );

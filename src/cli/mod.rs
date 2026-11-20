@@ -34,8 +34,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    #[command(about = "Serve the monitor-hub plugin protocol; the hub starts this command")]
-    Plugin,
+    #[command(about = "Serve the monitor-hub monitor protocol; the hub starts this command")]
+    Monitor,
     #[command(about = "Log in to SEI and show the versions and your units")]
     TestLogin,
     #[command(about = "List the acronym and id of every agency on the SEI login page")]
@@ -194,7 +194,7 @@ mod tests {
         assert_eq!(suggestions("diagnsoe"), ["diagnose"]);
         assert_eq!(
             suggestions(""),
-            ["plugin", "test-login", "orgs", "diagnose"]
+            ["monitor", "test-login", "orgs", "diagnose"]
         );
         assert!(suggestions("x").is_empty());
         assert!(suggestions("ççrgs").is_empty());

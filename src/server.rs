@@ -377,12 +377,12 @@ mod tests {
     use super::process_link;
 
     #[test]
-    fn plugin_json_matches_the_contract() {
+    fn monitor_json_matches_the_contract() {
         let manifest: Value = serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/plugin.json"
+            "/monitor.json"
         )))
-        .expect("plugin.json is JSON");
+        .expect("monitor.json is JSON");
 
         assert_eq!(
             manifest,

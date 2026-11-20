@@ -49,11 +49,11 @@ RUN case "$TARGETARCH" in \
 
 FROM scratch
 
-COPY plugin.json /plugin/plugin.json
-COPY --from=build /out/sei-monitor /plugin/sei-monitor
+COPY monitor.json /monitor/monitor.json
+COPY --from=build /out/sei-monitor /monitor/sei-monitor
 
 USER 65532:65532
 
 HEALTHCHECK NONE
 
-ENTRYPOINT ["/plugin/sei-monitor"]
+ENTRYPOINT ["/monitor/sei-monitor"]

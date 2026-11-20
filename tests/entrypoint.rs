@@ -412,14 +412,11 @@ async fn a_rejection_recorded_before_the_switch_holds_the_first_start() {
     record_rejection(&database, &fake).await;
     let mut spawned = start_monitor(&sei_env(&fake, &database.url, PASSWORD));
     let started = Instant::now();
-    let mut monitor_client = monitor_client(&spawned.socket).await;
+    let mut grpc = monitor_client(&spawned.socket).await;
 
-    let held = status_where(
-        &mut spawned,
-        &mut monitor_client,
-        "the monitor holds",
-        |status| status.state == i32::from(State::Paused),
-    )
+    let held = status_where(&mut spawned, &mut grpc, "the monitor holds", |status| {
+        status.state == i32::from(State::Paused)
+    })
     .await;
     let client = &client;
     until(&mut spawned, "the hold's event is stored", || async move {
@@ -429,7 +426,7 @@ async fn a_rejection_recorded_before_the_switch_holds_the_first_start() {
     tokio::time::sleep(STAY_UP.saturating_sub(started.elapsed())).await;
     assert!(spawned.still_running(), "{}", spawned.stderr_text());
     assert_eq!((fake.logins(), fake.failed_logins()), (0, 0));
-    drop(monitor_client);
+    drop(grpc);
     stop_cleanly(&mut spawned).await;
 
     assert_eq!(held.message, format!("{REJECTED}; {HELD}"));

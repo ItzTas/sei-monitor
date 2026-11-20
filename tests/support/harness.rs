@@ -5,8 +5,6 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use tokio_postgres::NoTls;
 
-use super::Database;
-
 use sei_monitor::event::{Event, Kind};
 use sei_monitor::monitor::{CycleResult, Jitter, Monitor, MonitorConfig};
 use sei_monitor::password::StaticPassword;
@@ -19,7 +17,7 @@ use super::fake_sei::{
     FakeActivity, FakeDocument, FakeProcess, FakeSei, FakeUser, ORG_ACRONYM, PASSWORD, UNIT_NUPROC,
     USER_ID, USER_NAME, USERNAME, process_number,
 };
-use super::{database_url_as, login_role, migrated_database};
+use super::{Database, database_url_as, login_role, migrated_database};
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(20);
 pub const FIFTEEN_MINUTES: Duration = Duration::from_secs(15 * 60);

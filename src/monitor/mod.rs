@@ -142,8 +142,8 @@ struct Prepared {
 
 struct RunningGuard<'a> {
     monitor: &'a Monitor,
-    // Fields drop after `drop` clears `running`, and `finish` takes the guard by value after
-    // writing `cycle_error`, so the hub's poll after this signal sees the cycle's end.
+    // Fields drop after `drop` clears `running`, and the guard drops when `finish` returns, after
+    // `cycle_error` is written, so the hub's poll after this signal sees the cycle's end.
     _cycle: StatusScope,
 }
 

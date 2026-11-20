@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
-use monitor_hub_sdk::Notifier;
+use monitor_hub_sdk::{Notifier, StatusScope};
 use tokio::sync::{mpsc, watch};
 use tracing::{debug, info, warn};
 
@@ -140,12 +140,26 @@ struct Prepared {
     account: Account,
 }
 
-struct RunningGuard<'a>(&'a Monitor);
+struct RunningGuard<'a> {
+    monitor: &'a Monitor,
+    // Fields drop after `drop` clears `running`, and `finish` takes the guard by value after
+    // writing `cycle_error`, so the hub's poll after this signal sees the cycle's end.
+    _cycle: StatusScope,
+}
+
+impl RunningGuard<'_> {
+    fn finish(
+        self,
+        outcome: Result<CycleResult, MonitorError>,
+    ) -> Result<CycleResult, MonitorError> {
+        self.monitor.inner().state.cycle_error = outcome.as_ref().err().map(error_text);
+        outcome
+    }
+}
 
 impl Drop for RunningGuard<'_> {
     fn drop(&mut self) {
-        self.0.inner().state.running = false;
-        self.0.notifier.status_changed();
+        self.monitor.inner().state.running = false;
     }
 }
 
@@ -246,10 +260,12 @@ impl Monitor {
 
     pub async fn run_once(&self, trigger: Trigger) -> Result<CycleResult, MonitorError> {
         let (prepared, started) = self.begin()?;
-        let _running = RunningGuard(self);
+        let running = RunningGuard {
+            monitor: self,
+            _cycle: self.notifier.status_scope(),
+        };
         let outcome = self.recorded_cycle(&prepared, trigger, started).await;
-        self.inner().state.cycle_error = outcome.as_ref().err().map(error_text);
-        outcome
+        running.finish(outcome)
     }
 
     async fn recorded_cycle(
@@ -325,7 +341,6 @@ impl Monitor {
         let started = self.clock.now();
         inner.state.running = true;
         inner.state.last_started_at = Some(started);
-        self.notifier.status_changed();
         Ok((prepared, started))
     }
 

@@ -310,9 +310,8 @@ mod tests {
             "postgres://sei:hunter2@/sei",
             "postgres://sei:hunter2@:5432/sei",
             "postgresql:///sei?user=sei",
-            "postgres://sei@db.internal/sei",
-            "postgres://sei:@db.internal/sei",
-            "postgres:///sei?host=db.internal&user=sei",
+            "postgres:///sei?host=&user=sei&password=hunter2",
+            "postgres:///sei?hostaddr=&user=sei",
         ];
         for url in refused {
             let error = database_options(&Secret::new(url.to_owned())).err();
@@ -323,6 +322,27 @@ mod tests {
             assert_eq!(
                 error.map(|error| error.to_string()).as_deref(),
                 Some("DATABASE_URL is not a valid Postgres address"),
+                "{url}"
+            );
+        }
+
+        let without_password = [
+            "postgres://sei@db.internal/sei",
+            "postgres://sei:@db.internal/sei",
+            "postgres://sei@db.internal/sei?password=",
+            "postgres:///sei?host=db.internal&user=sei",
+            "postgres:///sei?host=db.internal&user=sei&password=",
+            "postgres://db.internal/sei?sslmode=disable",
+        ];
+        for url in without_password {
+            let error = database_options(&Secret::new(url.to_owned())).err();
+            assert!(
+                matches!(error, Some(StoreError::InvalidUrl(_))),
+                "{url}: {error:?}"
+            );
+            assert_eq!(
+                error.map(|error| error.to_string()).as_deref(),
+                Some("DATABASE_URL has no password: add the role's password to the URL"),
                 "{url}"
             );
         }

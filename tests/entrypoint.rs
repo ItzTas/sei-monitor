@@ -297,7 +297,7 @@ async fn a_database_url_without_a_password_stops_before_reading_pgpass() {
     assert!(!exited.stderr.contains(PGPASS_MARKER), "{}", exited.stderr);
     assert_eq!(
         single_error(&exited.stderr)["error"],
-        "taking the database writer lock: DATABASE_URL is not a valid Postgres address",
+        "taking the database writer lock: DATABASE_URL has no password: add the role's password to the URL",
         "{}",
         exited.stderr
     );

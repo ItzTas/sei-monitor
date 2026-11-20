@@ -13,6 +13,7 @@ pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub(crate) const POOL_SIZE: u32 = 10;
 
 const NOT_A_POSTGRES_ADDRESS: &str = "DATABASE_URL is not a valid Postgres address";
+const NO_PASSWORD: &str = "DATABASE_URL has no password: add the role's password to the URL";
 
 const SCHEMES: [&str; 2] = ["postgres://", "postgresql://"];
 
@@ -33,8 +34,11 @@ pub(crate) fn database_options(database_url: &Secret) -> Result<PgConnectOptions
         return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
     }
     let url = Url::parse(address).map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
-    if !names_a_host(&url) || !names_a_password(&url) {
+    if !names_a_host(&url) {
         return Err(StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS));
+    }
+    if !names_a_password(&url) {
+        return Err(StoreError::InvalidUrl(NO_PASSWORD));
     }
     let mut options = PgConnectOptions::from_url(&keys_sqlx_reads(url)?)
         .map_err(|_| StoreError::InvalidUrl(NOT_A_POSTGRES_ADDRESS))?;
@@ -55,16 +59,18 @@ pub(crate) fn database_options(database_url: &Secret) -> Result<PgConnectOptions
 
 // 2.1 refused an address without a host; sqlx would fall back to PGHOST, a socket or localhost.
 fn names_a_host(url: &Url) -> bool {
-    url.has_host()
-        || url
-            .query_pairs()
-            .any(|(key, _)| key == "host" || key == "hostaddr")
+    url.has_host() || in_query(url, &["host", "hostaddr"])
 }
 
 // sqlx reads PGPASSWORD or a pgpass file, and logs a malformed pgpass line whole, only when the
-// address has no password.
+// address has no password. An empty one counts as none.
 fn names_a_password(url: &Url) -> bool {
-    url.password().is_some() || url.query_pairs().any(|(key, _)| key == "password")
+    url.password().is_some() || in_query(url, &["password"])
+}
+
+fn in_query(url: &Url, keys: &[&str]) -> bool {
+    url.query_pairs()
+        .any(|(key, value)| keys.contains(&key.as_ref()) && !value.is_empty())
 }
 
 // sqlx logs every query key it does not read, value included, so it only gets the keys it reads.

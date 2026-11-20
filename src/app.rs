@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, anyhow};
-use monitor_hub_plugin::serve_with_notifier;
+use monitor_hub_sdk::serve;
 use tokio::signal::unix::{Signal, SignalKind, signal};
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, timeout, timeout_at};
@@ -37,7 +37,7 @@ pub async fn run_plugin(config: PluginConfig) -> anyhow::Result<()> {
         Arc::new(SystemClock),
         random_jitter(),
     );
-    monitor.notifier().notify(started.newest_event);
+    monitor.notifier().events_recorded(started.newest_event);
     let plugin = SeiPlugin::new(Arc::clone(&monitor), config.full_detail)
         .with_first_read_boundary(started.first_read_boundary);
     serve_until_stopped(started.lock, monitor, plugin).await
@@ -139,7 +139,7 @@ async fn serve_until_stopped(
     let scheduler = run.abort_handle();
     let supervisor = tokio::spawn(supervise(Arc::clone(&monitor), run));
     let ended = tokio::select! {
-        served = serve_with_notifier(plugin, monitor.notifier().clone()) => served.context("serving the plugin"),
+        served = serve(plugin, monitor.notifier().clone()) => served.context("serving the plugin"),
         () = lock.closed() => Err(lock_lost(&lock)),
     };
     monitor.shut_down();

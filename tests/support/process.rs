@@ -9,11 +9,11 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use monitor_hub_plugin::proto::{
+use monitor_hub_sdk::proto::{
     CheckRequest, CheckResponse, DescribeRequest, DescribeResponse, Event, EventsRequest,
     EventsResponse, StatusRequest, StatusResponse, WatchRequest, WatchResponse,
 };
-use monitor_hub_plugin::{MAGIC_COOKIE_KEY, MAGIC_COOKIE_VALUE};
+use monitor_hub_sdk::{MAGIC_COOKIE_KEY, MAGIC_COOKIE_VALUE};
 use serde_json::Value;
 use tonic::client::Grpc;
 use tonic::codegen::http::uri::PathAndQuery;
@@ -280,7 +280,7 @@ impl PluginClient {
         self.grpc
             .server_streaming(
                 Request::new(WatchRequest {}),
-                PathAndQuery::from_static("/monitorhub.plugin.v1.Plugin/Watch"),
+                PathAndQuery::from_static("/monitorhub.monitor.v1.Monitor/Watch"),
                 ProstCodec::<WatchRequest, WatchResponse>::default(),
             )
             .await
@@ -296,7 +296,7 @@ impl PluginClient {
             .ready()
             .await
             .map_err(|error| Status::unavailable(error.to_string()))?;
-        let path = PathAndQuery::try_from(format!("/monitorhub.plugin.v1.Plugin/{method}"))
+        let path = PathAndQuery::try_from(format!("/monitorhub.monitor.v1.Monitor/{method}"))
             .expect("a method path");
         self.grpc
             .unary(Request::new(request), path, ProstCodec::<Q, A>::default())
@@ -362,7 +362,7 @@ fn collected(text: &Receiver<String>) -> String {
 
 fn handshake_socket(line: &str) -> Option<PathBuf> {
     let fields: Vec<&str> = line.trim().split('|').collect();
-    let ["1", "1", "unix", socket, "grpc"] = fields[..] else {
+    let ["1", "2", "unix", socket, "grpc"] = fields[..] else {
         return None;
     };
     Some(PathBuf::from(socket))

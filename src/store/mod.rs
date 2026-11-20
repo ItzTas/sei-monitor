@@ -10,7 +10,7 @@ mod runs;
 use std::error::Error;
 use std::fmt;
 
-use monitor_hub_plugin::Notifier;
+use monitor_hub_sdk::Notifier;
 use sea_orm::sqlx::postgres::{PgDatabaseError, PgSeverity};
 use sea_orm::{ConnAcquireErr, DatabaseConnection, DbErr, RuntimeErr};
 

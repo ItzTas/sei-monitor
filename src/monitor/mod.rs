@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
-use monitor_hub_plugin::Notifier;
+use monitor_hub_sdk::Notifier;
 use tokio::sync::{mpsc, watch};
 use tracing::{debug, info, warn};
 

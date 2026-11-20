@@ -14,7 +14,7 @@ pub use postgres::{Database, database};
 use std::io;
 use std::time::Duration;
 
-use monitor_hub_plugin::Signals;
+use monitor_hub_sdk::Signals;
 use sei_monitor::config::{Source, load_sei_url};
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{WRITER_LOCK_ID, acquire_writer_lock};

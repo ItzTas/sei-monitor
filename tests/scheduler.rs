@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use monitor_hub_plugin::Signals;
+use monitor_hub_sdk::Signals;
 use sei_monitor::event::Kind;
 use sei_monitor::monitor::{Clock, Monitor, MonitorError, State, TriggerError};
 use sei_monitor::password::{PasswordCommandError, PasswordSource};

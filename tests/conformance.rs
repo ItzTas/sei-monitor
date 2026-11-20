@@ -4,7 +4,7 @@ use std::env;
 use std::time::Duration;
 
 use chrono::{SecondsFormat, Utc};
-use monitor_hub_plugin_testkit::conformance::{Conformance, Outcome, run};
+use monitor_hub_sdk_testkit::conformance::{Conformance, Outcome, run};
 
 use sei_monitor::event::{Event, Kind, Payload};
 use sei_monitor::secret::Secret;

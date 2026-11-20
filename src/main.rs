@@ -6,7 +6,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use clap::Parser;
-use monitor_hub_plugin::{NOT_LAUNCHED_BY_HUB, launched_by_hub, logging};
+use monitor_hub_sdk::{NOT_LAUNCHED_BY_HUB, launched_by_hub, logging};
 use sei_monitor::app::run_plugin;
 use sei_monitor::cli::{Cli, Command, command_exit, diagnose, orgs, test_login, usage_exit};
 use sei_monitor::config::{ConfigError, PluginConfig, Source};

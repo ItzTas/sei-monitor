@@ -5,8 +5,8 @@ use std::future::Future;
 use std::os::unix::fs::PermissionsExt;
 use std::time::{Duration, Instant};
 
-use monitor_hub_plugin::NOT_LAUNCHED_BY_HUB;
-use monitor_hub_plugin::proto::{State, StatusResponse, WatchResponse};
+use monitor_hub_sdk::NOT_LAUNCHED_BY_HUB;
+use monitor_hub_sdk::proto::{State, StatusResponse, WatchResponse};
 use serde_json::Value;
 use tokio_postgres::{Client, NoTls};
 use tonic::Streaming;
@@ -866,7 +866,7 @@ async fn the_hubs_first_read_leaves_the_first_cycle_for_the_next_one() {
     let last = first.last().expect("the history").seq;
     let second = calls.events(last, 500).await.expect("second read");
 
-    let ids = |events: &[monitor_hub_plugin::proto::Event]| -> Vec<String> {
+    let ids = |events: &[monitor_hub_sdk::proto::Event]| -> Vec<String> {
         events.iter().map(|event| event.id.clone()).collect()
     };
     assert_eq!(ids(&first), history);

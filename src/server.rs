@@ -4,8 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, Datelike, Utc};
-use monitor_hub_plugin::proto::plugin_server::Plugin;
-use monitor_hub_plugin::proto::{
+use monitor_hub_sdk::proto::{
     CheckRequest, CheckResponse, DescribeRequest, DescribeResponse, Event, EventKind,
     EventsRequest, EventsResponse, Severity, State, StatusRequest, StatusResponse,
 };
@@ -115,7 +114,7 @@ impl SeiPlugin {
             return;
         }
         let newest = self.newest_event(last_issued).await;
-        self.monitor.notifier().notify(newest);
+        self.monitor.notifier().events_recorded(newest);
     }
 
     async fn newest_event(&self, fallback: i64) -> i64 {
@@ -189,7 +188,7 @@ impl SeiPlugin {
 }
 
 #[tonic::async_trait]
-impl Plugin for SeiPlugin {
+impl monitor_hub_sdk::Monitor for SeiPlugin {
     async fn describe(
         &self,
         _: Request<DescribeRequest>,
@@ -388,7 +387,7 @@ mod tests {
         assert_eq!(
             manifest,
             json!({
-                "protocol_version": 1,
+                "protocol_version": 2,
                 "name": "sei",
                 "command": ["sei-monitor", "plugin"],
                 "apk": [],

@@ -6,8 +6,9 @@ use std::process::ExitCode;
 use chrono_tz::Tz;
 use clap::error::{ContextKind, ContextValue, ErrorKind};
 use clap::{CommandFactory, Parser, Subcommand};
+use monitor_hub_sdk::settings::Problem;
 
-use crate::config::SeiConfig;
+use crate::config::{Config, SeiConfig, load_document};
 use crate::gotext::{go_quote, to_lower};
 use crate::sei::{Connection, Options, REQUEST_TIMEOUT, SeiError, Target, connect};
 use crate::version::{VERSION, user_agent};
@@ -42,6 +43,22 @@ pub enum Command {
     Orgs,
     #[command(about = "Check how the SEI API behaves, printing only counts and types")]
     Diagnose,
+    #[command(
+        about = "Check the monitor settings from the hub's document or the environment and print the problems as JSON; the hub runs this command"
+    )]
+    ValidateSettings,
+}
+
+/// The problems `Config::load` finds, without connecting anywhere or running the password command.
+pub fn validate_settings() -> Vec<Problem> {
+    let Err(refusal) = load_document().and_then(|source| Config::load(&source)) else {
+        return Vec::new();
+    };
+    refusal
+        .problems
+        .into_iter()
+        .map(|problem| Problem::new(problem.path, problem.text))
+        .collect()
 }
 
 pub fn usage_exit(error: clap::Error) -> ExitCode {
@@ -194,9 +211,26 @@ mod tests {
         assert_eq!(suggestions("diagnsoe"), ["diagnose"]);
         assert_eq!(
             suggestions(""),
-            ["monitor", "test-login", "orgs", "diagnose"]
+            [
+                "monitor",
+                "test-login",
+                "orgs",
+                "diagnose",
+                "validate-settings"
+            ]
         );
+        assert_eq!(suggestions("validate"), ["validate-settings"]);
+        assert_eq!(suggestions("test-logn"), ["test-login"]);
         assert!(suggestions("x").is_empty());
         assert!(suggestions("ççrgs").is_empty());
+    }
+
+    #[test]
+    fn the_settings_command_has_the_sdk_name() {
+        assert!(
+            Cli::command()
+                .find_subcommand(monitor_hub_sdk::settings::VALIDATE_SETTINGS_ARG)
+                .is_some()
+        );
     }
 }

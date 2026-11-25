@@ -142,7 +142,25 @@ fn handshake(
 
 pub fn run_to_exit(args: &[&str], env: &[(&str, &str)], within: Duration) -> Exited {
     let temp = ShortTempDir::new();
-    let mut child = command(args, &[("TMPDIR", temp.text())], env)
+    run_command(&mut command(args, &[("TMPDIR", temp.text())], env), within)
+}
+
+/// Only `env` reaches the program: no `PATH` and no `TMPDIR` are added.
+pub fn run_isolated(args: &[&str], env: &[(&str, &str)], dir: &Path, within: Duration) -> Exited {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sei-monitor"));
+    command
+        .args(args)
+        .env_clear()
+        .envs(env.iter().copied())
+        .current_dir(dir);
+    run_command(&mut command, within)
+}
+
+pub fn run_command(command: &mut Command, within: Duration) -> Exited {
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .expect("start the program");
     let stdout = read_all(child.stdout.take().expect("piped stdout"));

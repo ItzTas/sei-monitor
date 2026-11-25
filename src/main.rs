@@ -6,9 +6,12 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use clap::Parser;
+use monitor_hub_sdk::settings::answer;
 use monitor_hub_sdk::{NOT_LAUNCHED_BY_HUB, launched_by_hub, logging};
 use sei_monitor::app::run_monitor;
-use sei_monitor::cli::{Cli, Command, command_exit, diagnose, orgs, test_login, usage_exit};
+use sei_monitor::cli::{
+    Cli, Command, command_exit, diagnose, orgs, test_login, usage_exit, validate_settings,
+};
 use sei_monitor::config::{
     Config, ConfigError, ORGS_VARIABLES, SEI_VARIABLES, Source, load_document, operator_source,
 };
@@ -42,6 +45,7 @@ fn main() -> ExitCode {
         Some(Command::Diagnose) => {
             operate(SEI_VARIABLES, |source, out| Box::pin(diagnose(source, out)))
         }
+        Some(Command::ValidateSettings) => answer(&validate_settings()),
         None => not_launched_by_hub(),
     }
 }

@@ -331,6 +331,8 @@ fn help_lists_every_command() {
         "List the acronym and id of every agency on the SEI login page",
         "diagnose",
         "Check how the SEI API behaves, printing only counts and types",
+        "validate-settings",
+        "Check the monitor settings from the hub's document or the environment and print the problems as JSON; the hub runs this command",
     ] {
         assert!(help.stdout.contains(text), "{text:?} in:\n{}", help.stdout);
     }

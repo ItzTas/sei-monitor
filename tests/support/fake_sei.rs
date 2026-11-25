@@ -251,6 +251,11 @@ impl FakeSei {
         self.shared.lock().calls.get(route).copied().unwrap_or(0)
     }
 
+    /// Every call the fake recorded: the API routes and the login page.
+    pub fn requests(&self) -> usize {
+        self.shared.lock().calls.values().sum()
+    }
+
     pub fn logins(&self) -> usize {
         self.shared.lock().logins
     }

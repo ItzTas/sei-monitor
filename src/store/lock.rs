@@ -225,6 +225,9 @@ mod tests {
         );
         let released: bool = answer(&lock, unlock).await;
         assert!(released);
+        let _taker = acquire_writer_lock(&Secret::new(db.url.clone()))
+            .await
+            .expect("the freed lock");
 
         let error = lock
             .migrate()

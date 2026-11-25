@@ -209,6 +209,11 @@ fn problems_never_show_secret_values() {
     for source in [source(&env), direct] {
         let err = refused(Config::load(&source));
 
+        for text in [err.to_string(), format!("{err:?}"), format!("{err:#?}")] {
+            for secret in ["hunter2", "hunter3"] {
+                assert!(!text.contains(secret), "a problem shows {secret}");
+            }
+        }
         assert_eq!(
             err.texts(),
             [
@@ -216,11 +221,6 @@ fn problems_never_show_secret_values() {
                 "DATABASE_URL: use postgres://user:password@host/database",
             ]
         );
-        for text in [err.to_string(), format!("{err:?}"), format!("{err:#?}")] {
-            for secret in ["hunter2", "hunter3"] {
-                assert!(!text.contains(secret), "{text}");
-            }
-        }
     }
 }
 
@@ -239,10 +239,13 @@ fn a_secret_of_another_type_is_refused_without_its_value() {
             panic!("{field}: the document was taken");
         };
 
-        assert_eq!(err.problems, [problem(field, "must be string")]);
         for text in [err.to_string(), format!("{err:?}")] {
-            assert!(!text.contains(shown), "{text}");
+            assert!(
+                !text.contains(shown),
+                "{field}: the problem shows the value"
+            );
         }
+        assert_eq!(err.problems, [problem(field, "must be string")]);
     }
 
     let document = object(json!({"sei_url": "https://sei.example.org", "sei_password": null}));

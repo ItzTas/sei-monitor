@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A monitor for monitor-hub. It logs in to SEI through SEI's REST module (`mod-wssei`) with the owner's
 account, lists the processes of the watched units every `POLL_INTERVAL`, and records what changed as
 events in Postgres. The hub reads those events and sends the notifications. The monitor is written in
-Rust on the monitor-hub SDK (`monitor-hub-sdk`, git tag `sdk-rust/v0.4.0`).
+Rust on the monitor-hub SDK (`monitor-hub-sdk`, git tag `sdk-rust/v0.5.0`).
 
 The image does not run on its own. It holds `/monitor/monitor.json` and `/monitor/sei-monitor`, and the
 hub's image build copies that directory in. Release `1.0.0` was a standalone Go service with its own
@@ -95,7 +95,7 @@ skipping.
 - `tests/support/proxy.rs` is a TCP proxy that stops forwarding when told to. Two lock tests in
   `tests/store.rs` use it and wait out the whole 30 s loss limit, so that binary takes about 33 s.
 - The conformance command for `tests/conformance.rs`: the binary named by `MONITOR_CONFORMANCE`, or
-  else `go install` of `monitor-conformance` at the SDK's Go tag `sdk-go/v0.6.0`, which also checks
+  else `go install` of `monitor-conformance` at the SDK's Go tag `sdk-go/v0.7.0`, which also checks
   `Watch` on the real binary.
 
 The signal tests subscribe with `Notifier::subscribe` and wait for a signal with a bounded

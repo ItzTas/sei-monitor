@@ -63,7 +63,7 @@ jobs:
 
       - name: Install the conformance command
         run: |
-          GOBIN="$RUNNER_TEMP/bin" go install github.com/ItzTas/monitor-hub/sdk-go/cmd/monitor-conformance@v0.6.0
+          GOBIN="$RUNNER_TEMP/bin" go install github.com/ItzTas/monitor-hub/sdk-go/cmd/monitor-conformance@v0.7.0
           echo "MONITOR_CONFORMANCE=$RUNNER_TEMP/bin/monitor-conformance" >> "$GITHUB_ENV"
 
       - uses: Swatinem/rust-cache@v2.9.3

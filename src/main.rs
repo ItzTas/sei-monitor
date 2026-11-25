@@ -9,7 +9,7 @@ use clap::Parser;
 use monitor_hub_sdk::{NOT_LAUNCHED_BY_HUB, launched_by_hub, logging};
 use sei_monitor::app::run_monitor;
 use sei_monitor::cli::{Cli, Command, command_exit, diagnose, orgs, test_login, usage_exit};
-use sei_monitor::config::{Config, ConfigError, Source};
+use sei_monitor::config::{Config, ConfigError, SETTINGS, Source};
 use sei_monitor::harden::harden;
 use tokio::runtime::{Builder, Runtime};
 use tokio::signal::unix::{SignalKind, signal};
@@ -41,11 +41,14 @@ fn main() -> ExitCode {
 }
 
 fn operate(operation: Operation) -> ExitCode {
+    let source = match document_source() {
+        Ok(source) => source,
+        Err(problems) => return command_exit(Err(problems.into()), false),
+    };
     let runtime = match runtime() {
         Ok(runtime) => runtime,
         Err(failure) => return command_exit(Err(failure.into()), false),
     };
-    let source = Source::environment();
     let mut stdout = io::stdout().lock();
     let (result, interrupted) =
         runtime.block_on(until_interrupted(operation(&source, &mut stdout)));
@@ -81,7 +84,7 @@ fn monitor(hardening: Option<io::Error>) -> ExitCode {
     if !launched_by_hub() {
         return not_launched_by_hub();
     }
-    let config = match Config::load(&Source::environment()) {
+    let config = match document_source().and_then(|source| Config::load(&source)) {
         Ok(config) => config,
         Err(problems) => return refuse(&problems),
     };
@@ -112,6 +115,10 @@ fn monitor(hardening: Option<io::Error>) -> ExitCode {
     };
     error!(error = &*failure as &dyn Error, "fatal");
     ExitCode::FAILURE
+}
+
+fn document_source() -> Result<Source, ConfigError> {
+    Source::document(monitor_hub_sdk::config::load(SETTINGS)?)
 }
 
 fn refuse(problems: &ConfigError) -> ExitCode {

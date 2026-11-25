@@ -52,7 +52,6 @@ pub fn normalized_sei_url(raw: &str) -> String {
     let source = Source {
         lookup: Box::new(move |name| (name == "SEI_URL").then(|| raw.clone())),
         read_file: Box::new(|_| Err(io::ErrorKind::NotFound.into())),
-        invalid_utf8: Box::new(|_| false),
     };
     load_sei_url(&source).unwrap_or_else(|error| panic!("normalize the SEI address: {error}"))
 }

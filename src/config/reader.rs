@@ -1,11 +1,23 @@
+use std::collections::BTreeMap;
 use std::io;
+use std::sync::LazyLock;
 
 use zeroize::Zeroizing;
 
-use super::{ConfigError, ConfigProblem, Source};
+use super::{ConfigError, ConfigProblem, FIELDS, Source};
 use crate::gotext::{atoi, go_quote, trim};
 use crate::password::trim_final_newline;
 use crate::secret::Secret;
+
+static DEFAULTS: LazyLock<BTreeMap<String, String>> = LazyLock::new(|| {
+    FIELDS
+        .iter()
+        .filter_map(|field| {
+            let default = field.default.as_ref()?.as_str()?;
+            Some((field.env.clone()?, default.to_owned()))
+        })
+        .collect()
+});
 
 pub(crate) struct Reader<'a> {
     source: &'a Source,
@@ -41,9 +53,14 @@ impl<'a> Reader<'a> {
     }
 
     pub(crate) fn text(&self, name: &str) -> String {
-        self.lookup(name)
+        let value = self
+            .lookup(name)
             .map(|value| trim(&value).to_owned())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        if !value.is_empty() {
+            return value;
+        }
+        DEFAULTS.get(name).cloned().unwrap_or_default()
     }
 
     pub(crate) fn required(&mut self, name: &str, hint: &str) -> String {
@@ -74,20 +91,9 @@ impl<'a> Reader<'a> {
             return Secret::default();
         }
         if path.is_empty() {
-            return self.utf8_direct(name, direct);
-        }
-        self.secret_file(name, &path)
-    }
-
-    fn utf8_direct(&mut self, name: &str, direct: Secret) -> Secret {
-        if direct.is_empty() || !(self.source.invalid_utf8)(name) {
             return direct;
         }
-        self.problem(
-            &name.to_ascii_lowercase(),
-            format!("{name}: the value is not valid UTF-8"),
-        );
-        Secret::default()
+        self.secret_file(name, &path)
     }
 
     fn direct_secret(&self, name: &str) -> Secret {
@@ -119,11 +125,9 @@ impl<'a> Reader<'a> {
         Secret::new(value.to_owned())
     }
 
-    pub(crate) fn integer(&mut self, name: &str, fallback: i64, low: i64, high: i64) -> i64 {
+    /// With a problem it gives the declared default, which `retention_days` still reads.
+    pub(crate) fn integer(&mut self, name: &str, low: i64, high: i64) -> i64 {
         let value = self.text(name);
-        if value.is_empty() {
-            return fallback;
-        }
         if let Some(number) = atoi(&value).filter(|number| (low..=high).contains(number)) {
             return number;
         }
@@ -134,7 +138,10 @@ impl<'a> Reader<'a> {
                 go_quote(&value)
             ),
         );
-        fallback
+        DEFAULTS
+            .get(name)
+            .and_then(|default| atoi(default))
+            .unwrap_or_default()
     }
 }
 

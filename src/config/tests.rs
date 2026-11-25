@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsString;
 use std::fs;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
@@ -6,23 +7,65 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use monitor_hub_sdk::settings::{self, Field, FieldType};
+use monitor_hub_sdk::config::{Document, from_lookup};
+use monitor_hub_sdk::settings::{self, Field, FieldType, Settings};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use super::*;
 use crate::golden;
 
-pub(crate) fn source<K: AsRef<str>, V: AsRef<str>>(env: &[(K, V)]) -> Source {
-    let env: BTreeMap<String, String> = env
+fn declaration() -> Settings {
+    match settings::parse(SETTINGS.as_bytes()) {
+        Ok(declaration) => declaration,
+        Err(err) => panic!("{err}"),
+    }
+}
+
+fn env_source(env: BTreeMap<String, String>, read_file: ReadFile) -> Source {
+    let document = match from_lookup(&declaration(), |name| env.get(name).map(OsString::from)) {
+        Ok(document) => document,
+        Err(err) => panic!("{err}"),
+    };
+    match Source::with(document, env.get("PATH").cloned(), read_file) {
+        Ok(source) => source,
+        Err(err) => panic!("{err}"),
+    }
+}
+
+fn files_source<K: AsRef<str>, V: AsRef<str>>(env: &[(K, V)], files: &[File]) -> Source {
+    let env = env
         .iter()
         .map(|(name, value)| (name.as_ref().to_owned(), value.as_ref().to_owned()))
         .collect();
-    Source {
-        lookup: Box::new(move |name| env.get(name).cloned()),
-        read_file: Box::new(|_| Err(io::ErrorKind::NotFound.into())),
-        invalid_utf8: Box::new(|_| false),
+    let files: BTreeMap<String, Vec<u8>> = files
+        .iter()
+        .map(|(path, content)| ((*path).to_owned(), content.to_vec()))
+        .collect();
+    env_source(
+        env,
+        Box::new(move |path| {
+            files
+                .get(path)
+                .cloned()
+                .ok_or_else(|| io::ErrorKind::NotFound.into())
+        }),
+    )
+}
+
+pub(crate) fn source<K: AsRef<str>, V: AsRef<str>>(env: &[(K, V)]) -> Source {
+    files_source(env, &[])
+}
+
+fn object(value: Value) -> Document {
+    match value {
+        Value::Object(document) => document,
+        other => panic!("{other} is not an object"),
     }
+}
+
+fn not_found(_: &str) -> io::Result<Vec<u8>> {
+    Err(io::ErrorKind::NotFound.into())
 }
 
 pub(crate) fn minimal(changes: &[(&str, &str)]) -> Vec<(String, String)> {
@@ -88,13 +131,12 @@ fn load_applies_the_defaults() {
     assert_eq!(config.sei.api_url, "");
     assert_eq!(config.sei.username, "fulano.tal");
     assert_eq!(config.sei.org, "SEDEMO");
-    assert_eq!(config.sei.zone.name(), DEFAULT_TIME_ZONE);
+    assert_eq!(config.sei.zone.name(), "America/Sao_Paulo");
     assert_eq!(config.sei.concurrency, 3);
     assert!(config.sei.units.is_empty());
     assert!(!config.sei.all_units);
     assert_eq!(config.database_url.reveal(), "postgres://u:p@h/db");
     assert_eq!(config.poll_interval, Duration::from_secs(15 * 60));
-    assert_eq!(config.poll_interval, DEFAULT_POLL_INTERVAL);
     assert_eq!(config.return_warning_days, 2);
     assert_eq!(config.retention_days, 90);
     assert!(!config.full_detail);
@@ -155,22 +197,76 @@ fn problems_never_show_secret_values() {
         ("SEI_PASSWORD_CMD", "pass show hunter2"),
         ("DATABASE_URL", "mysql://u:hunter3@h/db"),
     ]);
-
-    let Err(err) = Config::load(&source(&env)) else {
-        panic!("the configuration loaded without problems");
+    let document: Document = env
+        .iter()
+        .map(|(name, value)| (name.to_ascii_lowercase(), json!(value)))
+        .collect();
+    let direct = match Source::with(document, None, Box::new(not_found)) {
+        Ok(source) => source,
+        Err(err) => panic!("{err}"),
     };
 
-    assert_eq!(
-        err.texts(),
-        [
-            "set only one of SEI_PASSWORD, SEI_PASSWORD_FILE and SEI_PASSWORD_CMD",
-            "DATABASE_URL: use postgres://user:password@host/database",
-        ]
-    );
-    for text in [err.to_string(), format!("{err:?}"), format!("{err:#?}")] {
-        for secret in ["hunter2", "hunter3"] {
-            assert!(!text.contains(secret), "{text}");
+    for source in [source(&env), direct] {
+        let err = refused(Config::load(&source));
+
+        assert_eq!(
+            err.texts(),
+            [
+                "set only one of SEI_PASSWORD, SEI_PASSWORD_FILE and SEI_PASSWORD_CMD",
+                "DATABASE_URL: use postgres://user:password@host/database",
+            ]
+        );
+        for text in [err.to_string(), format!("{err:?}"), format!("{err:#?}")] {
+            for secret in ["hunter2", "hunter3"] {
+                assert!(!text.contains(secret), "{text}");
+            }
         }
+    }
+}
+
+#[test]
+fn a_secret_of_another_type_is_refused_without_its_value() {
+    let cases = [
+        ("sei_password", json!(8675309), "8675309"),
+        ("sei_password_cmd", json!(true), "true"),
+        ("database_url", json!(1.5), "1.5"),
+    ];
+    for (field, value, shown) in cases {
+        let mut document = object(json!({"sei_url": "https://sei.example.org"}));
+        document.insert(field.to_owned(), value);
+
+        let Err(err) = Source::document(document) else {
+            panic!("{field}: the document was taken");
+        };
+
+        assert_eq!(err.problems, [problem(field, "must be string")]);
+        for text in [err.to_string(), format!("{err:?}")] {
+            assert!(!text.contains(shown), "{text}");
+        }
+    }
+
+    let document = object(json!({"sei_url": "https://sei.example.org", "sei_password": null}));
+    let Ok(source) = Source::document(document) else {
+        panic!("a null secret was refused");
+    };
+    assert_eq!((source.lookup)("SEI_PASSWORD"), None);
+}
+
+#[test]
+fn the_document_must_match_the_declaration() {
+    for document in [json!({"sei_url": "x", "other": "y"}), json!({"sei_url": 5})] {
+        let Err(err) = Source::document(object(document.clone())) else {
+            panic!("{document} was taken");
+        };
+
+        assert_eq!(
+            err.problems,
+            [problem(
+                "",
+                "the configuration document does not match settings.json"
+            )],
+            "{document}"
+        );
     }
 }
 
@@ -220,99 +316,92 @@ fn log_filter_follows_the_level() {
     }
 }
 
-fn not_utf8_source(
-    changes: &[(&'static str, &'static str)],
-    invalid: &'static [&'static str],
-    files: &'static [(&'static str, &'static [u8])],
-) -> Source {
-    let env: BTreeMap<String, String> = with(changes)
-        .into_iter()
-        .map(|(name, value)| (name.to_owned(), value.to_owned()))
-        .collect();
-    Source {
-        lookup: Box::new(move |name| env.get(name).cloned()),
-        read_file: Box::new(move |path| {
-            files
-                .iter()
-                .find(|(file, _)| *file == path)
-                .map(|(_, content)| content.to_vec())
-                .ok_or_else(|| io::ErrorKind::NotFound.into())
-        }),
-        invalid_utf8: Box::new(move |name| invalid.contains(&name)),
-    }
-}
-
 #[test]
-fn secrets_that_are_not_valid_utf8_are_refused() {
-    let cases: [(Source, &[&str]); 4] = [
-        (
-            not_utf8_source(&[("SEI_PASSWORD", "pw\u{fffd}")], &["SEI_PASSWORD"], &[]),
-            &["SEI_PASSWORD: the value is not valid UTF-8"],
-        ),
-        (
-            not_utf8_source(
-                &[("DATABASE_URL", "postgres://u:\u{fffd}@h/db")],
-                &["DATABASE_URL"],
-                &[],
-            ),
-            &[
-                "DATABASE_URL: the value is not valid UTF-8",
-                "DATABASE_URL: set the Postgres address, postgres://user:password@host/database",
-            ],
-        ),
-        (
-            not_utf8_source(
-                &[
-                    ("SEI_PASSWORD", ""),
-                    ("SEI_PASSWORD_FILE", "/run/secrets/sei"),
-                ],
-                &[],
-                &[("/run/secrets/sei", b"pw\xff\n")],
-            ),
-            &["SEI_PASSWORD_FILE: /run/secrets/sei is not valid UTF-8"],
-        ),
-        (
-            not_utf8_source(
-                &[
-                    ("DATABASE_URL", ""),
-                    ("DATABASE_URL_FILE", "/run/secrets/database"),
-                ],
-                &[],
-                &[("/run/secrets/database", b"postgres://u:\xc3@h/db\n")],
-            ),
-            &[
-                "DATABASE_URL_FILE: /run/secrets/database is not valid UTF-8",
-                "DATABASE_URL: set the Postgres address, postgres://user:password@host/database",
-            ],
-        ),
-    ];
-    for (source, want) in cases {
-        assert_eq!(problems(Config::load(&source)), want);
+fn text_that_is_not_utf8_follows_the_sdk() {
+    use std::os::unix::ffi::OsStringExt;
+
+    let document = |name: &str| {
+        let mut env: BTreeMap<String, OsString> = minimal(&[])
+            .into_iter()
+            .map(|(name, value)| (name, OsString::from(value)))
+            .collect();
+        env.insert(name.to_owned(), OsString::from_vec(b"a\xffb".to_vec()));
+        from_lookup(&declaration(), |name| env.get(name).cloned())
+    };
+    for name in ["SEI_PASSWORD", "DATABASE_URL", "SEI_PASSWORD_CMD"] {
+        let Err(err) = document(name) else {
+            panic!("{name} was taken");
+        };
+        assert_eq!(
+            ConfigError::from(err).problems,
+            [problem(
+                &name.to_ascii_lowercase(),
+                &format!("{name} is not valid UTF-8")
+            )]
+        );
     }
-}
 
-#[test]
-fn settings_that_are_not_secrets_keep_the_lossy_value() {
-    let source = not_utf8_source(&[("SEI_ORG", "SED\u{fffd}MO")], &["SEI_ORG"], &[]);
-
-    let config = match Config::load(&source) {
+    let source = match document("SEI_ORG").map_err(ConfigError::from) {
+        Ok(document) => Source::with(document, None, Box::new(not_found)),
+        Err(err) => Err(err),
+    };
+    let config = match source.and_then(|source| Config::load(&source)) {
         Ok(config) => config,
         Err(err) => panic!("{err}"),
     };
+    assert_eq!(config.sei.org, "a\u{fffd}b");
 
-    assert_eq!(config.sei.org, "SED\u{fffd}MO");
+    let no_address =
+        "DATABASE_URL: set the Postgres address, postgres://user:password@host/database";
+    let cases: [(Changes, File, Vec<ConfigProblem>); 2] = [
+        (
+            &[
+                ("SEI_PASSWORD", ""),
+                ("SEI_PASSWORD_FILE", "/run/secrets/sei"),
+            ],
+            ("/run/secrets/sei", b"pw\xff\n"),
+            vec![problem(
+                "sei_password_file",
+                "SEI_PASSWORD_FILE: /run/secrets/sei is not valid UTF-8",
+            )],
+        ),
+        (
+            &[
+                ("DATABASE_URL", ""),
+                ("DATABASE_URL_FILE", "/run/secrets/database"),
+            ],
+            ("/run/secrets/database", b"postgres://u:\xc3@h/db\n"),
+            vec![
+                problem(
+                    "database_url_file",
+                    "DATABASE_URL_FILE: /run/secrets/database is not valid UTF-8",
+                ),
+                problem("database_url_file", no_address),
+            ],
+        ),
+    ];
+    for (changes, file, want) in cases {
+        let source = files_source(&minimal(changes), &[file]);
+        assert_eq!(refused(Config::load(&source)).problems, want, "{changes:?}");
+    }
 }
 
 #[test]
-fn environment_values_that_are_not_utf8_are_flagged() {
-    use std::os::unix::ffi::OsStringExt;
-
-    let invalid = || Some(OsString::from_vec(b"pw\xff".to_vec()));
-    assert!(not_utf8(invalid()));
-    assert_eq!(lossy(invalid()).as_deref(), Some("pw\u{fffd}"));
-    assert!(!not_utf8(Some(OsString::from("pw"))));
-    assert!(!not_utf8(None));
-    assert_eq!(lossy(None), None);
+fn blank_values_take_the_declared_default() {
+    let load = |changes: &[(&str, &str)]| match Config::load(&source(&minimal(changes))) {
+        Ok(config) => config_record(&config),
+        Err(err) => panic!("{err}"),
+    };
+    let without = load(&[]);
+    let names: Vec<String> = declared()
+        .into_iter()
+        .filter(|field| field.default.is_some())
+        .filter_map(|field| field.env)
+        .collect();
+    assert!(!names.is_empty());
+    for name in &names {
+        assert_eq!(load(&[(name, " \t ")]), without, "{name}");
+    }
 }
 
 #[derive(Deserialize)]
@@ -379,9 +468,9 @@ fn case_source(case: &ConfigCase, program_dir: &FakeProgramDir) -> Source {
     env.entry("PATH".to_owned())
         .or_insert_with(|| program_dir.path().to_owned());
     let files = case.files.clone();
-    Source {
-        lookup: Box::new(move |name| env.get(name).cloned()),
-        read_file: Box::new(move |path| {
+    env_source(
+        env,
+        Box::new(move |path| {
             if path.starts_with("/denied/") {
                 return Err(io::ErrorKind::PermissionDenied.into());
             }
@@ -390,8 +479,7 @@ fn case_source(case: &ConfigCase, program_dir: &FakeProgramDir) -> Source {
                 .map(|content| content.clone().into_bytes())
                 .ok_or_else(|| io::ErrorKind::NotFound.into())
         }),
-        invalid_utf8: Box::new(|_| false),
-    }
+    )
 }
 
 fn password_record(password: &PasswordSetting) -> Value {
@@ -466,10 +554,7 @@ fn config_matches_go() {
 }
 
 fn declared() -> Vec<Field> {
-    match settings::parse(SETTINGS.as_bytes()) {
-        Ok(declaration) => declaration.fields,
-        Err(err) => panic!("{err}"),
-    }
+    declaration().fields
 }
 
 fn names_where(fields: &[Field], keep: impl Fn(&Field) -> bool) -> BTreeSet<&str> {
@@ -603,28 +688,8 @@ fn the_declaration_keeps_files_and_programs_out_of_the_page() {
     );
 }
 
-fn files_source<K: AsRef<str>, V: AsRef<str>>(env: &[(K, V)], files: &[(&str, &[u8])]) -> Source {
-    let env: BTreeMap<String, String> = env
-        .iter()
-        .map(|(name, value)| (name.as_ref().to_owned(), value.as_ref().to_owned()))
-        .collect();
-    let files: BTreeMap<String, Vec<u8>> = files
-        .iter()
-        .map(|(path, content)| ((*path).to_owned(), content.to_vec()))
-        .collect();
-    Source {
-        lookup: Box::new(move |name| env.get(name).cloned()),
-        read_file: Box::new(move |path| {
-            files
-                .get(path)
-                .cloned()
-                .ok_or_else(|| io::ErrorKind::NotFound.into())
-        }),
-        invalid_utf8: Box::new(|_| false),
-    }
-}
-
 type Changes<'a> = &'a [(&'a str, &'a str)];
+type File<'a> = (&'a str, &'a [u8]);
 
 fn problem(path: &str, text: &str) -> ConfigProblem {
     ConfigProblem {
@@ -849,7 +914,7 @@ fn every_problem_names_its_path() {
     let path: Changes = &[("PATH", "/nonexistent")];
     for (changes, database, want) in cases {
         let env = minimal(&[changes, path].concat());
-        let files: [(&str, &[u8]); 2] = [
+        let files: [File; 2] = [
             ("/run/secrets/sei", b"s3cr3t-file\n"),
             ("/run/secrets/db", database),
         ];
@@ -880,27 +945,14 @@ fn every_problem_names_a_declared_path() {
 }
 
 fn recorded(source: Source, asked: &Arc<Mutex<BTreeSet<String>>>) -> Source {
-    let record = |asked: Arc<Mutex<BTreeSet<String>>>| {
-        move |name: &str| {
-            asked.lock().unwrap().insert(name.to_owned());
-        }
-    };
-    let (on_lookup, on_invalid) = (record(Arc::clone(asked)), record(Arc::clone(asked)));
-    let Source {
-        lookup,
-        read_file,
-        invalid_utf8,
-    } = source;
+    let asked = Arc::clone(asked);
+    let Source { lookup, read_file } = source;
     Source {
         lookup: Box::new(move |name| {
-            on_lookup(name);
+            asked.lock().unwrap().insert(name.to_owned());
             lookup(name)
         }),
         read_file,
-        invalid_utf8: Box::new(move |name| {
-            on_invalid(name);
-            invalid_utf8(name)
-        }),
     }
 }
 

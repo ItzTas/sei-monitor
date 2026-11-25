@@ -975,3 +975,79 @@ fn the_reader_asks_only_for_declared_variables() {
         .collect();
     assert_eq!(asked, variables);
 }
+
+fn not_utf8() -> OsString {
+    use std::os::unix::ffi::OsStringExt;
+
+    OsString::from_vec(b"a\xffb".to_vec())
+}
+
+// Paths never carry a value, so a failure can print them.
+fn paths(err: &ConfigError) -> Vec<&str> {
+    err.problems
+        .iter()
+        .map(|problem| problem.path.as_str())
+        .collect()
+}
+
+#[test]
+fn operator_commands_read_only_their_variables() {
+    let orgs_env = BTreeMap::from([
+        ("SEI_URL", OsString::from("https://sei.example.org/sei/")),
+        ("DATABASE_URL", not_utf8()),
+        ("SEI_PASSWORD", not_utf8()),
+        ("SEI_ORG", not_utf8()),
+    ]);
+    let url = operator_source_from(ORGS_VARIABLES, |name| orgs_env.get(name).cloned())
+        .and_then(|source| load_sei_url(&source));
+    match url {
+        Ok(url) => assert_eq!(url, "https://sei.example.org"),
+        Err(err) => panic!("orgs was refused: {:?}", paths(&err)),
+    }
+
+    let mut sei_env: BTreeMap<String, OsString> = minimal(&[])
+        .into_iter()
+        .map(|(name, value)| (name, OsString::from(value)))
+        .collect();
+    sei_env.insert("DATABASE_URL".to_owned(), not_utf8());
+    let sei = operator_source_from(SEI_VARIABLES, |name| sei_env.get(name).cloned())
+        .and_then(|source| SeiConfig::load(&source));
+    match sei {
+        Ok(sei) => assert_eq!(
+            (sei.url.as_str(), sei.username.as_str(), sei.org.as_str()),
+            ("https://sei.example.org", "user.name", "SEDEMO")
+        ),
+        Err(err) => panic!("test-login was refused: {:?}", paths(&err)),
+    }
+}
+
+fn asked_by(load: impl Fn(&Source), envs: &[Changes]) -> BTreeSet<String> {
+    let asked = Arc::new(Mutex::new(BTreeSet::new()));
+    for env in envs {
+        load(&recorded(source(env), &asked));
+    }
+    asked.lock().unwrap().clone()
+}
+
+fn names_of(variables: &[&str]) -> BTreeSet<String> {
+    variables.iter().map(|name| (*name).to_owned()).collect()
+}
+
+#[test]
+fn operator_lists_are_what_the_commands_read() {
+    let orgs = asked_by(
+        |source| {
+            let _ = load_sei_url(source);
+        },
+        &[&[]],
+    );
+    assert_eq!(orgs, names_of(ORGS_VARIABLES));
+
+    let sei = asked_by(
+        |source| {
+            let _ = SeiConfig::load(source);
+        },
+        &[&[], &[("SEI_PASSWORD_CMD", "sh")]],
+    );
+    assert_eq!(sei, names_of(&[SEI_VARIABLES, &["PATH"]].concat()));
+}

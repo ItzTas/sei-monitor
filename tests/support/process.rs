@@ -13,7 +13,10 @@ use monitor_hub_sdk::proto::{
     CheckRequest, CheckResponse, DescribeRequest, DescribeResponse, Event, EventsRequest,
     EventsResponse, StatusRequest, StatusResponse, WatchRequest, WatchResponse,
 };
+use monitor_hub_sdk::settings;
 use monitor_hub_sdk::{MAGIC_COOKIE_KEY, MAGIC_COOKIE_VALUE};
+use monitor_hub_sdk_testkit::settings::{DocumentCommand, command_with_document};
+use sei_monitor::config::SETTINGS;
 use serde_json::Value;
 use tonic::client::Grpc;
 use tonic::codegen::http::uri::PathAndQuery;
@@ -61,7 +64,10 @@ pub struct RunningMonitor {
     pub child: Child,
     pub socket: PathBuf,
     pub stderr: Arc<Mutex<String>>,
+    hidden: Vec<String>,
     _temp: ShortTempDir,
+    // Fields drop after Drop::drop has reaped the process, so the file outlives it.
+    _document: Option<DocumentCommand>,
 }
 
 pub struct Exited {
@@ -72,9 +78,41 @@ pub struct Exited {
 
 pub fn spawn_monitor(env: &[(&str, &str)]) -> RunningMonitor {
     let temp = ShortTempDir::new();
-    let mut child = command(&["monitor"], &[COOKIE, ("TMPDIR", temp.text())], env)
+    let child = command(&["monitor"], &[COOKIE, ("TMPDIR", temp.text())], env)
         .spawn()
         .expect("start the monitor");
+    handshake(child, temp, None, Vec::new())
+}
+
+/// The document goes on descriptor 3; failure messages show stderr without its secrets.
+pub fn spawn_monitor_with_document(env: &[(&str, &str)], document: &Value) -> RunningMonitor {
+    let temp = ShortTempDir::new();
+    let bytes = serde_json::to_vec(document).expect("encode the document");
+    let mut handed = command_with_document(env!("CARGO_BIN_EXE_sei-monitor"), &["monitor"], &bytes)
+        .expect("write the document");
+    prepare(&mut handed.command, &[COOKIE, ("TMPDIR", temp.text())], env);
+    let child = handed.command.spawn().expect("start the monitor");
+    handshake(child, temp, Some(handed), secrets_of(document))
+}
+
+fn secrets_of(document: &Value) -> Vec<String> {
+    let declaration = settings::parse(SETTINGS.as_bytes()).expect("settings.json");
+    declaration
+        .fields
+        .iter()
+        .filter(|field| field.secret)
+        .filter_map(|field| document.get(field.name.as_str())?.as_str())
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+fn handshake(
+    mut child: Child,
+    temp: ShortTempDir,
+    document: Option<DocumentCommand>,
+    hidden: Vec<String>,
+) -> RunningMonitor {
     let stdout = child.stdout.take().expect("piped stdout");
     let stderr = Arc::new(Mutex::new(String::new()));
     collect_lines(
@@ -86,7 +124,9 @@ pub fn spawn_monitor(env: &[(&str, &str)]) -> RunningMonitor {
         child,
         socket: PathBuf::new(),
         stderr,
+        hidden,
         _temp: temp,
+        _document: document,
     };
     let Ok(line) = first_line.recv_timeout(HANDSHAKE_LIMIT) else {
         spawned.fail("the monitor printed no handshake line within 30 seconds");
@@ -210,6 +250,12 @@ impl RunningMonitor {
             .clone()
     }
 
+    pub fn stderr_shown(&self) -> String {
+        self.hidden.iter().fold(self.stderr_text(), |text, secret| {
+            text.replace(secret.as_str(), "[redacted]")
+        })
+    }
+
     pub fn still_running(&mut self) -> bool {
         matches!(self.child.try_wait(), Ok(None))
     }
@@ -225,7 +271,7 @@ impl RunningMonitor {
         let _ = self.child.kill();
         let _ = self.child.wait();
         thread::sleep(Duration::from_millis(50));
-        panic!("{problem}\nmonitor stderr:\n{}", self.stderr_text());
+        panic!("{problem}\nmonitor stderr:\n{}", self.stderr_shown());
     }
 }
 
@@ -307,16 +353,19 @@ impl MonitorClient {
 
 fn command(args: &[&str], fixed: &[(&str, &str)], env: &[(&str, &str)]) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_sei-monitor"));
+    command.args(args).env_clear();
+    prepare(&mut command, fixed, env);
     command
-        .args(args)
-        .env_clear()
+}
+
+fn prepare(command: &mut Command, fixed: &[(&str, &str)], env: &[(&str, &str)]) {
+    command
         .env("PATH", env::var_os("PATH").unwrap_or_default())
         .envs(fixed.iter().copied())
         .envs(env.iter().copied())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    command
 }
 
 fn first_line(stdout: impl Read + Send + 'static) -> Receiver<String> {

@@ -4,6 +4,7 @@ mod reader;
 pub(crate) mod tests;
 mod url;
 
+use std::ffi::OsString;
 use std::fs;
 use std::future::{Future, ready};
 use std::pin::Pin;
@@ -11,7 +12,7 @@ use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use chrono_tz::Tz;
-use monitor_hub_sdk::config::{Document, LoadError};
+use monitor_hub_sdk::config::{self, Document, LoadError};
 use monitor_hub_sdk::settings::{self, Field};
 use serde_json::Value;
 
@@ -29,6 +30,21 @@ pub const MIN_POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
 const ONLY_ONE_PASSWORD: &str =
     "set only one of SEI_PASSWORD, SEI_PASSWORD_FILE and SEI_PASSWORD_CMD";
 pub const SETTINGS: &str = include_str!("../../settings.json");
+/// What `load_sei_url` reads.
+pub const ORGS_VARIABLES: &[&str] = &["SEI_URL"];
+/// What `SeiConfig::load` reads, besides `PATH`.
+pub const SEI_VARIABLES: &[&str] = &[
+    "SEI_URL",
+    "SEI_API_URL",
+    "SEI_USERNAME",
+    "SEI_PASSWORD",
+    "SEI_PASSWORD_FILE",
+    "SEI_PASSWORD_CMD",
+    "SEI_ORG",
+    "SEI_TIMEZONE",
+    "SEI_CONCURRENCY",
+    "SEI_UNITS",
+];
 
 static FIELDS: LazyLock<Vec<Field>> = LazyLock::new(|| {
     settings::parse(SETTINGS.as_bytes())
@@ -145,6 +161,32 @@ impl SettingsDocument {
             .find(|(variable, _)| *variable == name)
             .and_then(|(_, value)| value.clone())
     }
+}
+
+/// The hub's descriptor when it names one, else the environment. The SDK reads the descriptor once
+/// per process.
+pub fn load_document() -> Result<Source, ConfigError> {
+    Source::document(config::load(SETTINGS)?)
+}
+
+/// The environment restricted to `names`, so a variable the command does not read cannot refuse
+/// it. It never reads the descriptor.
+pub fn operator_source(names: &[&str]) -> Result<Source, ConfigError> {
+    operator_source_from(names, |name| std::env::var_os(name))
+}
+
+pub(crate) fn operator_source_from(
+    names: &[&str],
+    lookup: impl Fn(&str) -> Option<OsString>,
+) -> Result<Source, ConfigError> {
+    let declaration = settings::parse(SETTINGS.as_bytes()).map_err(LoadError::from)?;
+    let document = config::from_lookup(&declaration, |name| {
+        if !names.contains(&name) {
+            return None;
+        }
+        lookup(name)
+    })?;
+    Source::document(document)
 }
 
 /// An empty path stands for the configuration as a whole.

@@ -1,16 +1,20 @@
 mod support;
 
+use std::ffi::OsString;
 use std::fs;
 use std::future::Future;
 use std::os::unix::fs::PermissionsExt;
 use std::time::{Duration, Instant};
 
 use monitor_hub_sdk::NOT_LAUNCHED_BY_HUB;
+use monitor_hub_sdk::config::from_lookup;
 use monitor_hub_sdk::proto::{State, StatusResponse, WatchResponse};
+use monitor_hub_sdk::settings;
 use serde_json::Value;
 use tokio_postgres::{Client, NoTls};
 use tonic::Streaming;
 
+use sei_monitor::config::SETTINGS;
 use sei_monitor::migration::{DROP_GO_TABLES, GOOSE_SCHEMA};
 use sei_monitor::secret::Secret;
 use sei_monitor::store::{AccountKey, Store, WRITER_LOCK_ID, acquire_writer_lock};
@@ -22,7 +26,7 @@ use support::fake_sei::{
 use support::harness::{Harness, populate, process, start};
 use support::process::{
     COOKIE, MonitorClient, RunningMonitor, ShortTempDir, error_lines, monitor_client, run_to_exit,
-    spawn_monitor, terminate,
+    spawn_monitor, spawn_monitor_with_document, terminate,
 };
 use support::schema::goose_era_database;
 use support::{Database, SIGNAL_WAIT, database, database_url_as, login_role, migrated_database};
@@ -42,6 +46,7 @@ const PAUSED_HERE: &str = "restart the monitor with the configuration fixed, the
 const DB_ROLE: &str = "sei_entrypoint_secrets";
 const DB_PASSWORD: &str = "db-secret-7f3a";
 const PGPASS_MARKER: &str = "pgpass-line-3c9d";
+const UNROUTABLE_SEI: &str = "https://192.0.2.1";
 const HELD_EVENTS: &str =
     "SELECT count(*) FROM events WHERE kind = 'account_login_failed' AND ref LIKE 'login-held:%'";
 
@@ -77,6 +82,30 @@ fn borrowed<'a>(env: &'a [(&'static str, String)]) -> Vec<(&'static str, &'a str
 
 fn start_monitor(env: &[(&'static str, String)]) -> RunningMonitor {
     spawn_monitor(&borrowed(env))
+}
+
+fn document_of(env: &[(&'static str, String)]) -> Value {
+    let declaration = settings::parse(SETTINGS.as_bytes()).expect("settings.json");
+    let document = from_lookup(&declaration, |name| {
+        env.iter()
+            .find(|(known, _)| *known == name)
+            .map(|(_, value)| OsString::from(value))
+    })
+    .expect("a document from the variables");
+    Value::Object(document)
+}
+
+fn start_with_document(env: &[(&'static str, String)]) -> RunningMonitor {
+    spawn_monitor_with_document(&[], &document_of(env))
+}
+
+// The messages name only the text and the secret, never what the text holds.
+fn assert_hidden(texts: &[&str], secrets: &[&str]) {
+    for (index, text) in texts.iter().enumerate() {
+        for (secret, value) in secrets.iter().enumerate() {
+            assert!(!text.contains(value), "text {index} shows secret {secret}");
+        }
+    }
 }
 
 async fn until<T, F: Future<Output = Option<T>>>(
@@ -126,7 +155,7 @@ fn single_error(stderr: &str) -> Value {
 async fn stop_cleanly(spawned: &mut RunningMonitor) {
     terminate(&mut spawned.child);
     let status = spawned.exit_within(STOP_LIMIT);
-    assert_eq!(status.code(), Some(0), "{}", spawned.stderr_text());
+    assert_eq!(status.code(), Some(0), "{}", spawned.stderr_shown());
 }
 
 async fn record_rejection(database: &Database, fake: &FakeSei) {
@@ -964,4 +993,147 @@ async fn a_rejected_login_reaches_the_hub_as_a_signal() {
     drop(watch);
     drop(client);
     stop_cleanly(&mut spawned).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_monitor_reads_its_configuration_from_the_descriptor() {
+    let Some(database) = migrated_database().await else {
+        return;
+    };
+    let fake = FakeSei::start();
+    populate(&fake);
+    let data = ShortTempDir::new();
+    let document = document_of(&sei_env(&fake, &database.url, PASSWORD));
+    let mut spawned = spawn_monitor_with_document(
+        &[
+            ("MONITOR_HUB_DATA_DIR", data.text()),
+            ("SEI_URL", UNROUTABLE_SEI),
+        ],
+        &document,
+    );
+    let mut client = monitor_client(&spawned.socket).await;
+
+    let described = client.describe().await;
+    let done = status_where(&mut spawned, &mut client, "a cycle succeeds", |status| {
+        status.last_success_at.is_some()
+    })
+    .await;
+    drop(client);
+    stop_cleanly(&mut spawned).await;
+
+    assert_hidden(
+        &[&spawned.stderr_text(), &format!("{done:?}")],
+        &[PASSWORD, &database.url],
+    );
+    assert_eq!(described.expect("describe").name, "sei");
+    assert_eq!((fake.calls(ROUTE_LOGIN), fake.logins()), (1, 1));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_recorded_rejection_holds_when_the_configuration_comes_from_a_document() {
+    let Some(database) = migrated_database().await else {
+        return;
+    };
+    let fake = FakeSei::start();
+    populate(&fake);
+    fake.set_password("changed-by-the-user");
+    record_rejection(&database, &fake).await;
+    let env = sei_env(&fake, &database.url, PASSWORD);
+    let secrets = [PASSWORD, database.url.as_str()];
+
+    for life in 0..3 {
+        let mut spawned = start_with_document(&env);
+        let started = Instant::now();
+        let mut client = monitor_client(&spawned.socket).await;
+        let held = status_where(&mut spawned, &mut client, "the monitor holds", |status| {
+            status.state == i32::from(State::Paused)
+        })
+        .await;
+        tokio::time::sleep(STAY_UP.saturating_sub(started.elapsed())).await;
+        assert!(spawned.still_running(), "{}", spawned.stderr_shown());
+        drop(client);
+        stop_cleanly(&mut spawned).await;
+        assert_hidden(&[&spawned.stderr_text(), &held.message], &secrets);
+        assert_eq!((fake.logins(), fake.failed_logins()), (0, 0), "life {life}");
+        assert_eq!(held.message, format!("{REJECTED}; {HELD}"), "life {life}");
+    }
+
+    let mut spawned = start_with_document(&env);
+    let mut client = monitor_client(&spawned.socket).await;
+    status_where(&mut spawned, &mut client, "the monitor holds", |status| {
+        status.message.ends_with(HELD)
+    })
+    .await;
+    let accepted = client.check().await.expect("check");
+    let paused = status_where(
+        &mut spawned,
+        &mut client,
+        "the check is rejected",
+        |status| status.message.ends_with(PAUSED_HERE),
+    )
+    .await;
+    drop(client);
+    stop_cleanly(&mut spawned).await;
+
+    assert_hidden(
+        &[
+            &spawned.stderr_text(),
+            &format!("{accepted:?}"),
+            &paused.message,
+        ],
+        &secrets,
+    );
+    assert!(accepted.accepted, "{accepted:?}");
+    assert_eq!(paused.state, i32::from(State::Paused));
+    assert_eq!(fake.failed_logins(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_password_command_does_not_inherit_the_document() {
+    let Some(database) = migrated_database().await else {
+        return;
+    };
+    let fake = FakeSei::start();
+    populate(&fake);
+    let dir = ShortTempDir::new();
+    let seen = dir.path().join("seen");
+    let program = dir.path().join("password");
+    fs::write(
+        &program,
+        format!(
+            "#!/bin/sh\ncat /proc/$$/fd/3 > {} 2>/dev/null\necho {PASSWORD}\n",
+            seen.display()
+        ),
+    )
+    .expect("write the password program");
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o700))
+        .expect("make the password program executable");
+    let mut env = sei_env(&fake, &database.url, PASSWORD);
+    env.retain(|(name, _)| *name != "SEI_PASSWORD");
+    with(
+        &mut env,
+        "SEI_PASSWORD_CMD",
+        program.to_str().expect("a UTF-8 path"),
+    );
+    let mut spawned = start_with_document(&env);
+    let mut client = monitor_client(&spawned.socket).await;
+
+    let done = status_where(&mut spawned, &mut client, "a cycle succeeds", |status| {
+        status.last_success_at.is_some()
+    })
+    .await;
+    drop(client);
+    stop_cleanly(&mut spawned).await;
+
+    assert_hidden(
+        &[&spawned.stderr_text(), &format!("{done:?}")],
+        &[PASSWORD, &database.url],
+    );
+    assert_eq!((fake.calls(ROUTE_LOGIN), fake.logins()), (1, 1));
+    let read = fs::read(&seen).expect("the password program ran");
+    assert!(
+        read.is_empty(),
+        "the password program read {} bytes from descriptor 3",
+        read.len()
+    );
 }

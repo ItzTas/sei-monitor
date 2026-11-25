@@ -535,3 +535,50 @@ fn the_document_wins_over_the_environment() {
     assert_eq!(exited.status.code(), Some(0));
     assert_eq!(exited.stdout, VALID);
 }
+
+#[test]
+fn database_addresses_the_start_refuses_are_refused() {
+    let base = Base::start();
+    let files = ShortTempDir::new();
+    let channel_binding = secret_file(
+        &files,
+        "database",
+        &format!(
+            "postgres://monitor:{DB_FILE_MARKER}@127.0.0.1:{}/monitor?channel_binding=require\n",
+            base.port()
+        ),
+    );
+    let no_password = with(
+        &base.env(),
+        "DATABASE_URL",
+        &format!("postgres://monitor@127.0.0.1:{}/monitor", base.port()),
+    );
+    let no_password_answer = answer(&[(
+        "database_url",
+        "DATABASE_URL has no password: add the role's password to the URL",
+    )]);
+
+    let from_env = validate(&base, &no_password);
+    let from_document = validate_document(&base, &document_of(&no_password), &Env::new());
+    let from_file = validate(
+        &base,
+        &with(
+            &without(&base.env(), "DATABASE_URL"),
+            "DATABASE_URL_FILE",
+            &channel_binding,
+        ),
+    );
+
+    for (source, exited) in [("environment", from_env), ("document", from_document)] {
+        assert_eq!(exited.status.code(), Some(1), "{source}");
+        assert_eq!(exited.stdout, no_password_answer, "{source}");
+    }
+    assert_eq!(from_file.status.code(), Some(1));
+    assert_eq!(
+        from_file.stdout,
+        answer(&[(
+            "database_url_file",
+            "DATABASE_URL's channel_binding needs TLS, and the monitor connects without TLS",
+        )])
+    );
+}

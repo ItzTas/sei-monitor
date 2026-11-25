@@ -428,14 +428,19 @@ fn units(value: &str) -> (Vec<String>, bool) {
     (units, false)
 }
 
-fn database_url(reader: &mut Reader) -> Secret {
+/// The path of a problem with the database address: the file's when the address came from it.
+pub(crate) fn database_url_path(source: &Source) -> &'static str {
+    let reader = Reader::new(source);
     let from_file =
         !reader.has_secret("DATABASE_URL") && !reader.text("DATABASE_URL_FILE").is_empty();
-    let path = if from_file {
-        "database_url_file"
-    } else {
-        "database_url"
-    };
+    if from_file {
+        return "database_url_file";
+    }
+    "database_url"
+}
+
+fn database_url(reader: &mut Reader) -> Secret {
+    let path = database_url_path(reader.source());
     let value = reader.secret("DATABASE_URL");
     if value.is_empty() {
         reader.problem(

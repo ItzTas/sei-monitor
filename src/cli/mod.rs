@@ -8,9 +8,10 @@ use clap::error::{ContextKind, ContextValue, ErrorKind};
 use clap::{CommandFactory, Parser, Subcommand};
 use monitor_hub_sdk::settings::Problem;
 
-use crate::config::{Config, SeiConfig, load_document};
+use crate::config::{Config, ConfigError, SeiConfig, database_url_path, load_document};
 use crate::gotext::{go_quote, to_lower};
 use crate::sei::{Connection, Options, REQUEST_TIMEOUT, SeiError, Target, connect};
+use crate::store::check_database_url;
 use crate::version::{VERSION, user_agent};
 
 pub use commands::{orgs, test_login};
@@ -49,11 +50,27 @@ pub enum Command {
     ValidateSettings,
 }
 
-/// The problems `Config::load` finds, without connecting anywhere or running the password command.
+/// What start-up refuses before it connects, checked without connecting anywhere or running the
+/// password command.
 pub fn validate_settings() -> Vec<Problem> {
-    let Err(refusal) = load_document().and_then(|source| Config::load(&source)) else {
+    let source = match load_document() {
+        Ok(source) => source,
+        Err(refusal) => return problems(refusal),
+    };
+    let config = match Config::load(&source) {
+        Ok(config) => config,
+        Err(refusal) => return problems(refusal),
+    };
+    let Err(refusal) = check_database_url(&config.database_url) else {
         return Vec::new();
     };
+    vec![Problem::new(
+        database_url_path(&source),
+        refusal.to_string(),
+    )]
+}
+
+fn problems(refusal: ConfigError) -> Vec<Problem> {
     refusal
         .problems
         .into_iter()

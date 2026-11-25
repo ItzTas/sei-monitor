@@ -27,6 +27,11 @@ pub use records::{
     Trigger,
 };
 
+/// The address checks of start-up, without connecting.
+pub(crate) fn check_database_url(database_url: &Secret) -> Result<(), StoreError> {
+    database_options(database_url).map(drop)
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
     #[error("{0}")]

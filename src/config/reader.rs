@@ -48,6 +48,10 @@ impl<'a> Reader<'a> {
         })
     }
 
+    pub(crate) fn source(&self) -> &'a Source {
+        self.source
+    }
+
     pub(crate) fn lookup(&self, name: &str) -> Option<String> {
         (self.source.lookup)(name)
     }

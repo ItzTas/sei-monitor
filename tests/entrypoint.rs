@@ -4,6 +4,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::future::Future;
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use monitor_hub_sdk::NOT_LAUNCHED_BY_HUB;
@@ -29,7 +30,9 @@ use support::process::{
     spawn_monitor, spawn_monitor_with_document, terminate,
 };
 use support::schema::goose_era_database;
-use support::{Database, SIGNAL_WAIT, database, database_url_as, login_role, migrated_database};
+use support::{
+    Database, SIGNAL_WAIT, ci, database, database_url_as, login_role, migrated_database,
+};
 
 const EXIT_LIMIT: Duration = Duration::from_secs(30);
 const STOP_LIMIT: Duration = Duration::from_secs(2);
@@ -106,6 +109,26 @@ fn assert_hidden(texts: &[&str], secrets: &[&str]) {
             assert!(!text.contains(value), "text {index} shows secret {secret}");
         }
     }
+}
+
+// The skip of FakeProgramDir::create in src/config/tests.rs.
+fn runs_programs(dir: &Path) -> bool {
+    let probe = dir.join("probe");
+    fs::write(&probe, "#!/bin/sh\n").expect("write the probe");
+    fs::set_permissions(&probe, fs::Permissions::from_mode(0o700))
+        .expect("make the probe executable");
+    if std::process::Command::new(&probe).status().is_ok() {
+        return true;
+    }
+    let notice = format!(
+        "the programs in {} cannot be executed (is the temporary directory mounted noexec?)",
+        dir.display()
+    );
+    if ci() {
+        panic!("{notice}, and CI is set");
+    }
+    eprintln!("skipping: {notice}");
+    false
 }
 
 async fn until<T, F: Future<Output = Option<T>>>(
@@ -1096,12 +1119,15 @@ async fn the_password_command_does_not_inherit_the_document() {
     let fake = FakeSei::start();
     populate(&fake);
     let dir = ShortTempDir::new();
+    if !runs_programs(dir.path()) {
+        return;
+    }
     let seen = dir.path().join("seen");
     let program = dir.path().join("password");
     fs::write(
         &program,
         format!(
-            "#!/bin/sh\ncat /proc/$$/fd/3 > {} 2>/dev/null\necho {PASSWORD}\n",
+            "#!/bin/sh\ncat /proc/$$/fd/3 > '{}' 2>/dev/null\necho {PASSWORD}\n",
             seen.display()
         ),
     )

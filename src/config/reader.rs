@@ -2,14 +2,14 @@ use std::io;
 
 use zeroize::Zeroizing;
 
-use super::{ConfigError, Source};
+use super::{ConfigError, ConfigProblem, Source};
 use crate::gotext::{atoi, go_quote, trim};
 use crate::password::trim_final_newline;
 use crate::secret::Secret;
 
 pub(crate) struct Reader<'a> {
     source: &'a Source,
-    problems: Vec<String>,
+    problems: Vec<ConfigProblem>,
 }
 
 impl<'a> Reader<'a> {
@@ -20,8 +20,11 @@ impl<'a> Reader<'a> {
         }
     }
 
-    pub(crate) fn problem(&mut self, problem: String) {
-        self.problems.push(problem);
+    pub(crate) fn problem(&mut self, path: &str, text: String) {
+        self.problems.push(ConfigProblem {
+            path: path.to_owned(),
+            text,
+        });
     }
 
     pub(crate) fn finish<T>(self, value: T) -> Result<T, ConfigError> {
@@ -46,7 +49,10 @@ impl<'a> Reader<'a> {
     pub(crate) fn required(&mut self, name: &str, hint: &str) -> String {
         let value = self.text(name);
         if value.is_empty() {
-            self.problem(format!("{name} is required{hint}"));
+            self.problem(
+                &name.to_ascii_lowercase(),
+                format!("{name} is required{hint}"),
+            );
         }
         value
     }
@@ -61,7 +67,10 @@ impl<'a> Reader<'a> {
         let direct = self.direct_secret(name);
         let path = self.text(&format!("{name}_FILE"));
         if !direct.is_empty() && !path.is_empty() {
-            self.problem(format!("set either {name} or {name}_FILE, not both"));
+            self.problem(
+                &name.to_ascii_lowercase(),
+                format!("set either {name} or {name}_FILE, not both"),
+            );
             return Secret::default();
         }
         if path.is_empty() {
@@ -74,7 +83,10 @@ impl<'a> Reader<'a> {
         if direct.is_empty() || !(self.source.invalid_utf8)(name) {
             return direct;
         }
-        self.problem(format!("{name}: the value is not valid UTF-8"));
+        self.problem(
+            &name.to_ascii_lowercase(),
+            format!("{name}: the value is not valid UTF-8"),
+        );
         Secret::default()
     }
 
@@ -87,20 +99,22 @@ impl<'a> Reader<'a> {
     }
 
     fn secret_file(&mut self, name: &str, path: &str) -> Secret {
+        let field = format!("{name}_file").to_ascii_lowercase();
         let content = match (self.source.read_file)(path) {
             Ok(content) => Zeroizing::new(content),
             Err(err) => {
-                self.problem(format!("{name}_FILE: {}", describe_file_error(path, &err)));
+                let text = format!("{name}_FILE: {}", describe_file_error(path, &err));
+                self.problem(&field, text);
                 return Secret::default();
             }
         };
         let Ok(text) = std::str::from_utf8(&content) else {
-            self.problem(format!("{name}_FILE: {path} is not valid UTF-8"));
+            self.problem(&field, format!("{name}_FILE: {path} is not valid UTF-8"));
             return Secret::default();
         };
         let value = trim_final_newline(text);
         if value.is_empty() {
-            self.problem(format!("{name}_FILE: {path} is empty"));
+            self.problem(&field, format!("{name}_FILE: {path} is empty"));
         }
         Secret::new(value.to_owned())
     }
@@ -113,10 +127,13 @@ impl<'a> Reader<'a> {
         if let Some(number) = atoi(&value).filter(|number| (low..=high).contains(number)) {
             return number;
         }
-        self.problem(format!(
-            "{name}: use a whole number from {low} to {high} (got {})",
-            go_quote(&value)
-        ));
+        self.problem(
+            &name.to_ascii_lowercase(),
+            format!(
+                "{name}: use a whole number from {low} to {high} (got {})",
+                go_quote(&value)
+            ),
+        );
         fallback
     }
 }

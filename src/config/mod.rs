@@ -26,6 +26,8 @@ use url::{normalize_api_url, normalize_sei_url};
 pub const DEFAULT_TIME_ZONE: &str = "America/Sao_Paulo";
 pub const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(15 * 60);
 pub const MIN_POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
+const ONLY_ONE_PASSWORD: &str =
+    "set only one of SEI_PASSWORD, SEI_PASSWORD_FILE and SEI_PASSWORD_CMD";
 pub const SETTINGS: &str = include_str!("../../settings.json");
 
 type Lookup = Box<dyn Fn(&str) -> Option<String> + Send + Sync>;
@@ -56,10 +58,30 @@ fn not_utf8(value: Option<OsString>) -> bool {
     value.is_some_and(|value| value.to_str().is_none())
 }
 
+/// An empty path stands for the configuration as a whole.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfigProblem {
+    pub path: String,
+    pub text: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("invalid configuration:\n  - {}", .problems.join("\n  - "))]
+#[error(
+    "invalid configuration:\n  - {}",
+    .problems.iter().map(|problem| problem.text.as_str()).collect::<Vec<_>>().join("\n  - ")
+)]
 pub struct ConfigError {
-    pub problems: Vec<String>,
+    pub problems: Vec<ConfigProblem>,
+}
+
+impl ConfigError {
+    #[cfg(test)]
+    pub(crate) fn texts(&self) -> Vec<String> {
+        self.problems
+            .iter()
+            .map(|problem| problem.text.clone())
+            .collect()
+    }
 }
 
 pub enum PasswordSetting {
@@ -175,7 +197,7 @@ fn sei_url(reader: &mut Reader) -> String {
         return value;
     }
     normalize_sei_url(&value).unwrap_or_else(|problem| {
-        reader.problem(problem);
+        reader.problem("sei_url", problem);
         String::new()
     })
 }
@@ -186,24 +208,30 @@ fn api_url(reader: &mut Reader) -> String {
         return value;
     }
     normalize_api_url(&value).unwrap_or_else(|problem| {
-        reader.problem(problem);
+        reader.problem("sei_api_url", problem);
         String::new()
     })
 }
 
 fn sei_password(reader: &mut Reader) -> PasswordSetting {
     let command_set = !reader.text("SEI_PASSWORD_CMD").is_empty();
+    let password_set = reader.has_secret("SEI_PASSWORD");
     let options = [
-        reader.has_secret("SEI_PASSWORD"),
+        password_set,
         !reader.text("SEI_PASSWORD_FILE").is_empty(),
         command_set,
     ];
-    let problem = match options.iter().filter(|set| **set).count() {
-        0 => "SEI_PASSWORD is required (or SEI_PASSWORD_FILE, or SEI_PASSWORD_CMD)",
+    // Only SEI_PASSWORD can be cleared on the page; the file and the command live in the .env.
+    let (path, problem) = match options.iter().filter(|set| **set).count() {
+        0 => (
+            "sei_password",
+            "SEI_PASSWORD is required (or SEI_PASSWORD_FILE, or SEI_PASSWORD_CMD)",
+        ),
         1 => return chosen_password(reader, command_set),
-        _ => "set only one of SEI_PASSWORD, SEI_PASSWORD_FILE and SEI_PASSWORD_CMD",
+        _ if password_set => ("sei_password", ONLY_ONE_PASSWORD),
+        _ => ("", ONLY_ONE_PASSWORD),
     };
-    reader.problem(problem.to_owned());
+    reader.problem(path, problem.to_owned());
     PasswordSetting::Static(Secret::default())
 }
 
@@ -214,15 +242,15 @@ fn chosen_password(reader: &mut Reader, command_set: bool) -> PasswordSetting {
     let command = match PasswordCommand::new(&reader.text("SEI_PASSWORD_CMD")) {
         Ok(command) => command,
         Err(problem) => {
-            reader.problem(problem);
+            reader.problem("sei_password_cmd", problem);
             return PasswordSetting::Static(Secret::default());
         }
     };
     if !look_path(command.program(), reader.lookup("PATH").as_deref()) {
-        reader.problem(format!(
-            "SEI_PASSWORD_CMD: program not found: {}",
-            command.program()
-        ));
+        reader.problem(
+            "sei_password_cmd",
+            format!("SEI_PASSWORD_CMD: program not found: {}", command.program()),
+        );
     }
     PasswordSetting::Command(command)
 }
@@ -235,10 +263,13 @@ fn zone(reader: &mut Reader) -> Tz {
         &text
     };
     load_zone(name).unwrap_or_else(|| {
-        reader.problem(format!(
-            "SEI_TIMEZONE: unknown time zone {} (e.g. America/Boa_Vista)",
-            go_quote(name)
-        ));
+        reader.problem(
+            "sei_timezone",
+            format!(
+                "SEI_TIMEZONE: unknown time zone {} (e.g. America/Boa_Vista)",
+                go_quote(name)
+            ),
+        );
         Tz::UTC
     })
 }
@@ -258,9 +289,17 @@ fn units(value: &str) -> (Vec<String>, bool) {
 }
 
 fn database_url(reader: &mut Reader) -> Secret {
+    let from_file =
+        !reader.has_secret("DATABASE_URL") && !reader.text("DATABASE_URL_FILE").is_empty();
+    let path = if from_file {
+        "database_url_file"
+    } else {
+        "database_url"
+    };
     let value = reader.secret("DATABASE_URL");
     if value.is_empty() {
         reader.problem(
+            path,
             "DATABASE_URL: set the Postgres address, postgres://user:password@host/database"
                 .to_owned(),
         );
@@ -273,7 +312,10 @@ fn database_url(reader: &mut Reader) -> Secret {
             .is_some_and(|rest| !rest.is_empty())
     });
     if !valid {
-        reader.problem("DATABASE_URL: use postgres://user:password@host/database".to_owned());
+        reader.problem(
+            path,
+            "DATABASE_URL: use postgres://user:password@host/database".to_owned(),
+        );
     }
     value
 }
@@ -284,15 +326,18 @@ fn poll_interval(reader: &mut Reader) -> Duration {
         return DEFAULT_POLL_INTERVAL;
     }
     let Some(nanos) = parse_go_duration(&value) else {
-        reader.problem(format!(
-            "POLL_INTERVAL: use a duration such as 15m or 1h (got {})",
-            go_quote(&value)
-        ));
+        reader.problem(
+            "poll_interval",
+            format!(
+                "POLL_INTERVAL: use a duration such as 15m or 1h (got {})",
+                go_quote(&value)
+            ),
+        );
         return DEFAULT_POLL_INTERVAL;
     };
     let minimum = nanos_of(MIN_POLL_INTERVAL);
     if nanos < minimum {
-        reader.problem(format!(
+        reader.problem("poll_interval", format!(
             "POLL_INTERVAL: the minimum is {}, to keep the load on the agency's SEI low (got {value})",
             format_go_duration(minimum)
         ));
@@ -311,7 +356,7 @@ fn retention_days(reader: &mut Reader, return_warning_days: i64) -> i64 {
     if days == 0 || days >= minimum {
         return days;
     }
-    reader.problem(format!(
+    reader.problem("retention_days", format!(
         "RETENTION_DAYS: keep events for at least {minimum} days, RETURN_WARNING_DAYS plus 2, or use 0 to keep them forever (got {days})"
     ));
     days
@@ -326,10 +371,10 @@ fn detail_level(reader: &mut Reader, name: &str, fallback: bool) -> bool {
     if let Some((_, full)) = LEVELS.iter().find(|(level, _)| *level == value) {
         return *full;
     }
-    reader.problem(format!(
-        "{name}: use minimal or full (got {})",
-        go_quote(&value)
-    ));
+    reader.problem(
+        &name.to_ascii_lowercase(),
+        format!("{name}: use minimal or full (got {})", go_quote(&value)),
+    );
     fallback
 }
 
@@ -337,10 +382,13 @@ fn log_level(reader: &mut Reader) -> i64 {
     let text = reader.text("LOG_LEVEL");
     let value = if text.is_empty() { "info" } else { &text };
     parse_level(value).unwrap_or_else(|| {
-        reader.problem(format!(
-            "LOG_LEVEL: use debug, info, warn or error (got {})",
-            go_quote(value)
-        ));
+        reader.problem(
+            "log_level",
+            format!(
+                "LOG_LEVEL: use debug, info, warn or error (got {})",
+                go_quote(value)
+            ),
+        );
         0
     })
 }

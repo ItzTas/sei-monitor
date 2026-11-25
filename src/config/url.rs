@@ -188,7 +188,7 @@ mod tests {
     fn outcome(
         result: Result<String, crate::config::ConfigError>,
     ) -> (Option<String>, Option<Vec<String>>) {
-        result.map_or_else(|err| (None, Some(err.problems)), |url| (Some(url), None))
+        result.map_or_else(|err| (None, Some(err.texts())), |url| (Some(url), None))
     }
 
     #[test]

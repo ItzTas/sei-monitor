@@ -3,6 +3,7 @@ use std::fs;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use monitor_hub_sdk::settings::{self, Field, FieldType};
@@ -61,11 +62,15 @@ fn with(changes: &[(&'static str, &'static str)]) -> Vec<(&'static str, &'static
     env
 }
 
-fn problems<T>(result: Result<T, ConfigError>) -> Vec<String> {
+fn refused<T>(result: Result<T, ConfigError>) -> ConfigError {
     match result {
         Ok(_) => panic!("the configuration loaded without problems"),
-        Err(err) => err.problems,
+        Err(err) => err,
     }
+}
+
+fn problems<T>(result: Result<T, ConfigError>) -> Vec<String> {
+    refused(result).texts()
 }
 
 fn loaded(env: &[(&str, &str)]) -> Config {
@@ -156,7 +161,7 @@ fn problems_never_show_secret_values() {
     };
 
     assert_eq!(
-        err.problems,
+        err.texts(),
         [
             "set only one of SEI_PASSWORD, SEI_PASSWORD_FILE and SEI_PASSWORD_CMD",
             "DATABASE_URL: use postgres://user:password@host/database",
@@ -428,7 +433,7 @@ fn outcome<T>(
 ) -> (Value, Option<Vec<String>>) {
     match result {
         Ok(value) => (record(&value), None),
-        Err(err) => (Value::Null, Some(err.problems)),
+        Err(err) => (Value::Null, Some(err.texts())),
     }
 }
 
@@ -596,4 +601,322 @@ fn the_declaration_keeps_files_and_programs_out_of_the_page() {
         detail.options.as_deref(),
         Some(["minimal".to_owned(), "full".to_owned()].as_slice())
     );
+}
+
+fn files_source<K: AsRef<str>, V: AsRef<str>>(env: &[(K, V)], files: &[(&str, &[u8])]) -> Source {
+    let env: BTreeMap<String, String> = env
+        .iter()
+        .map(|(name, value)| (name.as_ref().to_owned(), value.as_ref().to_owned()))
+        .collect();
+    let files: BTreeMap<String, Vec<u8>> = files
+        .iter()
+        .map(|(path, content)| ((*path).to_owned(), content.to_vec()))
+        .collect();
+    Source {
+        lookup: Box::new(move |name| env.get(name).cloned()),
+        read_file: Box::new(move |path| {
+            files
+                .get(path)
+                .cloned()
+                .ok_or_else(|| io::ErrorKind::NotFound.into())
+        }),
+        invalid_utf8: Box::new(|_| false),
+    }
+}
+
+type Changes<'a> = &'a [(&'a str, &'a str)];
+
+fn problem(path: &str, text: &str) -> ConfigProblem {
+    ConfigProblem {
+        path: path.to_owned(),
+        text: text.to_owned(),
+    }
+}
+
+#[test]
+fn every_problem_names_its_path() {
+    const ONLY_ONE: &str = "set only one of SEI_PASSWORD, SEI_PASSWORD_FILE and SEI_PASSWORD_CMD";
+    const NO_ADDRESS: &str =
+        "DATABASE_URL: set the Postgres address, postgres://user:password@host/database";
+    const NOT_POSTGRES: &str = "DATABASE_URL: use postgres://user:password@host/database";
+    const DATABASE: &[u8] = b"postgres://u:p@h/db\n";
+
+    let empty = golden::cases::<ConfigCase>("config", "/plugin")
+        .into_iter()
+        .find(|case| case.name == "empty environment")
+        .and_then(|case| case.problems)
+        .expect("the empty environment case");
+    let want: Vec<ConfigProblem> = [
+        "sei_url",
+        "sei_username",
+        "sei_password",
+        "sei_org",
+        "database_url",
+    ]
+    .iter()
+    .zip(&empty)
+    .map(|(path, text)| problem(path, text))
+    .collect();
+    let empty_source = files_source(&[("PATH", "/nonexistent")], &[]);
+    assert_eq!(refused(Config::load(&empty_source)).problems, want);
+
+    let cases: [(Changes, &[u8], Vec<ConfigProblem>); 21] = [
+        (
+            &[("SEI_URL", "ftp://x")],
+            DATABASE,
+            vec![problem(
+                "sei_url",
+                "SEI_URL: use a full address starting with https://",
+            )],
+        ),
+        (
+            &[("SEI_API_URL", "https://h/api?x")],
+            DATABASE,
+            vec![problem(
+                "sei_api_url",
+                "SEI_API_URL: remove everything after ? or #",
+            )],
+        ),
+        (
+            &[("SEI_PASSWORD_FILE", "/run/secrets/sei")],
+            DATABASE,
+            vec![problem("sei_password", ONLY_ONE)],
+        ),
+        (
+            &[
+                ("SEI_PASSWORD", ""),
+                ("SEI_PASSWORD_FILE", "/run/secrets/sei"),
+                ("SEI_PASSWORD_CMD", "sh"),
+            ],
+            DATABASE,
+            vec![problem("", ONLY_ONE)],
+        ),
+        (
+            &[
+                ("SEI_PASSWORD", ""),
+                ("SEI_PASSWORD_FILE", "/run/secrets/missing"),
+            ],
+            DATABASE,
+            vec![problem(
+                "sei_password_file",
+                "SEI_PASSWORD_FILE: /run/secrets/missing does not exist",
+            )],
+        ),
+        (
+            &[("SEI_PASSWORD", ""), ("SEI_PASSWORD_CMD", "'x")],
+            DATABASE,
+            vec![problem(
+                "sei_password_cmd",
+                "SEI_PASSWORD_CMD: unterminated quote or trailing backslash",
+            )],
+        ),
+        (
+            &[
+                ("SEI_PASSWORD", ""),
+                ("SEI_PASSWORD_CMD", "no-such-program-sei-monitor"),
+            ],
+            DATABASE,
+            vec![problem(
+                "sei_password_cmd",
+                "SEI_PASSWORD_CMD: program not found: no-such-program-sei-monitor",
+            )],
+        ),
+        (
+            &[("SEI_TIMEZONE", "Mars/Base")],
+            DATABASE,
+            vec![problem(
+                "sei_timezone",
+                "SEI_TIMEZONE: unknown time zone \"Mars/Base\" (e.g. America/Boa_Vista)",
+            )],
+        ),
+        (
+            &[("SEI_CONCURRENCY", "0")],
+            DATABASE,
+            vec![problem(
+                "sei_concurrency",
+                "SEI_CONCURRENCY: use a whole number from 1 to 10 (got \"0\")",
+            )],
+        ),
+        (
+            &[("RETURN_WARNING_DAYS", "61")],
+            DATABASE,
+            vec![problem(
+                "return_warning_days",
+                "RETURN_WARNING_DAYS: use a whole number from 0 to 60 (got \"61\")",
+            )],
+        ),
+        (
+            &[("RETENTION_DAYS", "3651")],
+            DATABASE,
+            vec![problem(
+                "retention_days",
+                "RETENTION_DAYS: use a whole number from 0 to 3650 (got \"3651\")",
+            )],
+        ),
+        (
+            &[("POLL_INTERVAL", "15")],
+            DATABASE,
+            vec![problem(
+                "poll_interval",
+                "POLL_INTERVAL: use a duration such as 15m or 1h (got \"15\")",
+            )],
+        ),
+        (
+            &[("POLL_INTERVAL", "1m")],
+            DATABASE,
+            vec![problem(
+                "poll_interval",
+                "POLL_INTERVAL: the minimum is 5m0s, to keep the load on the agency's SEI low (got 1m)",
+            )],
+        ),
+        (
+            &[("NOTIFICATION_DETAIL", "verbose")],
+            DATABASE,
+            vec![problem(
+                "notification_detail",
+                "NOTIFICATION_DETAIL: use minimal or full (got \"verbose\")",
+            )],
+        ),
+        (
+            &[("LOG_LEVEL", "loud")],
+            DATABASE,
+            vec![problem(
+                "log_level",
+                "LOG_LEVEL: use debug, info, warn or error (got \"loud\")",
+            )],
+        ),
+        (
+            &[("RETURN_WARNING_DAYS", "30"), ("RETENTION_DAYS", "31")],
+            DATABASE,
+            vec![problem(
+                "retention_days",
+                "RETENTION_DAYS: keep events for at least 32 days, RETURN_WARNING_DAYS plus 2, or use 0 to keep them forever (got 31)",
+            )],
+        ),
+        (
+            &[("RETURN_WARNING_DAYS", "x"), ("RETENTION_DAYS", "3")],
+            DATABASE,
+            vec![
+                problem(
+                    "return_warning_days",
+                    "RETURN_WARNING_DAYS: use a whole number from 0 to 60 (got \"x\")",
+                ),
+                problem(
+                    "retention_days",
+                    "RETENTION_DAYS: keep events for at least 4 days, RETURN_WARNING_DAYS plus 2, or use 0 to keep them forever (got 3)",
+                ),
+            ],
+        ),
+        (
+            &[("DATABASE_URL", "mysql://x")],
+            DATABASE,
+            vec![problem("database_url", NOT_POSTGRES)],
+        ),
+        (
+            &[("DATABASE_URL_FILE", "/run/secrets/db")],
+            DATABASE,
+            vec![
+                problem(
+                    "database_url",
+                    "set either DATABASE_URL or DATABASE_URL_FILE, not both",
+                ),
+                problem("database_url", NO_ADDRESS),
+            ],
+        ),
+        (
+            &[
+                ("DATABASE_URL", ""),
+                ("DATABASE_URL_FILE", "/run/secrets/missing"),
+            ],
+            DATABASE,
+            vec![
+                problem(
+                    "database_url_file",
+                    "DATABASE_URL_FILE: /run/secrets/missing does not exist",
+                ),
+                problem("database_url_file", NO_ADDRESS),
+            ],
+        ),
+        (
+            &[
+                ("DATABASE_URL", ""),
+                ("DATABASE_URL_FILE", "/run/secrets/db"),
+            ],
+            b"mysql://u:p@h/db\n",
+            vec![problem("database_url_file", NOT_POSTGRES)],
+        ),
+    ];
+    let path: Changes = &[("PATH", "/nonexistent")];
+    for (changes, database, want) in cases {
+        let env = minimal(&[changes, path].concat());
+        let files: [(&str, &[u8]); 2] = [
+            ("/run/secrets/sei", b"s3cr3t-file\n"),
+            ("/run/secrets/db", database),
+        ];
+        let got = refused(Config::load(&files_source(&env, &files))).problems;
+        assert_eq!(got, want, "{changes:?}");
+    }
+}
+
+#[test]
+fn every_problem_names_a_declared_path() {
+    let Some(program_dir) = FakeProgramDir::create("paths-test") else {
+        return;
+    };
+    let fields = declared();
+    let names = names_where(&fields, |_| true);
+    for case in golden::cases::<ConfigCase>("config", "/plugin") {
+        let Err(err) = Config::load(&case_source(&case, &program_dir)) else {
+            continue;
+        };
+        for problem in err.problems {
+            assert!(
+                problem.path.is_empty() || names.contains(problem.path.as_str()),
+                "{}: {problem:?}",
+                case.name
+            );
+        }
+    }
+}
+
+fn recorded(source: Source, asked: &Arc<Mutex<BTreeSet<String>>>) -> Source {
+    let record = |asked: Arc<Mutex<BTreeSet<String>>>| {
+        move |name: &str| {
+            asked.lock().unwrap().insert(name.to_owned());
+        }
+    };
+    let (on_lookup, on_invalid) = (record(Arc::clone(asked)), record(Arc::clone(asked)));
+    let Source {
+        lookup,
+        read_file,
+        invalid_utf8,
+    } = source;
+    Source {
+        lookup: Box::new(move |name| {
+            on_lookup(name);
+            lookup(name)
+        }),
+        read_file,
+        invalid_utf8: Box::new(move |name| {
+            on_invalid(name);
+            invalid_utf8(name)
+        }),
+    }
+}
+
+#[test]
+fn the_reader_asks_only_for_declared_variables() {
+    let asked = Arc::new(Mutex::new(BTreeSet::new()));
+    let envs: [Changes; 2] = [&[], &[("SEI_PASSWORD_CMD", "sh"), ("PATH", "/nonexistent")]];
+    for env in envs {
+        let _ = Config::load(&recorded(source(env), &asked));
+    }
+
+    let mut asked = asked.lock().unwrap().clone();
+    assert!(asked.remove("PATH"), "{asked:?}");
+    let variables: BTreeSet<String> = declared()
+        .into_iter()
+        .filter_map(|field| field.env)
+        .collect();
+    assert_eq!(asked, variables);
 }

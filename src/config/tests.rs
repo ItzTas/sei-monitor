@@ -1,10 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use monitor_hub_sdk::settings::{self, Field, FieldType};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -457,4 +458,142 @@ fn config_matches_go() {
         });
         assert_eq!(got, (case.result, case.problems), "sei_url: {}", case.name);
     }
+}
+
+fn declared() -> Vec<Field> {
+    match settings::parse(SETTINGS.as_bytes()) {
+        Ok(declaration) => declaration.fields,
+        Err(err) => panic!("{err}"),
+    }
+}
+
+fn names_where(fields: &[Field], keep: impl Fn(&Field) -> bool) -> BTreeSet<&str> {
+    fields
+        .iter()
+        .filter(|field| keep(field))
+        .map(|field| field.name.as_str())
+        .collect()
+}
+
+#[test]
+fn the_declaration_is_version_2() {
+    let fields = declared();
+
+    let names: Vec<&str> = fields.iter().map(|field| field.name.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "sei_url",
+            "sei_api_url",
+            "sei_username",
+            "sei_org",
+            "sei_password",
+            "sei_password_file",
+            "sei_password_cmd",
+            "sei_timezone",
+            "sei_units",
+            "poll_interval",
+            "sei_concurrency",
+            "retention_days",
+            "return_warning_days",
+            "notification_detail",
+            "database_url",
+            "database_url_file",
+            "log_level",
+        ]
+    );
+    for field in &fields {
+        assert_eq!(
+            field.env,
+            Some(field.name.to_ascii_uppercase()),
+            "{}",
+            field.name
+        );
+        assert!(
+            field.fields.is_none() && field.items.is_none(),
+            "{}",
+            field.name
+        );
+    }
+}
+
+#[test]
+fn declared_defaults_are_todays() {
+    let defaults: BTreeMap<String, Value> = declared()
+        .into_iter()
+        .filter_map(|field| Some((field.env?, field.default?)))
+        .collect();
+    let today = [
+        ("SEI_TIMEZONE", "America/Sao_Paulo"),
+        ("POLL_INTERVAL", "15m"),
+        ("SEI_CONCURRENCY", "3"),
+        ("RETENTION_DAYS", "90"),
+        ("RETURN_WARNING_DAYS", "2"),
+        ("NOTIFICATION_DETAIL", "minimal"),
+        ("LOG_LEVEL", "info"),
+    ];
+    assert_eq!(
+        defaults,
+        today
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), json!(value)))
+            .collect::<BTreeMap<_, _>>()
+    );
+
+    let load = |changes: &[(&str, &str)]| match Config::load(&source(&minimal(changes))) {
+        Ok(config) => config_record(&config),
+        Err(err) => panic!("{err}"),
+    };
+    let without = load(&[]);
+    for pair in today {
+        assert_eq!(load(&[pair]), without, "{}={}", pair.0, pair.1);
+    }
+}
+
+#[test]
+fn the_declaration_keeps_files_and_programs_out_of_the_page() {
+    let fields = declared();
+
+    assert_eq!(
+        names_where(&fields, |field| field.editable == Some(false)),
+        BTreeSet::from(["database_url_file", "sei_password_cmd", "sei_password_file"])
+    );
+    for field in fields.iter().filter(|field| !field.is_editable()) {
+        assert!(
+            field
+                .reason
+                .as_deref()
+                .is_some_and(|reason| !reason.is_empty()),
+            "{}",
+            field.name
+        );
+    }
+    assert_eq!(
+        names_where(&fields, |field| field.secret),
+        BTreeSet::from(["database_url", "sei_password", "sei_password_cmd"])
+    );
+    assert_eq!(
+        names_where(&fields, |field| field.required),
+        BTreeSet::from(["sei_org", "sei_url", "sei_username"])
+    );
+
+    let kinds = BTreeMap::from([
+        ("notification_detail", FieldType::Choice),
+        ("poll_interval", FieldType::Duration),
+    ]);
+    for field in &fields {
+        let kind = kinds
+            .get(field.name.as_str())
+            .copied()
+            .unwrap_or(FieldType::String);
+        assert_eq!(field.kind, kind, "{}", field.name);
+    }
+    let detail = fields
+        .iter()
+        .find(|field| field.name == "notification_detail")
+        .unwrap();
+    assert_eq!(
+        detail.options.as_deref(),
+        Some(["minimal".to_owned(), "full".to_owned()].as_slice())
+    );
 }

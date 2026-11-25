@@ -34,6 +34,7 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && touch src/lib.rs && cargo fetch --locked
 
 COPY src src
+COPY settings.json ./
 COPY sql/schema sql/schema
 COPY testdata/golden/html_entities.json testdata/golden/html_entities.json
 

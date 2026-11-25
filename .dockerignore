@@ -4,6 +4,7 @@
 !Cargo.lock
 !rust-toolchain.toml
 !monitor.json
+!settings.json
 !src
 !sql/schema/*.sql
 !testdata/golden/html_entities.json

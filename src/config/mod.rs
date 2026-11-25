@@ -26,6 +26,7 @@ use url::{normalize_api_url, normalize_sei_url};
 pub const DEFAULT_TIME_ZONE: &str = "America/Sao_Paulo";
 pub const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(15 * 60);
 pub const MIN_POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
+pub const SETTINGS: &str = include_str!("../../settings.json");
 
 type Lookup = Box<dyn Fn(&str) -> Option<String> + Send + Sync>;
 type ReadFile = Box<dyn Fn(&str) -> std::io::Result<Vec<u8>> + Send + Sync>;

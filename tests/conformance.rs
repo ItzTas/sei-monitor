@@ -74,6 +74,7 @@ fn monitor_conformance(sei_url: &str, database_url: &str, sockets: &ShortTempDir
     .collect();
     conformance.min_events = 1;
     conformance.ready_timeout = READY_LIMIT;
+    conformance.monitor_dir = Some(env!("CARGO_MANIFEST_DIR").into());
     conformance
 }
 

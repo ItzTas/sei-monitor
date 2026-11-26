@@ -264,7 +264,7 @@ fn usage_errors_exit_2_and_help_and_version_exit_0() {
 
     let version = run_to_exit(&["--version"], &[], EXIT_LIMIT);
     assert_eq!(version.status.code(), Some(0), "{}", version.stderr);
-    assert_eq!(version.stdout, "sei-monitor 2.3.0\n");
+    assert_eq!(version.stdout, "sei-monitor 2.4.0\n");
 
     let help = run_to_exit(&["--help"], &[], EXIT_LIMIT);
     assert_eq!(help.status.code(), Some(0), "{}", help.stderr);

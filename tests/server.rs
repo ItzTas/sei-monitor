@@ -250,7 +250,7 @@ async fn describe_names_the_monitor_and_its_kinds() {
 
     assert_eq!(described.name, "sei");
     assert_eq!(described.display_name, "SEI");
-    assert_eq!(described.version, "2.3.0");
+    assert_eq!(described.version, "2.4.0");
     let expected: Vec<EventKind> = Kind::ALL
         .iter()
         .map(|kind| EventKind {

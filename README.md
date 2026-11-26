@@ -32,10 +32,10 @@ message for every process you had before; reports start with the second check.
 
 ## How monitor-hub runs it
 
-The image `ghcr.io/itztas/sei-monitor` holds two files: `/monitor/monitor.json` and the static binary
-`/monitor/sei-monitor`, built for amd64 and arm64. The hub's `monitors.json` names the image, and the
-hub's image build copies `/monitor/` to `/opt/monitor-hub/monitors/sei/`. The manifest tells the hub
-to run `sei-monitor monitor`:
+The image `ghcr.io/itztas/sei-monitor` holds three files: `/monitor/monitor.json`,
+`/monitor/settings.json` and the static binary `/monitor/sei-monitor`, built for amd64 and arm64.
+The hub's `monitors.json` names the image, and the hub's image build copies `/monitor/` to
+`/opt/monitor-hub/monitors/sei/`. The manifest tells the hub to run `sei-monitor monitor`:
 
 ```json
 {"protocol_version":2,"name":"sei","command":["sei-monitor","monitor"],"apk":[]}
@@ -47,6 +47,12 @@ Set the monitor's variables in the hub's `.env` with the `SEI__` prefix: `SEI__S
 `SEI__DATABASE_URL` and so on. The hub gives the monitor only the variables with that prefix, with
 the prefix removed, plus its own `PATH`, `TZ`, `TMPDIR` and `MONITOR_HUB_DATA_DIR`. A misspelled
 name is not an error: the monitor never sees it.
+
+The monitor reads its settings as one configuration document, whose fields `settings.json`
+declares. A hub that hands documents over passes it at every start on the descriptor named by
+`MONITOR_HUB_CONFIG_FD`, and the monitor reads it once, at start-up, and closes it. The hub
+releases up to v0.3.0 hand over no document. They pass the `SEI__` variables without the prefix,
+as above, and the monitor builds the same document from them.
 
 Run the image by hand and it prints that the hub did not launch it, then exits with code 1.
 
@@ -97,13 +103,26 @@ the call again.
 | `NOTIFICATION_DETAIL` | `minimal` | `minimal` or `full`, see [Detail level](#detail-level). |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
 
+Set these in the hub's `.env` with the `SEI__` prefix. `settings.json` declares each variable as a
+field named after it in lower case: `sei_url` for `SEI_URL`, and so on. The hub's settings page,
+which comes in a later hub release, will change every field except `SEI_PASSWORD_CMD`,
+`SEI_PASSWORD_FILE` and `DATABASE_URL_FILE`. Those three make the monitor run a program or read a
+file inside the hub's container, so they stay in `.env`. Saving on the page will restart the
+monitor, and with the right password each restart is one login. A value made only of spaces takes
+the default.
+
 A bad value stops the monitor at start-up with one `fatal` line in the hub's log that lists every
-problem at once. The hub then restarts it with a back-off until the configuration is fixed.
+problem at once. The hub then restarts it with a back-off until the configuration is fixed. A
+configuration document with a field `settings.json` does not declare, or with a value that is
+neither text nor `null`, is refused with `the configuration document does not match
+settings.json`. `SEI_PASSWORD`, `SEI_PASSWORD_CMD` or `DATABASE_URL` holding such a value gets
+`must be string` instead. Neither message shows the value.
 
 The monitor is stricter about its database than the Go release was. Point `DATABASE_URL` straight
 at Postgres, not at a transaction pooler, and put the host, port, user, password and database in
 it. The monitor checks the address when it takes its database lock, and a bad one stops the start
-with a message that never shows the address:
+with a message that never shows the address. `validate-settings` refuses the same addresses with
+the same messages:
 
 - With no password, or an empty one: `DATABASE_URL has no password: add the role's password to
   the URL`. If the database trusts the role without a password, put any password there; Postgres
@@ -281,7 +300,7 @@ check by hand:
 
 ## Operator commands
 
-The binary has three commands for you, besides `monitor`:
+The binary has three commands for you, besides `monitor` and `validate-settings`:
 
 | Command | What it does |
 |---|---|
@@ -317,6 +336,19 @@ exec /opt/monitor-hub/monitors/sei/sei-monitor "$@"' sei test-login
 Put `orgs` or `diagnose` in place of `test-login` at the end. When the hub reads the password from
 `SEI__SEI_PASSWORD_FILE` or `SEI__SEI_PASSWORD_CMD`, the command uses the same file or program.
 Ctrl+C stops a command with exit code 130.
+
+The commands read only the environment, never a configuration document, and each one reads only
+its own variables: `orgs` reads `SEI_URL`, and `test-login` and `diagnose` read the names in
+`names` above. A value saved only on the hub's settings page, once there is one, never reaches
+them, so the script above stays the way to run them.
+
+`validate-settings` is for the hub. It reads the configuration the way the monitor's start does,
+from the document or from the environment, and prints one JSON object that lists every problem
+with the path of its field, such as
+`{"problems":[{"path":"sei_username","message":"SEI_USERNAME is required"}]}`. It exits with 0 when
+the list is empty and 1 otherwise. It refuses a database address that the start would refuse, with
+the same message. It needs no cookie from the hub, never talks to SEI or to the database, never
+runs the password command, and never prints a secret.
 
 ## Switching from the Go release to the monitor
 
@@ -494,6 +526,9 @@ The monitor was checked against the Go release's own output. These differences a
   `rustup run` with the toolchain in `rust-toolchain.toml` when `rustup` is installed, so another
   cargo earlier on `PATH` is never used by accident.
 - No test talks to a real SEI. A fake server in `tests/support/` plays its part.
+- A new variable is a new field in `settings.json` and in `SettingsDocument`
+  (`src/config/mod.rs`), with its line in `SettingsDocument::variable`. `tests/settings.rs` and
+  `the_reader_asks_only_for_declared_variables` fail while either field is missing.
 - To run the operator commands from a checkout, export the plain variables and run
   `cargo run -- test-login`. The binary never reads `.env`.
 

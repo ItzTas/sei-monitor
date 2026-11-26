@@ -9,9 +9,10 @@ account, lists the processes of the watched units every `POLL_INTERVAL`, and rec
 events in Postgres. The hub reads those events and sends the notifications. The monitor is written in
 Rust on the monitor-hub SDK (`monitor-hub-sdk`, git tag `sdk-rust/v0.5.0`).
 
-The image does not run on its own. It holds `/monitor/monitor.json` and `/monitor/sei-monitor`, and the
-hub's image build copies that directory in. Release `1.0.0` was a standalone Go service with its own
-notifications, feed, API and web page. Its code is gone from the tree.
+The image does not run on its own. It holds `/monitor/monitor.json`, `/monitor/settings.json` and
+`/monitor/sei-monitor`, and the hub's image build copies that directory in. Release `1.0.0` was a
+standalone Go service with its own notifications, feed, API and web page. Its code is gone from the
+tree.
 
 ## Code
 
@@ -32,8 +33,8 @@ notifications, feed, API and web page. Its code is gone from the tree.
   into the binary (`chrono-tz`). Nothing reads `TZ` or the local zone.
 - The SEI password, the session token and `DATABASE_URL` never appear in a log, an error, a gRPC
   message, an event, command output or a `Debug` output. They live in `Secret` (prints
-  `[redacted]`, zeroed on drop), and `Config`, `SeiConfig`, `Credentials` and `Store` do not
-  derive `Debug`.
+  `[redacted]`, zeroed on drop), and `Config`, `SeiConfig`, `SettingsDocument`, `Credentials`
+  and `Store` do not derive `Debug`.
 - Code that calls SEI concurrently drops the pending calls at the first error and never spawns a
   detached task for a SEI call. Each wrong password costs one rejected login, and enough of them
   lock the account.
@@ -96,7 +97,10 @@ skipping.
   `tests/store.rs` use it and wait out the whole 30 s loss limit, so that binary takes about 33 s.
 - The conformance command for `tests/conformance.rs`: the binary named by `MONITOR_CONFORMANCE`, or
   else `go install` of `monitor-conformance` at the SDK's Go tag `sdk-go/v0.7.0`, which also checks
-  `Watch` on the real binary.
+  `Watch` on the real binary, and `settings.json` and `validate-settings` in the repository's
+  directory.
+- `tests/settings.rs` runs the SDK testkit on the same file and validator, and checks that
+  `SettingsDocument` reads every declared field and refuses any other.
 
 The signal tests subscribe with `Notifier::subscribe` and wait for a signal with a bounded
 `timeout` on `Signals::changed` (`support::next_signal`, 5 s), or look for one without waiting
@@ -138,16 +142,39 @@ test that reads the list prints the command that regenerates it.
 
 ## Configuration
 
-Under monitor-hub, set these on the hub with the `SEI__` prefix (`SEI__SEI_URL` and so on). The hub
-removes the prefix before it starts the monitor. The monitor reads only its environment, never a
-`.env`. `config::Config::load` collects every problem and reports them together, with Go's
-texts, and never shows a secret value.
+Under monitor-hub, set these in the hub's `.env` with the `SEI__` prefix (`SEI__SEI_URL` and so
+on). `settings.json` (embedded as `config::SETTINGS`) declares each one as a top-level field named
+after it in lower case, with `env` set to the variable's name. The monitor never reads a `.env`.
+
+The configuration is one document. `config::load_document` calls the SDK's
+`monitor_hub_sdk::config::load`: it reads the document from the descriptor named by
+`MONITOR_HUB_CONFIG_FD` when the hub hands one over, once per process, and closes it. Without one
+it builds the same document from the environment through the SDK's env bridge. The hub releases
+up to v0.3.0 hand over no document and pass the variables without the prefix, so today the monitor
+always takes the bridge. `SettingsDocument` is the document's shape: 17 `Option<String>` fields
+with `deny_unknown_fields`. A document it refuses gives one problem with an empty path, `the
+configuration document does not match settings.json`. A secret field (`sei_password`,
+`sei_password_cmd`, `database_url`) holding neither text nor `null` gives `must be string` on its
+path, checked before serde, whose errors quote the value. The reader then looks each value up by
+the variable's name.
+
+Defaults live only in `settings.json`. A value that is empty after Go's trim, such as one made only
+of spaces, takes the declared default. `config::Config::load` collects every problem and reports
+them together, with Go's texts, and never shows a secret value. Each problem carries the path of
+its field: the variable's name in lower case, `<name>_file` for a failed read of a `_FILE`,
+`database_url_file` when the bad address came from that file, `sei_password` or an empty path for
+two password sources (empty when only the file and the command are set), and the SDK's path for
+the bridge's own problems.
+
+`PATH`, the `PG*` variables and the proxy variables (`HTTP_PROXY` and its siblings) are not
+fields. They are still read from the process environment.
 
 - `DATABASE_URL` (required, secret, or `DATABASE_URL_FILE`): the Postgres address, as
   `postgres://user:password@host:port/database?sslmode=disable` (`postgresql://` works too). Put
   the host, port, user, password and database in the URL. The configuration refuses any other
   scheme, the key=value form included, with Go's text `DATABASE_URL: use
-  postgres://user:password@host/database`. Start-up checks the rest when it takes the writer lock.
+  postgres://user:password@host/database`. Start-up checks the rest when it takes the writer lock,
+  and `validate-settings` runs the same checks without connecting.
   - The password goes in the address or in a `password` query key. A URL without one, or with an
     empty one, is refused with `DATABASE_URL has no password: add the role's password to the URL`.
     Without a password in the URL, sqlx would read `PGPASSWORD`, `PGPASSFILE` or `~/.pgpass`, and
@@ -203,9 +230,10 @@ src/
 ├── harden.rs               RLIMIT_CORE 0, PR_SET_DUMPABLE 0, umask 077
 ├── app.rs                  monitor start-up: writer lock, migrations, store, monitor, serve, shutdown
 ├── server.rs               SeiMonitor: Describe, Status, Check and Events
-├── cli/                    clap commands and exit codes (mod.rs), orgs and test-login
-│                           (commands.rs), diagnose (diagnose.rs)
-├── config/                 Source, ConfigError, SeiConfig, Config (mod.rs); the problem
+├── cli/                    clap commands, exit codes and validate-settings (mod.rs), orgs and
+│                           test-login (commands.rs), diagnose (diagnose.rs)
+├── config/                 SETTINGS, SettingsDocument, Source, load_document, operator_source,
+│                           ConfigProblem, ConfigError, SeiConfig, Config (mod.rs); the problem
 │                           collector (reader.rs); SEI_URL and SEI_API_URL as Go's net/url parses
 │                           them (url.rs, url/); the PATH lookup for SEI_PASSWORD_CMD (lookpath.rs)
 ├── gotext.rs               Go's text rules: quoting, EqualFold, Fields, case tables, Atoi, capped
@@ -245,6 +273,18 @@ tests/                      one file per area; tests/support/ holds the fake SEI
 - The hub starts `sei-monitor monitor` with its cookie variable. Started any other way, or with no
   command, the binary prints the SDK's `NOT_LAUNCHED_BY_HUB` text on stderr and exits 1.
 - Stdout carries only the handshake line. Logs go to stderr as JSON lines.
+- `sei-monitor validate-settings` answers the hub without the cookie. It loads the document the way
+  start-up does (descriptor or environment), runs `Config::load` and then, on a configuration that
+  loads, the `DATABASE_URL` checks of start-up (`store::check_database_url`, which builds the
+  connection options and connects to nothing). It prints `{"problems":[...]}` with one
+  `{"path","message"}` per problem and exits 0 or 1. It never opens a connection (neither SEI nor
+  Postgres), takes no lock, builds no runtime, never runs the `SEI_PASSWORD_CMD` program (it only
+  looks it up on `PATH`), reads the `_FILE` files as start-up does and drops their contents, starts
+  no log, and writes nothing on stderr or to disk. No message carries a password, `DATABASE_URL`,
+  a file's contents or an argument of the password command.
+- `orgs`, `test-login` and `diagnose` never read the descriptor. Each one builds its document from
+  the environment restricted to the variables it reads (`config::operator_source` with
+  `ORGS_VARIABLES` or `SEI_VARIABLES`), so a variable it does not read cannot stop it.
 - Start-up reads the configuration, takes the database writer lock (a Postgres advisory lock on a
   connection of its own), applies the migrations with `sea-orm-migration` on that connection, opens
   the pool and reads the highest event position ever issued and the id of the newest stored event,

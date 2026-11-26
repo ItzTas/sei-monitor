@@ -3,6 +3,7 @@ mod support;
 use std::ffi::OsString;
 use std::fs;
 use std::future::Future;
+use std::io::ErrorKind;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -117,8 +118,12 @@ fn runs_programs(dir: &Path) -> bool {
     fs::write(&probe, "#!/bin/sh\n").expect("write the probe");
     fs::set_permissions(&probe, fs::Permissions::from_mode(0o700))
         .expect("make the probe executable");
-    if std::process::Command::new(&probe).status().is_ok() {
-        return true;
+    let err = match std::process::Command::new(&probe).status() {
+        Ok(_) => return true,
+        Err(err) => err,
+    };
+    if err.kind() != ErrorKind::PermissionDenied {
+        panic!("run the probe in {}: {err}", dir.display());
     }
     let notice = format!(
         "the programs in {} cannot be executed (is the temporary directory mounted noexec?)",

@@ -51,6 +51,7 @@ RUN case "$TARGETARCH" in \
 FROM scratch
 
 COPY monitor.json /monitor/monitor.json
+COPY settings.json /monitor/settings.json
 COPY --from=build /out/sei-monitor /monitor/sei-monitor
 
 USER 65532:65532

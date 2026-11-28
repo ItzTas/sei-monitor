@@ -10,7 +10,7 @@ mod tests {
 
     #[test]
     fn user_agent_names_the_crate_version() {
-        assert_eq!(VERSION, "2.4.0");
-        assert_eq!(user_agent(), "sei-monitor/2.4.0");
+        assert_eq!(VERSION, "2.5.0");
+        assert_eq!(user_agent(), "sei-monitor/2.5.0");
     }
 }

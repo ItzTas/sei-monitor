@@ -17,8 +17,7 @@ const NO_PASSWORD: &str = "DATABASE_URL has no password: add the role's password
 
 const SCHEMES: [&str; 2] = ["postgres://", "postgresql://"];
 
-// sqlx has no client-side keepalive, so the server is asked to probe the connection instead,
-// with the values 2.1 set on the client.
+// sqlx has no client-side keepalive, so the server is asked to probe the connection instead.
 const KEEPALIVES: [(&str, &str); 4] = [
     ("tcp_keepalives_idle", "30"),
     ("tcp_keepalives_interval", "10"),
@@ -57,7 +56,7 @@ pub(crate) fn database_options(database_url: &Secret) -> Result<PgConnectOptions
     Ok(options.disable_statement_logging().options(KEEPALIVES))
 }
 
-// 2.1 refused an address without a host; sqlx would fall back to PGHOST, a socket or localhost.
+// Without a host in the address, sqlx would fall back to PGHOST, a socket or localhost.
 fn names_a_host(url: &Url) -> bool {
     url.has_host() || in_query(url, &["host", "hostaddr"])
 }

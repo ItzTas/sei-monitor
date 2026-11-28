@@ -63,7 +63,7 @@ impl WriterLock {
             .await
             .map_err(StoreError::LockLost)?;
         // Read without creating the migration table, so a role with table rights only still
-        // starts once nothing is pending, as it did with 2.1.
+        // starts once nothing is pending.
         let pending = Migrator::get_pending_migrations_read_only(&transaction).await?;
         if !pending.is_empty() {
             Migrator::up(&transaction, None)

@@ -530,11 +530,13 @@ fn config_matches_go() {
         return;
     };
     // The frozen golden file names this group "plugin". LOG_LEVEL takes only the four level names,
-    // so the cases with slog's offsets, such as info-4, are left out.
+    // so the cases where Go accepted a slog offset, such as info-4, are left out.
     let level_offset = |case: &ConfigCase| {
-        case.env
-            .get("LOG_LEVEL")
-            .is_some_and(|level| level.contains(['+', '-']))
+        case.problems.is_none()
+            && case
+                .env
+                .get("LOG_LEVEL")
+                .is_some_and(|level| level.contains(['+', '-']))
     };
     for case in golden::cases::<ConfigCase>("config", "/plugin")
         .into_iter()

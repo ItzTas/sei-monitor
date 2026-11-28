@@ -1,0 +1,167 @@
+[
+  {
+    "text": "",
+    "limit": 5,
+    "output": ""
+  },
+  {
+    "text": "abcde",
+    "limit": 5,
+    "output": "abcde"
+  },
+  {
+    "text": "abcdef",
+    "limit": 5,
+    "output": "abcd…"
+  },
+  {
+    "text": "abcd",
+    "limit": 5,
+    "output": "abcd"
+  },
+  {
+    "text": "ãçéõú",
+    "limit": 5,
+    "output": "ãçéõú"
+  },
+  {
+    "text": "ãçéõúê",
+    "limit": 5,
+    "output": "ãçéõ…"
+  },
+  {
+    "text": "ãçéõ",
+    "limit": 5,
+    "output": "ãçéõ"
+  },
+  {
+    "text": "ab cd",
+    "limit": 5,
+    "output": "ab cd"
+  },
+  {
+    "text": "abcd efgh",
+    "limit": 6,
+    "output": "abcd…"
+  },
+  {
+    "text": "abcd efgh",
+    "limit": 5,
+    "output": "abcd…"
+  },
+  {
+    "text": "a  b\t\tc\n\nd",
+    "limit": 7,
+    "output": "a b c d"
+  },
+  {
+    "text": "a  b\t\tc\n\nd e",
+    "limit": 7,
+    "output": "a b c…"
+  },
+  {
+    "text": "  abcde  ",
+    "limit": 5,
+    "output": "abcde"
+  },
+  {
+    "text": "   ",
+    "limit": 5,
+    "output": ""
+  },
+  {
+    "text": " \t\n\r\u000b\f",
+    "limit": 5,
+    "output": ""
+  },
+  {
+    "text": " 　\u2028",
+    "limit": 5,
+    "output": ""
+  },
+  {
+    "text": "a b　c\u2028de",
+    "limit": 9,
+    "output": "a b c d e"
+  },
+  {
+    "text": "a b　c\u2028de f",
+    "limit": 9,
+    "output": "a b c d…"
+  },
+  {
+    "text": "a​b​c",
+    "limit": 5,
+    "output": "a​b​c"
+  },
+  {
+    "text": "a​b​c​",
+    "limit": 5,
+    "output": "a​b​…"
+  },
+  {
+    "text": "😀😀😀😀😀",
+    "limit": 5,
+    "output": "😀😀😀😀😀"
+  },
+  {
+    "text": "😀😀😀😀😀😀",
+    "limit": 5,
+    "output": "😀😀😀😀…"
+  },
+  {
+    "text": "ééé",
+    "limit": 5,
+    "output": "éé…"
+  },
+  {
+    "text": "ééé",
+    "limit": 6,
+    "output": "ééé"
+  },
+  {
+    "text": "abc",
+    "limit": 1,
+    "output": "…"
+  },
+  {
+    "text": "a",
+    "limit": 1,
+    "output": "a"
+  },
+  {
+    "text": "ab",
+    "limit": 2,
+    "output": "ab"
+  },
+  {
+    "text": "ãããããããããããããããããããããããããããããããããããããããã",
+    "limit": 40,
+    "output": "ãããããããããããããããããããããããããããããããããããããããã"
+  },
+  {
+    "text": "ããããããããããããããããããããããããããããããããããããããããã",
+    "limit": 40,
+    "output": "ããããããããããããããããããããããããããããããããããããããã…"
+  },
+  {
+    "text": "çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã",
+    "limit": 80,
+    "output": "çãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã"
+  },
+  {
+    "text": "éçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã",
+    "limit": 80,
+    "output": "éçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçãçã…"
+  },
+  {
+    "text": "Aquisição de cadeiras ergonômicas para o setor de protocolo",
+    "limit": 40,
+    "output": "Aquisição de cadeiras ergonômicas para…"
+  },
+  {
+    "text": "Processo remetido pela unidade SEDEMO/NUPROC\n  para a unidade SEDEMO/PROTOCOLO com retorno programado",
+    "limit": 80,
+    "output": "Processo remetido pela unidade SEDEMO/NUPROC para a unidade SEDEMO/PROTOCOLO co…"
+  }
+]

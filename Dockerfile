@@ -1,33 +1,61 @@
-FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine3.24 AS build
+FROM --platform=$BUILDPLATFORM rust:1.99.1-trixie AS build
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ARG ZIG_VERSION=0.17.0
+ARG CARGO_ZIGBUILD_VERSION=0.24.0
+ARG BUILDARCH
+RUN case "$BUILDARCH" in \
+      amd64) arch=x86_64 \
+        zig_sha256=1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026 \
+        zigbuild_sha256=3ca25ee4348f9abd0932ed4debe826d246e20fb616d0201de5bd05e7f965e9d9 ;; \
+      arm64) arch=aarch64 \
+        zig_sha256=9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8 \
+        zigbuild_sha256=de42626985f428033078dfc12ac8a59ee713f8e5627235ec883b1c899bee895c ;; \
+      *) echo "unsupported build platform: $BUILDARCH" >&2; exit 1 ;; \
+    esac \
+    && zigbuild="cargo-zigbuild-${arch}-unknown-linux-gnu" \
+    && curl -fsSLo /tmp/zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-${arch}-linux-${ZIG_VERSION}.tar.xz" \
+    && curl -fsSLo /tmp/zigbuild.tar.xz "https://github.com/rust-cross/cargo-zigbuild/releases/download/v${CARGO_ZIGBUILD_VERSION}/${zigbuild}.tar.xz" \
+    && echo "${zig_sha256}  /tmp/zig.tar.xz" | sha256sum -c - \
+    && echo "${zigbuild_sha256}  /tmp/zigbuild.tar.xz" | sha256sum -c - \
+    && mkdir /opt/zig \
+    && tar -xJf /tmp/zig.tar.xz -C /opt/zig --strip-components=1 \
+    && tar -xJf /tmp/zigbuild.tar.xz -C /usr/local/cargo/bin --strip-components=1 "${zigbuild}/cargo-zigbuild" \
+    && rm /tmp/zig.tar.xz /tmp/zigbuild.tar.xz
+ENV PATH="/opt/zig:${PATH}"
 
 WORKDIR /src
 
-COPY go.* ./
-RUN go mod download
+COPY rust-toolchain.toml ./
+RUN rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
 
-COPY . .
-ARG VERSION=dev
-ARG TARGETOS TARGETARCH
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
-      -trimpath \
-      -ldflags "-s -w -X github.com/ItzTas/sei-monitor/internal/core.version=${VERSION}" \
-      -o /out/sei-monitor .
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && touch src/lib.rs && cargo fetch --locked
 
-FROM alpine:3.24
+COPY src src
+COPY settings.json ./
+COPY sql/schema sql/schema
+COPY testdata/golden/html_entities.json testdata/golden/html_entities.json
 
-# hadolint ignore=DL3018
-RUN apk add --no-cache ca-certificates \
-    && addgroup -S -g 65532 sei-monitor \
-    && adduser -S -D -H -u 65532 -G sei-monitor sei-monitor
+ARG TARGETARCH
+RUN case "$TARGETARCH" in \
+      amd64) target=x86_64-unknown-linux-musl ;; \
+      arm64) target=aarch64-unknown-linux-musl ;; \
+      *) echo "unsupported target platform: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && cargo zigbuild --release --locked --target "$target" \
+    && mkdir /out \
+    && cp "target/${target}/release/sei-monitor" /out/sei-monitor
 
-COPY --from=build /out/sei-monitor /usr/local/bin/sei-monitor
+FROM scratch
+
+COPY monitor.json /monitor/monitor.json
+COPY settings.json /monitor/settings.json
+COPY --from=build /out/sei-monitor /monitor/sei-monitor
 
 USER 65532:65532
 
-EXPOSE 8080
+HEALTHCHECK NONE
 
-HEALTHCHECK --interval=1m --timeout=10s --start-period=5m --retries=3 \
-    CMD ["sh", "-c", "address=\"${HTTP_ADDRESS-:8080}\"; [ -z \"$address\" ] || wget -q -O /dev/null \"http://127.0.0.1:${address##*:}/healthz\""]
-
-ENTRYPOINT ["/usr/local/bin/sei-monitor"]
-CMD ["serve"]
+ENTRYPOINT ["/monitor/sei-monitor"]

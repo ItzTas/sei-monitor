@@ -1,0 +1,541 @@
+mod lookpath;
+mod reader;
+#[cfg(test)]
+pub(crate) mod tests;
+mod url;
+
+use std::ffi::OsString;
+use std::fs;
+use std::future::{Future, ready};
+use std::pin::Pin;
+use std::sync::{Arc, LazyLock};
+use std::time::Duration;
+
+use chrono_tz::Tz;
+use monitor_hub_sdk::config::{self, Document, LoadError};
+use monitor_hub_sdk::settings::{self, Field};
+use serde_json::Value;
+
+use crate::duration::{format_go_duration, parse_go_duration};
+use crate::gotext::{equal_fold, go_quote, to_lower, to_upper, trim};
+use crate::password::{PasswordCommand, PasswordCommandError, PasswordSource};
+use crate::secret::Secret;
+use crate::timezone::load_zone;
+use lookpath::look_path;
+use reader::Reader;
+pub(crate) use url::path_escape;
+use url::{normalize_api_url, normalize_sei_url};
+
+pub const MIN_POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
+const ONLY_ONE_PASSWORD: &str =
+    "set only one of SEI_PASSWORD, SEI_PASSWORD_FILE and SEI_PASSWORD_CMD";
+pub const SETTINGS: &str = include_str!("../../settings.json");
+/// What `load_sei_url` reads.
+pub const ORGS_VARIABLES: &[&str] = &["SEI_URL"];
+/// What `SeiConfig::load` reads, besides `PATH`.
+pub const SEI_VARIABLES: &[&str] = &[
+    "SEI_URL",
+    "SEI_API_URL",
+    "SEI_USERNAME",
+    "SEI_PASSWORD",
+    "SEI_PASSWORD_FILE",
+    "SEI_PASSWORD_CMD",
+    "SEI_ORG",
+    "SEI_TIMEZONE",
+    "SEI_CONCURRENCY",
+    "SEI_UNITS",
+];
+
+static FIELDS: LazyLock<Vec<Field>> = LazyLock::new(|| {
+    settings::parse(SETTINGS.as_bytes())
+        .map(|declaration| declaration.fields)
+        .unwrap_or_default()
+});
+
+type Lookup = Box<dyn Fn(&str) -> Option<String> + Send + Sync>;
+type ReadFile = Box<dyn Fn(&str) -> std::io::Result<Vec<u8>> + Send + Sync>;
+
+pub struct Source {
+    pub lookup: Lookup,
+    pub read_file: ReadFile,
+}
+
+impl Source {
+    pub fn document(document: Document) -> Result<Source, ConfigError> {
+        let path = std::env::var_os("PATH").map(|path| path.to_string_lossy().into_owned());
+        Source::with(document, path, Box::new(|path| fs::read(path)))
+    }
+
+    pub(crate) fn with(
+        document: Document,
+        path: Option<String>,
+        read_file: ReadFile,
+    ) -> Result<Source, ConfigError> {
+        let mistyped = mistyped_secrets(&document);
+        if !mistyped.is_empty() {
+            return Err(ConfigError { problems: mistyped });
+        }
+        // serde's error quotes the value it refuses, so its text stays out.
+        let Ok(fields) = serde_json::from_value::<SettingsDocument>(Value::Object(document)) else {
+            return Err(ConfigError {
+                problems: vec![ConfigProblem {
+                    path: String::new(),
+                    text: "the configuration document does not match settings.json".to_owned(),
+                }],
+            });
+        };
+        Ok(Source {
+            lookup: Box::new(move |name| {
+                if name == "PATH" {
+                    return path.clone();
+                }
+                fields.variable(name)
+            }),
+            read_file,
+        })
+    }
+}
+
+// A secret of another type is refused before serde, whose error would quote it.
+fn mistyped_secrets(document: &Document) -> Vec<ConfigProblem> {
+    FIELDS
+        .iter()
+        .filter(|field| field.secret)
+        .filter(|field| {
+            document
+                .get(&field.name)
+                .is_some_and(|value| !value.is_string() && !value.is_null())
+        })
+        .map(|field| ConfigProblem {
+            path: field.name.clone(),
+            text: "must be string".to_owned(),
+        })
+        .collect()
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SettingsDocument {
+    sei_url: Option<String>,
+    sei_api_url: Option<String>,
+    sei_username: Option<String>,
+    sei_org: Option<String>,
+    sei_password: Option<String>,
+    sei_password_file: Option<String>,
+    sei_password_cmd: Option<String>,
+    sei_timezone: Option<String>,
+    sei_units: Option<String>,
+    poll_interval: Option<String>,
+    sei_concurrency: Option<String>,
+    retention_days: Option<String>,
+    return_warning_days: Option<String>,
+    notification_detail: Option<String>,
+    database_url: Option<String>,
+    database_url_file: Option<String>,
+    log_level: Option<String>,
+}
+
+impl SettingsDocument {
+    fn variable(&self, name: &str) -> Option<String> {
+        let variables = [
+            ("SEI_URL", &self.sei_url),
+            ("SEI_API_URL", &self.sei_api_url),
+            ("SEI_USERNAME", &self.sei_username),
+            ("SEI_ORG", &self.sei_org),
+            ("SEI_PASSWORD", &self.sei_password),
+            ("SEI_PASSWORD_FILE", &self.sei_password_file),
+            ("SEI_PASSWORD_CMD", &self.sei_password_cmd),
+            ("SEI_TIMEZONE", &self.sei_timezone),
+            ("SEI_UNITS", &self.sei_units),
+            ("POLL_INTERVAL", &self.poll_interval),
+            ("SEI_CONCURRENCY", &self.sei_concurrency),
+            ("RETENTION_DAYS", &self.retention_days),
+            ("RETURN_WARNING_DAYS", &self.return_warning_days),
+            ("NOTIFICATION_DETAIL", &self.notification_detail),
+            ("DATABASE_URL", &self.database_url),
+            ("DATABASE_URL_FILE", &self.database_url_file),
+            ("LOG_LEVEL", &self.log_level),
+        ];
+        variables
+            .into_iter()
+            .find(|(variable, _)| *variable == name)
+            .and_then(|(_, value)| value.clone())
+    }
+}
+
+/// The hub's descriptor when it names one, else the environment. The SDK reads the descriptor once
+/// per process.
+pub fn load_document() -> Result<Source, ConfigError> {
+    Source::document(config::load(SETTINGS)?)
+}
+
+/// The environment restricted to `names`, so a variable the command does not read cannot refuse
+/// it. It never reads the descriptor.
+pub fn operator_source(names: &[&str]) -> Result<Source, ConfigError> {
+    operator_source_from(names, |name| std::env::var_os(name))
+}
+
+pub(crate) fn operator_source_from(
+    names: &[&str],
+    lookup: impl Fn(&str) -> Option<OsString>,
+) -> Result<Source, ConfigError> {
+    let declaration = settings::parse(SETTINGS.as_bytes()).map_err(LoadError::from)?;
+    let document = config::from_lookup(&declaration, |name| {
+        if !names.contains(&name) {
+            return None;
+        }
+        lookup(name)
+    })?;
+    Source::document(document)
+}
+
+/// An empty path stands for the configuration as a whole.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfigProblem {
+    pub path: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "invalid configuration:\n  - {}",
+    .problems.iter().map(|problem| problem.text.as_str()).collect::<Vec<_>>().join("\n  - ")
+)]
+pub struct ConfigError {
+    pub problems: Vec<ConfigProblem>,
+}
+
+impl From<LoadError> for ConfigError {
+    fn from(err: LoadError) -> ConfigError {
+        let problems = err
+            .problems()
+            .into_iter()
+            .map(|problem| ConfigProblem {
+                path: problem.path,
+                text: problem.message,
+            })
+            .collect();
+        ConfigError { problems }
+    }
+}
+
+impl ConfigError {
+    #[cfg(test)]
+    pub(crate) fn texts(&self) -> Vec<String> {
+        self.problems
+            .iter()
+            .map(|problem| problem.text.clone())
+            .collect()
+    }
+}
+
+pub enum PasswordSetting {
+    Static(Secret),
+    Command(PasswordCommand),
+}
+
+impl PasswordSource for PasswordSetting {
+    fn password(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<Secret, PasswordCommandError>> + Send + '_>> {
+        match self {
+            PasswordSetting::Static(secret) => Box::pin(ready(Ok(secret.clone()))),
+            PasswordSetting::Command(command) => command.password(),
+        }
+    }
+}
+
+pub struct SeiConfig {
+    pub url: String,
+    pub api_url: String,
+    pub username: String,
+    pub password: Arc<PasswordSetting>,
+    pub org: String,
+    pub units: Vec<String>,
+    pub all_units: bool,
+    pub zone: Tz,
+    pub concurrency: usize,
+}
+
+impl SeiConfig {
+    pub fn load(source: &Source) -> Result<SeiConfig, ConfigError> {
+        let mut reader = Reader::new(source);
+        let sei = read_sei(&mut reader);
+        reader.finish(sei)
+    }
+}
+
+pub struct Config {
+    pub sei: SeiConfig,
+    pub database_url: Secret,
+    pub poll_interval: Duration,
+    pub return_warning_days: i64,
+    pub retention_days: i64,
+    pub full_detail: bool,
+    pub log_level: i64,
+}
+
+impl Config {
+    pub fn load(source: &Source) -> Result<Config, ConfigError> {
+        let mut reader = Reader::new(source);
+        let full_detail = detail_level(&mut reader, "NOTIFICATION_DETAIL");
+        let return_warning_days = reader.integer("RETURN_WARNING_DAYS", 0, 60);
+        let sei = read_sei(&mut reader);
+        let database_url = database_url(&mut reader);
+        let poll_interval = poll_interval(&mut reader);
+        let retention_days = retention_days(&mut reader, return_warning_days);
+        let log_level = log_level(&mut reader);
+        reader.finish(Config {
+            sei,
+            database_url,
+            poll_interval,
+            return_warning_days,
+            retention_days,
+            full_detail,
+            log_level,
+        })
+    }
+
+    pub fn log_filter(&self) -> &'static str {
+        const FILTERS: [(i64, &str); 3] = [(-4, "debug"), (0, "info"), (4, "warn")];
+        FILTERS
+            .iter()
+            .find(|(limit, _)| self.log_level <= *limit)
+            .map_or("error", |(_, filter)| filter)
+    }
+}
+
+pub fn load_sei_url(source: &Source) -> Result<String, ConfigError> {
+    let mut reader = Reader::new(source);
+    let url = sei_url(&mut reader);
+    reader.finish(url)
+}
+
+fn read_sei(reader: &mut Reader) -> SeiConfig {
+    let url = sei_url(reader);
+    let api_url = api_url(reader);
+    let username = reader.required("SEI_USERNAME", "");
+    let password = Arc::new(sei_password(reader));
+    let org = reader.required(
+        "SEI_ORG",
+        " (acronym or numeric id; the orgs subcommand lists them)",
+    );
+    let zone = zone(reader);
+    let concurrency = reader.integer("SEI_CONCURRENCY", 1, 10);
+    let (units, all_units) = units(&reader.text("SEI_UNITS"));
+    SeiConfig {
+        url,
+        api_url,
+        username,
+        password,
+        org,
+        units,
+        all_units,
+        zone,
+        concurrency: usize::try_from(concurrency).unwrap_or_default(),
+    }
+}
+
+fn sei_url(reader: &mut Reader) -> String {
+    let value = reader.required("SEI_URL", " (the SEI address, e.g. https://sei.rr.gov.br)");
+    if value.is_empty() {
+        return value;
+    }
+    normalize_sei_url(&value).unwrap_or_else(|problem| {
+        reader.problem("sei_url", problem);
+        String::new()
+    })
+}
+
+fn api_url(reader: &mut Reader) -> String {
+    let value = reader.text("SEI_API_URL");
+    if value.is_empty() {
+        return value;
+    }
+    normalize_api_url(&value).unwrap_or_else(|problem| {
+        reader.problem("sei_api_url", problem);
+        String::new()
+    })
+}
+
+fn sei_password(reader: &mut Reader) -> PasswordSetting {
+    let command_set = !reader.text("SEI_PASSWORD_CMD").is_empty();
+    let password_set = reader.has_secret("SEI_PASSWORD");
+    let options = [
+        password_set,
+        !reader.text("SEI_PASSWORD_FILE").is_empty(),
+        command_set,
+    ];
+    // Only SEI_PASSWORD can be cleared on the page; the file and the command live in the .env.
+    let (path, problem) = match options.iter().filter(|set| **set).count() {
+        0 => (
+            "sei_password",
+            "SEI_PASSWORD is required (or SEI_PASSWORD_FILE, or SEI_PASSWORD_CMD)",
+        ),
+        1 => return chosen_password(reader, command_set),
+        _ if password_set => ("sei_password", ONLY_ONE_PASSWORD),
+        _ => ("", ONLY_ONE_PASSWORD),
+    };
+    reader.problem(path, problem.to_owned());
+    PasswordSetting::Static(Secret::default())
+}
+
+fn chosen_password(reader: &mut Reader, command_set: bool) -> PasswordSetting {
+    if !command_set {
+        return PasswordSetting::Static(reader.secret("SEI_PASSWORD"));
+    }
+    let command = match PasswordCommand::new(&reader.text("SEI_PASSWORD_CMD")) {
+        Ok(command) => command,
+        Err(problem) => {
+            reader.problem("sei_password_cmd", problem);
+            return PasswordSetting::Static(Secret::default());
+        }
+    };
+    if !look_path(command.program(), reader.lookup("PATH").as_deref()) {
+        reader.problem(
+            "sei_password_cmd",
+            format!("SEI_PASSWORD_CMD: program not found: {}", command.program()),
+        );
+    }
+    PasswordSetting::Command(command)
+}
+
+fn zone(reader: &mut Reader) -> Tz {
+    let name = reader.text("SEI_TIMEZONE");
+    load_zone(&name).unwrap_or_else(|| {
+        reader.problem(
+            "sei_timezone",
+            format!(
+                "SEI_TIMEZONE: unknown time zone {} (e.g. America/Boa_Vista)",
+                go_quote(&name)
+            ),
+        );
+        Tz::UTC
+    })
+}
+
+fn units(value: &str) -> (Vec<String>, bool) {
+    if equal_fold(value, "all") {
+        return (Vec::new(), true);
+    }
+    let mut units: Vec<String> = Vec::new();
+    for part in value.split(',').map(trim) {
+        if part.is_empty() || units.iter().any(|unit| equal_fold(unit, part)) {
+            continue;
+        }
+        units.push(part.to_owned());
+    }
+    (units, false)
+}
+
+/// The path of a problem with the database address: the file's when the address came from it.
+pub(crate) fn database_url_path(source: &Source) -> &'static str {
+    let reader = Reader::new(source);
+    let from_file =
+        !reader.has_secret("DATABASE_URL") && !reader.text("DATABASE_URL_FILE").is_empty();
+    if from_file {
+        return "database_url_file";
+    }
+    "database_url"
+}
+
+fn database_url(reader: &mut Reader) -> Secret {
+    let path = database_url_path(reader.source());
+    let value = reader.secret("DATABASE_URL");
+    if value.is_empty() {
+        reader.problem(
+            path,
+            "DATABASE_URL: set the Postgres address, postgres://user:password@host/database"
+                .to_owned(),
+        );
+        return value;
+    }
+    let valid = ["postgres://", "postgresql://"].iter().any(|scheme| {
+        value
+            .reveal()
+            .strip_prefix(scheme)
+            .is_some_and(|rest| !rest.is_empty())
+    });
+    if !valid {
+        reader.problem(
+            path,
+            "DATABASE_URL: use postgres://user:password@host/database".to_owned(),
+        );
+    }
+    value
+}
+
+fn poll_interval(reader: &mut Reader) -> Duration {
+    let value = reader.text("POLL_INTERVAL");
+    let Some(nanos) = parse_go_duration(&value) else {
+        reader.problem(
+            "poll_interval",
+            format!(
+                "POLL_INTERVAL: use a duration such as 15m or 1h (got {})",
+                go_quote(&value)
+            ),
+        );
+        return MIN_POLL_INTERVAL;
+    };
+    let minimum = nanos_of(MIN_POLL_INTERVAL);
+    if nanos < minimum {
+        reader.problem("poll_interval", format!(
+            "POLL_INTERVAL: the minimum is {}, to keep the load on the agency's SEI low (got {value})",
+            format_go_duration(minimum)
+        ));
+        return MIN_POLL_INTERVAL;
+    }
+    Duration::from_nanos(nanos.unsigned_abs())
+}
+
+fn nanos_of(duration: Duration) -> i64 {
+    i64::try_from(duration.as_nanos()).unwrap_or(i64::MAX)
+}
+
+fn retention_days(reader: &mut Reader, return_warning_days: i64) -> i64 {
+    let days = reader.integer("RETENTION_DAYS", 0, 3650);
+    let minimum = return_warning_days + 2;
+    if days == 0 || days >= minimum {
+        return days;
+    }
+    reader.problem("retention_days", format!(
+        "RETENTION_DAYS: keep events for at least {minimum} days, RETURN_WARNING_DAYS plus 2, or use 0 to keep them forever (got {days})"
+    ));
+    days
+}
+
+fn detail_level(reader: &mut Reader, name: &str) -> bool {
+    let value = to_lower(&reader.text(name));
+    const LEVELS: [(&str, bool); 2] = [("minimal", false), ("full", true)];
+    if let Some((_, full)) = LEVELS.iter().find(|(level, _)| *level == value) {
+        return *full;
+    }
+    reader.problem(
+        &name.to_ascii_lowercase(),
+        format!("{name}: use minimal or full (got {})", go_quote(&value)),
+    );
+    false
+}
+
+fn log_level(reader: &mut Reader) -> i64 {
+    let value = reader.text("LOG_LEVEL");
+    parse_level(&value).unwrap_or_else(|| {
+        reader.problem(
+            "log_level",
+            format!(
+                "LOG_LEVEL: use debug, info, warn or error (got {})",
+                go_quote(&value)
+            ),
+        );
+        0
+    })
+}
+
+fn parse_level(value: &str) -> Option<i64> {
+    const NAMES: [(&str, i64); 4] = [("DEBUG", -4), ("INFO", 0), ("WARN", 4), ("ERROR", 8)];
+    let name = to_upper(value);
+    NAMES
+        .iter()
+        .find(|(level, _)| *level == name)
+        .map(|(_, level)| *level)
+}

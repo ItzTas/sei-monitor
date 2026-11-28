@@ -1,29 +1,18 @@
-.PHONY: check lint test generate openapi dev local up down
+.PHONY: check test up down
 
-check: lint test
+TOOLCHAIN := $(shell sed -n 's/^channel = "\(.*\)"$$/\1/p' rust-toolchain.toml)
+CARGO := $(if $(shell command -v rustup),rustup run $(TOOLCHAIN) cargo,cargo)
 
-lint:
-	test -z "$$(gofmt -l .)"
-	go vet ./...
-	golangci-lint run ./...
+check:
+	$(CARGO) fmt --check
+	$(CARGO) clippy --locked --all-targets --all-features -- -D warnings
+	$(CARGO) test
 
 test:
-	go test -race ./...
-
-generate:
-	go tool sqlc generate
-
-openapi:
-	go run . openapi > docs/openapi.json
-
-dev:
-	go tool air
-
-local:
-	go run . $(CMD)
+	$(CARGO) test
 
 up:
-	docker compose up -d --build
+	docker compose up -d
 
 down:
 	docker compose down

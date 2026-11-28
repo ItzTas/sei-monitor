@@ -1,0 +1,1341 @@
+{
+  "notes": "Each scenario starts on a fresh fake SEI server and an empty database; the fake's state carries over between the cycles of one scenario, each cycle applying its setup calls in order before the cycle runs.",
+  "defaults": {
+    "account": {
+      "username": "fulano.tal",
+      "password": "senha-de-teste",
+      "org_id": 63,
+      "user": {
+        "id": 101,
+        "acronym": "fulano.tal",
+        "name": "Fulano de Tal"
+      },
+      "units": [
+        {
+          "id": 1001,
+          "acronym": "SEDEMO/NUPROC",
+          "description": "Núcleo de Processos"
+        },
+        {
+          "id": 1002,
+          "acronym": "SEDEMO/GAB",
+          "description": "Gabinete"
+        }
+      ]
+    },
+    "current_unit_id": 1001,
+    "orgs": [
+      {
+        "id": 63,
+        "acronym": "SEDEMO",
+        "description": "Secretaria de Demonstração"
+      },
+      {
+        "id": 34,
+        "acronym": "ADEMO",
+        "description": "Agência de Demonstração"
+      },
+      {
+        "id": 48,
+        "acronym": "BDEMO",
+        "description": "Banco de Demonstração"
+      },
+      {
+        "id": 12,
+        "acronym": "CDEMO",
+        "description": "Corpo de Demonstração"
+      },
+      {
+        "id": 15,
+        "acronym": "DDEMO",
+        "description": "Departamento de Demonstração"
+      },
+      {
+        "id": 21,
+        "acronym": "EDEMO",
+        "description": "Escritório de Demonstração"
+      },
+      {
+        "id": 25,
+        "acronym": "FDEMO",
+        "description": "Fundação de Demonstração"
+      },
+      {
+        "id": 40,
+        "acronym": "GDEMO",
+        "description": "Gabinete de Demonstração"
+      },
+      {
+        "id": 50,
+        "acronym": "HDEMO",
+        "description": "Hospital de Demonstração"
+      },
+      {
+        "id": 70,
+        "acronym": "IDEMO",
+        "description": "Instituto de Demonstração"
+      },
+      {
+        "id": 72,
+        "acronym": "JDEMO",
+        "description": "Junta de Demonstração"
+      },
+      {
+        "id": 80,
+        "acronym": "KDEMO",
+        "description": "Kit de Demonstração"
+      }
+    ],
+    "org_list_total": 12,
+    "org_list_page_size": 10,
+    "versions": {
+      "sei": "5.0.5",
+      "module": "3.0.4"
+    },
+    "time_zone": "America/Boa_Vista",
+    "api_path": "/sei/modulos/wssei/controlador_ws.php/api/v2"
+  },
+  "scenarios": [
+    {
+      "name": "every kind at once",
+      "config": {
+        "all_units": true,
+        "units": [],
+        "concurrency": 3,
+        "return_warning_days": 2,
+        "retention_days": 0,
+        "poll_interval_ns": 900000000000,
+        "channels": [
+          "webhook"
+        ],
+        "trigger": "scheduled",
+        "org": "SEDEMO",
+        "username": "fulano.tal",
+        "zone": "America/Boa_Vista",
+        "prepare_at": "2026-11-04T18:00:07.25Z"
+      },
+      "cycles": [
+        {
+          "at": "2026-11-04T18:00:07.25Z",
+          "setup": [
+            {
+              "call": "set_processes",
+              "args": {
+                "unit_id": 1001,
+                "processes": [
+                  {
+                    "id": 9001,
+                    "number": "00000.000001/2026-00",
+                    "type": "Contrato",
+                    "description": "Compra de cadeiras",
+                    "assignee": {
+                      "id": 202,
+                      "acronym": "beltrano.silva",
+                      "name": "Beltrano da Silva"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9002,
+                    "number": "00000.000002/2026-00",
+                    "type": "Diárias",
+                    "description": "Diárias para o seminário regional",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9003,
+                    "number": "00000.000003/2026-00",
+                    "type": "Ofício",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "06/11/2026",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9004,
+                    "number": "00000.000004/2026-00",
+                    "type": "Contrato",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "03/11/2026",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9005,
+                    "number": "00000.000005/2026-00",
+                    "type": "Memorando",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9006,
+                    "number": "00000.000006/2026-00",
+                    "type": "Despacho",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9007,
+                    "number": "00000.000007/2026-00",
+                    "type": "Licitação",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  }
+                ]
+              }
+            },
+            {
+              "call": "set_processes",
+              "args": {
+                "unit_id": 1002,
+                "processes": [
+                  {
+                    "id": 9001,
+                    "number": "00000.000001/2026-00",
+                    "type": "Contrato",
+                    "description": "Compra de cadeiras",
+                    "assignee": {
+                      "id": 202,
+                      "acronym": "beltrano.silva",
+                      "name": "Beltrano da Silva"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9008,
+                    "number": "00000.000008/2026-00",
+                    "type": "Requerimento",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9001,
+                "activities": [
+                  {
+                    "id": 50001,
+                    "user": "beltrano.silva",
+                    "unit": "SEDEMO/PROTOCOLO",
+                    "text": "Processo gerado",
+                    "at": "2026-11-01T18:00:00Z"
+                  },
+                  {
+                    "id": 50002,
+                    "user": "beltrano.silva",
+                    "unit": "SEDEMO/PROTOCOLO",
+                    "text": "Processo remetido pela unidade SEDEMO/PROTOCOLO",
+                    "at": "2026-11-02T18:00:00Z"
+                  },
+                  {
+                    "id": 50003,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo recebido na unidade",
+                    "at": "2026-11-03T18:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9002,
+                "activities": [
+                  {
+                    "id": 60001,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo gerado",
+                    "at": "2026-11-03T18:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9003,
+                "activities": [
+                  {
+                    "id": 61001,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo gerado",
+                    "at": "2026-11-03T18:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9004,
+                "activities": [
+                  {
+                    "id": 62001,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo gerado",
+                    "at": "2026-11-03T18:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9006,
+                "activities": [
+                  {
+                    "id": 71001,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo gerado",
+                    "at": "2026-11-03T18:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9007,
+                "activities": [
+                  {
+                    "id": 72001,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo gerado",
+                    "at": "2026-11-03T18:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9008,
+                "activities": [
+                  {
+                    "id": 85005,
+                    "user": "beltrano.silva",
+                    "unit": "SEDEMO/GAB",
+                    "text": "Processo gerado",
+                    "at": "2026-11-03T18:00:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_documents",
+              "args": {
+                "procedure_id": 9001,
+                "documents": [
+                  {
+                    "id": 80001,
+                    "protocol": "0080001",
+                    "type": "Ofício",
+                    "number": "1",
+                    "label": "Ofício 1 (0080001)"
+                  },
+                  {
+                    "id": 80002,
+                    "protocol": "0080002",
+                    "type": "Despacho",
+                    "number": "2",
+                    "label": "Despacho 2 (0080002)"
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "processes_seen": 8,
+            "events_created": 0
+          },
+          "events": []
+        },
+        {
+          "at": "2026-11-04T18:15:07.25Z",
+          "setup": [
+            {
+              "call": "set_processes",
+              "args": {
+                "unit_id": 1001,
+                "processes": [
+                  {
+                    "id": 9001,
+                    "number": "00000.000001/2026-00",
+                    "type": "Contrato",
+                    "description": "Compra de cadeiras",
+                    "assignee": {
+                      "id": 101,
+                      "acronym": "fulano.tal",
+                      "name": "Fulano de Tal"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9003,
+                    "number": "00000.000003/2026-00",
+                    "type": "Ofício",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "06/11/2026",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9004,
+                    "number": "00000.000004/2026-00",
+                    "type": "Contrato",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "03/11/2026",
+                    "return_overdue": true,
+                    "generated": false
+                  },
+                  {
+                    "id": 9005,
+                    "number": "00000.000005/2026-00",
+                    "type": "Memorando",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9006,
+                    "number": "00000.000006/2026-00",
+                    "type": "Despacho",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9009,
+                    "number": "00000.000009/2026-00",
+                    "type": "Ofício",
+                    "description": "",
+                    "assignee": {
+                      "id": 101,
+                      "acronym": "fulano.tal",
+                      "name": "Fulano de Tal"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": true
+                  }
+                ]
+              }
+            },
+            {
+              "call": "set_processes",
+              "args": {
+                "unit_id": 1002,
+                "processes": [
+                  {
+                    "id": 9001,
+                    "number": "00000.000001/2026-00",
+                    "type": "Contrato",
+                    "description": "Compra de cadeiras",
+                    "assignee": {
+                      "id": 101,
+                      "acronym": "fulano.tal",
+                      "name": "Fulano de Tal"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9008,
+                    "number": "00000.000008/2026-00",
+                    "type": "Requerimento",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9010,
+                    "number": "00000.000010/2026-00",
+                    "type": "Contrato",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "01/11/2026",
+                    "return_overdue": true,
+                    "generated": false
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9001,
+                "activities": [
+                  {
+                    "id": 50010,
+                    "user": "beltrano.silva",
+                    "unit": "SEDEMO/PROTOCOLO",
+                    "text": "Documento Ofício 3 assinado",
+                    "at": "2026-11-04T18:05:03Z"
+                  },
+                  {
+                    "id": 50005,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo recebido na unidade",
+                    "at": "2026-11-04T18:06:04Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9005,
+                "activities": [
+                  {
+                    "id": 70001,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo recebido na unidade",
+                    "at": "2026-11-04T18:07:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9008,
+                "activities": [
+                  {
+                    "id": 85010,
+                    "user": "beltrano.silva",
+                    "unit": "SEDEMO/GAB",
+                    "text": "Processo remetido pela unidade SEDEMO/GAB",
+                    "at": "2026-11-04T18:08:00Z"
+                  },
+                  {
+                    "id": 85001,
+                    "user": "beltrano.silva",
+                    "unit": "SEDEMO/GAB",
+                    "text": "Processo recebido na unidade",
+                    "at": "2026-11-04T18:09:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9009,
+                "activities": [
+                  {
+                    "id": 90001,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo gerado",
+                    "at": "2026-11-04T18:10:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_documents",
+              "args": {
+                "procedure_id": 9001,
+                "documents": [
+                  {
+                    "id": 80003,
+                    "protocol": "0080003",
+                    "type": "Ofício",
+                    "number": "3",
+                    "label": "Ofício 3 (0080003)"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_documents",
+              "args": {
+                "procedure_id": 9005,
+                "documents": [
+                  {
+                    "id": 81001,
+                    "protocol": "0081001",
+                    "type": "Memorando",
+                    "number": "1",
+                    "label": "Memorando 1 (0081001)"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_documents",
+              "args": {
+                "procedure_id": 9006,
+                "documents": [
+                  {
+                    "id": 82001,
+                    "protocol": "0082001",
+                    "type": "Despacho",
+                    "number": "",
+                    "label": "Despacho (0082001)"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_documents",
+              "args": {
+                "procedure_id": 9009,
+                "documents": [
+                  {
+                    "id": 91001,
+                    "protocol": "0091001",
+                    "type": "Ofício",
+                    "number": "9",
+                    "label": "Ofício 9 (0091001)"
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "processes_seen": 8,
+            "events_created": 10
+          },
+          "events": [
+            {
+              "kind": "assignment_changed",
+              "procedure_id": 9001,
+              "ref": "9001:2026-11-04T18:15:07Z",
+              "occurred_at": "2026-11-04T18:15:07.25Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000001/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Contrato",
+                "description": "Compra de cadeiras",
+                "assigned_user": "fulano.tal",
+                "assigned_user_name": "Fulano de Tal",
+                "previous_assigned_user": "beltrano.silva",
+                "assigned_to_self": true
+              }
+            },
+            {
+              "kind": "return_due_soon",
+              "procedure_id": 9003,
+              "ref": "9003:2026-11-06",
+              "occurred_at": "2026-11-04T18:15:07.25Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000003/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Ofício",
+                "return_date": "2026-11-06"
+              }
+            },
+            {
+              "kind": "return_overdue",
+              "procedure_id": 9004,
+              "ref": "9004:2026-11-03",
+              "occurred_at": "2026-11-04T18:15:07.25Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000004/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Contrato",
+                "return_date": "2026-11-03"
+              }
+            },
+            {
+              "kind": "process_entered",
+              "procedure_id": 9009,
+              "ref": "9009:2026-11-04T18:15:07Z",
+              "occurred_at": "2026-11-04T18:15:07.25Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000009/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Ofício",
+                "assigned_user": "fulano.tal",
+                "assigned_user_name": "Fulano de Tal",
+                "assigned_to_self": true
+              }
+            },
+            {
+              "kind": "process_entered",
+              "procedure_id": 9010,
+              "ref": "9010:2026-11-04T18:15:07Z",
+              "occurred_at": "2026-11-04T18:15:07.25Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000010/2026-00",
+                "unit": "SEDEMO/GAB",
+                "process_type": "Contrato"
+              }
+            },
+            {
+              "kind": "process_left",
+              "procedure_id": 9002,
+              "ref": "9002:2026-11-04T18:15:07Z",
+              "occurred_at": "2026-11-04T18:15:07.25Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000002/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Diárias",
+                "description": "Diárias para o seminário regional"
+              }
+            },
+            {
+              "kind": "process_left",
+              "procedure_id": 9007,
+              "ref": "9007:2026-11-04T18:15:07Z",
+              "occurred_at": "2026-11-04T18:15:07.25Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000007/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Licitação"
+              }
+            },
+            {
+              "kind": "activity_added",
+              "procedure_id": 9001,
+              "ref": "50010",
+              "occurred_at": "2026-11-04T18:05:03Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000001/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Contrato",
+                "description": "Compra de cadeiras",
+                "activity_text": "Documento Ofício 3 assinado",
+                "activity_user": "beltrano.silva",
+                "activity_unit": "SEDEMO/PROTOCOLO"
+              }
+            },
+            {
+              "kind": "activity_added",
+              "procedure_id": 9001,
+              "ref": "50005",
+              "occurred_at": "2026-11-04T18:06:04Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000001/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Contrato",
+                "description": "Compra de cadeiras",
+                "activity_text": "Processo recebido na unidade",
+                "activity_user": "fulano.tal",
+                "activity_unit": "SEDEMO/NUPROC"
+              }
+            },
+            {
+              "kind": "document_added",
+              "procedure_id": 9001,
+              "ref": "80003",
+              "occurred_at": "2026-11-04T18:15:07.25Z",
+              "detected_at": "2026-11-04T18:15:07.25Z",
+              "payload": {
+                "process_number": "00000.000001/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Contrato",
+                "description": "Compra de cadeiras",
+                "document_name": "Ofício 3 (0080003)",
+                "document_type": "Ofício",
+                "document_protocol": "0080003"
+              }
+            }
+          ]
+        },
+        {
+          "at": "2026-11-04T18:30:07.25Z",
+          "setup": [
+            {
+              "call": "set_processes",
+              "args": {
+                "unit_id": 1001,
+                "processes": [
+                  {
+                    "id": 9001,
+                    "number": "00000.000001/2026-00",
+                    "type": "Contrato",
+                    "description": "Compra de cadeiras",
+                    "assignee": {
+                      "id": 101,
+                      "acronym": "fulano.tal",
+                      "name": "Fulano de Tal"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9003,
+                    "number": "00000.000003/2026-00",
+                    "type": "Ofício",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "06/11/2026",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9004,
+                    "number": "00000.000004/2026-00",
+                    "type": "Contrato",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "03/11/2026",
+                    "return_overdue": true,
+                    "generated": false
+                  },
+                  {
+                    "id": 9005,
+                    "number": "00000.000005/2026-00",
+                    "type": "Memorando",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9006,
+                    "number": "00000.000006/2026-00",
+                    "type": "Despacho",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9009,
+                    "number": "00000.000009/2026-00",
+                    "type": "Ofício",
+                    "description": "",
+                    "assignee": {
+                      "id": 101,
+                      "acronym": "fulano.tal",
+                      "name": "Fulano de Tal"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": true
+                  },
+                  {
+                    "id": 9007,
+                    "number": "00000.000007/2026-00",
+                    "type": "Licitação",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  }
+                ]
+              }
+            },
+            {
+              "call": "set_processes",
+              "args": {
+                "unit_id": 1002,
+                "processes": [
+                  {
+                    "id": 9001,
+                    "number": "00000.000001/2026-00",
+                    "type": "Contrato",
+                    "description": "Compra de cadeiras",
+                    "assignee": {
+                      "id": 101,
+                      "acronym": "fulano.tal",
+                      "name": "Fulano de Tal"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9008,
+                    "number": "00000.000008/2026-00",
+                    "type": "Requerimento",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9010,
+                    "number": "00000.000010/2026-00",
+                    "type": "Contrato",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "01/11/2026",
+                    "return_overdue": true,
+                    "generated": false
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9005,
+                "activities": [
+                  {
+                    "id": 70002,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo remetido pela unidade SEDEMO/NUPROC",
+                    "at": "2026-11-04T18:20:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9006,
+                "activities": [
+                  {
+                    "id": 71002,
+                    "user": "",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Processo recebido na unidade",
+                    "at": "2026-11-04T18:21:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9008,
+                "activities": [
+                  {
+                    "id": 85020,
+                    "user": "beltrano.silva",
+                    "unit": "SEDEMO/GAB",
+                    "text": "Processo sobrestado",
+                    "at": "2026-11-04T18:22:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9009,
+                "activities": [
+                  {
+                    "id": 90002,
+                    "user": "beltrano.silva",
+                    "unit": "SEDEMO/PROTOCOLO",
+                    "text": "Documento Ofício 10 assinado",
+                    "at": "2026-11-04T18:23:30Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_documents",
+              "args": {
+                "procedure_id": 9009,
+                "documents": [
+                  {
+                    "id": 91002,
+                    "protocol": "0091002",
+                    "type": "Ofício",
+                    "number": "10",
+                    "label": "Ofício 10 (0091002)"
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "processes_seen": 9,
+            "events_created": 7
+          },
+          "events": [
+            {
+              "kind": "process_entered",
+              "procedure_id": 9007,
+              "ref": "9007:2026-11-04T18:30:07Z",
+              "occurred_at": "2026-11-04T18:30:07.25Z",
+              "detected_at": "2026-11-04T18:30:07.25Z",
+              "payload": {
+                "process_number": "00000.000007/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Licitação"
+              }
+            },
+            {
+              "kind": "activity_added",
+              "procedure_id": 9005,
+              "ref": "70002",
+              "occurred_at": "2026-11-04T18:20:00Z",
+              "detected_at": "2026-11-04T18:30:07.25Z",
+              "payload": {
+                "process_number": "00000.000005/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Memorando",
+                "activity_text": "Processo remetido pela unidade SEDEMO/NUPROC",
+                "activity_user": "fulano.tal",
+                "activity_unit": "SEDEMO/NUPROC"
+              }
+            },
+            {
+              "kind": "activity_added",
+              "procedure_id": 9006,
+              "ref": "71002",
+              "occurred_at": "2026-11-04T18:21:00Z",
+              "detected_at": "2026-11-04T18:30:07.25Z",
+              "payload": {
+                "process_number": "00000.000006/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Despacho",
+                "activity_text": "Processo recebido na unidade",
+                "activity_unit": "SEDEMO/NUPROC"
+              }
+            },
+            {
+              "kind": "document_added",
+              "procedure_id": 9006,
+              "ref": "82001",
+              "occurred_at": "2026-11-04T18:30:07.25Z",
+              "detected_at": "2026-11-04T18:30:07.25Z",
+              "payload": {
+                "process_number": "00000.000006/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Despacho",
+                "document_name": "Despacho (0082001)",
+                "document_type": "Despacho",
+                "document_protocol": "0082001"
+              }
+            },
+            {
+              "kind": "activity_added",
+              "procedure_id": 9009,
+              "ref": "90002",
+              "occurred_at": "2026-11-04T18:23:30Z",
+              "detected_at": "2026-11-04T18:30:07.25Z",
+              "payload": {
+                "process_number": "00000.000009/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Ofício",
+                "activity_text": "Documento Ofício 10 assinado",
+                "activity_user": "beltrano.silva",
+                "activity_unit": "SEDEMO/PROTOCOLO"
+              }
+            },
+            {
+              "kind": "document_added",
+              "procedure_id": 9009,
+              "ref": "91002",
+              "occurred_at": "2026-11-04T18:30:07.25Z",
+              "detected_at": "2026-11-04T18:30:07.25Z",
+              "payload": {
+                "process_number": "00000.000009/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Ofício",
+                "document_name": "Ofício 10 (0091002)",
+                "document_type": "Ofício",
+                "document_protocol": "0091002"
+              }
+            },
+            {
+              "kind": "activity_added",
+              "procedure_id": 9008,
+              "ref": "85020",
+              "occurred_at": "2026-11-04T18:22:00Z",
+              "detected_at": "2026-11-04T18:30:07.25Z",
+              "payload": {
+                "process_number": "00000.000008/2026-00",
+                "unit": "SEDEMO/GAB",
+                "process_type": "Requerimento",
+                "activity_text": "Processo sobrestado",
+                "activity_user": "beltrano.silva",
+                "activity_unit": "SEDEMO/GAB"
+              }
+            }
+          ]
+        },
+        {
+          "at": "2026-11-04T18:45:07.25Z",
+          "setup": [
+            {
+              "call": "set_processes",
+              "args": {
+                "unit_id": 1001,
+                "processes": [
+                  {
+                    "id": 9001,
+                    "number": "00000.000001/2026-00",
+                    "type": "Contrato",
+                    "description": "Compra de cadeiras",
+                    "assignee": {
+                      "id": 101,
+                      "acronym": "fulano.tal",
+                      "name": "Fulano de Tal"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9003,
+                    "number": "00000.000003/2026-00",
+                    "type": "Ofício",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "06/11/2026",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9004,
+                    "number": "00000.000004/2026-00",
+                    "type": "Contrato",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "03/11/2026",
+                    "return_overdue": true,
+                    "generated": false
+                  },
+                  {
+                    "id": 9005,
+                    "number": "00000.000005/2026-00",
+                    "type": "Memorando",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9006,
+                    "number": "00000.000006/2026-00",
+                    "type": "Despacho",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9009,
+                    "number": "00000.000009/2026-00",
+                    "type": "Ofício",
+                    "description": "",
+                    "assignee": {
+                      "id": 101,
+                      "acronym": "fulano.tal",
+                      "name": "Fulano de Tal"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": true
+                  },
+                  {
+                    "id": 9007,
+                    "number": "00000.000007/2026-00",
+                    "type": "Licitação",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  }
+                ]
+              }
+            },
+            {
+              "call": "set_processes",
+              "args": {
+                "unit_id": 1002,
+                "processes": [
+                  {
+                    "id": 9001,
+                    "number": "00000.000001/2026-00",
+                    "type": "Contrato",
+                    "description": "Compra de cadeiras",
+                    "assignee": {
+                      "id": 101,
+                      "acronym": "fulano.tal",
+                      "name": "Fulano de Tal"
+                    },
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9008,
+                    "number": "00000.000008/2026-00",
+                    "type": "Requerimento",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "",
+                    "return_overdue": false,
+                    "generated": false
+                  },
+                  {
+                    "id": 9010,
+                    "number": "00000.000010/2026-00",
+                    "type": "Contrato",
+                    "description": "",
+                    "assignee": null,
+                    "return_date": "01/11/2026",
+                    "return_overdue": true,
+                    "generated": false
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "processes_seen": 9,
+            "events_created": 0
+          },
+          "events": []
+        },
+        {
+          "at": "2026-11-04T19:00:07.25Z",
+          "setup": [
+            {
+              "call": "add_activities",
+              "args": {
+                "procedure_id": 9001,
+                "activities": [
+                  {
+                    "id": 50020,
+                    "user": "fulano.tal",
+                    "unit": "SEDEMO/NUPROC",
+                    "text": "Documentos Ofício 4 e Despacho 5 incluídos",
+                    "at": "2026-11-04T18:50:00Z"
+                  }
+                ]
+              }
+            },
+            {
+              "call": "add_documents",
+              "args": {
+                "procedure_id": 9001,
+                "documents": [
+                  {
+                    "id": 80004,
+                    "protocol": "0080004",
+                    "type": "Ofício",
+                    "number": "4",
+                    "label": "Ofício 4 (0080004)"
+                  },
+                  {
+                    "id": 80005,
+                    "protocol": "0080005",
+                    "type": "Despacho",
+                    "number": "5",
+                    "label": "Despacho 5 (0080005)"
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "processes_seen": 9,
+            "events_created": 3
+          },
+          "events": [
+            {
+              "kind": "activity_added",
+              "procedure_id": 9001,
+              "ref": "50020",
+              "occurred_at": "2026-11-04T18:50:00Z",
+              "detected_at": "2026-11-04T19:00:07.25Z",
+              "payload": {
+                "process_number": "00000.000001/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Contrato",
+                "description": "Compra de cadeiras",
+                "activity_text": "Documentos Ofício 4 e Despacho 5 incluídos",
+                "activity_user": "fulano.tal",
+                "activity_unit": "SEDEMO/NUPROC"
+              }
+            },
+            {
+              "kind": "document_added",
+              "procedure_id": 9001,
+              "ref": "80004",
+              "occurred_at": "2026-11-04T19:00:07.25Z",
+              "detected_at": "2026-11-04T19:00:07.25Z",
+              "payload": {
+                "process_number": "00000.000001/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Contrato",
+                "description": "Compra de cadeiras",
+                "document_name": "Ofício 4 (0080004)",
+                "document_type": "Ofício",
+                "document_protocol": "0080004"
+              }
+            },
+            {
+              "kind": "document_added",
+              "procedure_id": 9001,
+              "ref": "80005",
+              "occurred_at": "2026-11-04T19:00:07.25Z",
+              "detected_at": "2026-11-04T19:00:07.25Z",
+              "payload": {
+                "process_number": "00000.000001/2026-00",
+                "unit": "SEDEMO/NUPROC",
+                "process_type": "Contrato",
+                "description": "Compra de cadeiras",
+                "document_name": "Despacho 5 (0080005)",
+                "document_type": "Despacho",
+                "document_protocol": "0080005"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

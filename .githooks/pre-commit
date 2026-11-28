@@ -1,12 +1,20 @@
 #!/bin/sh
 set -e
 
-unformatted=$(gofmt -l .)
-if [ -n "$unformatted" ]; then
-	echo "pre-commit: run gofmt -w on these files:" >&2
-	echo "$unformatted" >&2
+toolchain=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
+
+run_cargo() {
+	if command -v rustup >/dev/null 2>&1; then
+		rustup run "$toolchain" cargo "$@"
+		return
+	fi
+	cargo "$@"
+}
+
+if ! run_cargo fmt --check; then
+	echo "pre-commit: run cargo fmt" >&2
 	exit 1
 fi
 
-echo "pre-commit: go test ./..."
-go test ./...
+echo "pre-commit: cargo test"
+run_cargo test

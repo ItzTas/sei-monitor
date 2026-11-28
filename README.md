@@ -498,6 +498,7 @@ The monitor was checked against the Go release's own output. These differences a
   Brazilian.
 - A secret that is not valid UTF-8 (the password, `DATABASE_URL`, their files, the output of the
   password command) is refused without showing it. Go used the raw bytes.
+- `LOG_LEVEL` takes only the four level names. Go also took slog's offsets, such as `info-4`.
 - The pruning cutoff is computed in UTC, and never deletes an event the hub has not read.
 - The `account_login_failed` event ends with how to resume instead of Go's sentence that a
   restart resumes monitoring.

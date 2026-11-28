@@ -17,7 +17,7 @@ use monitor_hub_sdk::settings::{self, Field};
 use serde_json::Value;
 
 use crate::duration::{format_go_duration, parse_go_duration};
-use crate::gotext::{atoi, equal_fold, go_quote, to_lower, to_upper, trim};
+use crate::gotext::{equal_fold, go_quote, to_lower, to_upper, trim};
 use crate::password::{PasswordCommand, PasswordCommandError, PasswordSource};
 use crate::secret::Secret;
 use crate::timezone::load_zone;
@@ -533,13 +533,9 @@ fn log_level(reader: &mut Reader) -> i64 {
 
 fn parse_level(value: &str) -> Option<i64> {
     const NAMES: [(&str, i64); 4] = [("DEBUG", -4), ("INFO", 0), ("WARN", 4), ("ERROR", 8)];
-    let (name, offset) = match value.find(['+', '-']) {
-        Some(sign) => (&value[..sign], atoi(&value[sign..])?),
-        None => (value, 0),
-    };
-    let name = to_upper(name);
+    let name = to_upper(value);
     NAMES
         .iter()
         .find(|(level, _)| *level == name)
-        .map(|(_, level)| level.wrapping_add(offset))
+        .map(|(_, level)| *level)
 }

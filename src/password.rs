@@ -280,17 +280,16 @@ fn without_secrets(
 }
 
 pub(crate) fn is_secret_name(name: &str) -> bool {
-    const SECRETS: [&str; 10] = [
+    // The monitor's secrets, then the hub's: an operator command runs in the hub's container,
+    // next to the hub's own variables.
+    const SECRETS: [&str; 7] = [
         "SEI_PASSWORD",
-        "FEED_TOKEN",
-        "API_TOKEN",
-        "SMTP_PASSWORD",
-        "TELEGRAM_TOKEN",
-        "NTFY_TOKEN",
-        "WEBHOOK_SECRET",
-        "POSTGRES_PASSWORD",
         "DATABASE_URL",
         "AMQP_URL",
+        "NTFY_TOKEN",
+        "SMTP_PASSWORD",
+        "TELEGRAM_TOKEN",
+        "WEBHOOK_SECRET",
     ];
     let upper = to_upper(name);
     let unprefixed = upper.rsplit("__").next().unwrap_or(&upper);
@@ -449,7 +448,7 @@ mod tests {
             [
                 ("SEI_PASSWORD", "hunter2"),
                 ("DATABASE_URL_FILE", "/run/secrets/database-url"),
-                ("API_TOKEN_CMD", "pass show api-token"),
+                ("TELEGRAM_TOKEN_CMD", "pass show telegram-token"),
                 ("KEEP_ME", "kept"),
             ]
             .map(|(name, value)| (name.into(), value.into())),
@@ -697,7 +696,7 @@ mod tests {
             .collect();
         assert!(names.contains(&"KEEP_ME"), "{names:?}");
         assert!(names.contains(&"PATH"), "{names:?}");
-        for secret in ["SEI_PASSWORD", "DATABASE_URL_FILE", "API_TOKEN_CMD"] {
+        for secret in ["SEI_PASSWORD", "DATABASE_URL_FILE", "TELEGRAM_TOKEN_CMD"] {
             assert!(!names.contains(&secret), "{secret} reached the command");
         }
         assert!(!listing.reveal().contains("hunter2"));
@@ -757,54 +756,52 @@ mod tests {
         }
     }
 
-    #[derive(Deserialize)]
-    #[serde(deny_unknown_fields)]
-    struct EnvironCase {
-        environ: Vec<String>,
-        kept: Vec<String>,
-    }
-
     #[test]
-    fn secret_names_match_go() {
-        for case in golden::cases::<EnvironCase>("without_secrets", "") {
-            let vars = case.environ.iter().map(|entry| {
-                let name = entry
-                    .split_once('=')
-                    .map_or(entry.as_str(), |(name, _)| name);
-                (OsString::from(name), OsString::from(entry))
-            });
-            let kept: Vec<String> = without_secrets(vars)
-                .map(|(_, entry)| entry.into_string().unwrap())
-                .collect();
-            let expected: Vec<String> = case
-                .kept
-                .iter()
-                .filter(|entry| !entry.starts_with("AMQP_URL="))
-                .cloned()
-                .collect();
-            assert_eq!(kept, expected, "environ {:?}", case.environ);
-        }
-    }
-
-    #[test]
-    fn prefixed_secrets_and_the_broker_address_are_secret() {
-        let secret = [
+    fn secret_names_are_the_monitors_and_the_hubs_secrets() {
+        let bases = [
+            "SEI_PASSWORD",
+            "DATABASE_URL",
             "AMQP_URL",
-            "AMQP_URL_FILE",
-            "SEI__SEI_PASSWORD",
-            "SEI__SEI_PASSWORD_CMD",
-            "SEI__DATABASE_URL",
-            "DIARIO__DATABASE_URL_FILE",
-            "hub__amqp_url",
-            "A__B__API_TOKEN",
+            "NTFY_TOKEN",
+            "SMTP_PASSWORD",
+            "TELEGRAM_TOKEN",
+            "WEBHOOK_SECRET",
+        ];
+        for base in bases {
+            for name in [
+                base.to_owned(),
+                format!("{base}_FILE"),
+                format!("{base}_CMD"),
+                format!("SEI__{base}"),
+                format!("A__B__{base}_FILE"),
+                base.to_ascii_lowercase(),
+            ] {
+                assert!(is_secret_name(&name), "{name}");
+            }
+        }
+        let secret = [
+            "Sei_Password_File",
+            "SEI_PASSWORD_file",
+            "ſei_password",
+            "seı_password",
         ];
         let kept = [
+            "PATH",
+            "SEI_URL",
+            "SEI_USERNAME",
             "SEI__SEI_URL",
             "SEI__SEI_PASSWORDS",
             "SEI__",
             "__PATH",
             "SEI_PASSWORD__X",
+            "SEI_PASSWORD_FILE_CMD",
+            "SEI_PASSWORD_CMD_CMD",
+            "SEI_PASSWORD_FILE_FILE",
+            "XSEI_PASSWORD",
+            "SEI_PASSWORDİ",
             "AMQP_URLS",
+            "VAULT_TOKEN",
+            "",
         ];
         for name in secret {
             assert!(is_secret_name(name), "{name}");

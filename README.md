@@ -152,10 +152,11 @@ Set exactly one of these:
   into the hub's container. The monitor reads it once, at start-up. The hub runs as user 65532, so
   that user must be able to read the file.
 - `SEI_PASSWORD_CMD`: a command that prints the password. The monitor runs it at every login,
-  without a shell, with a 30-second limit. Its environment leaves out the secret variables: the
-  passwords, tokens and database addresses of the monitor and of the Go release, the same names
-  behind a prefix such as `SEI__` or `DIARIO__`, and `AMQP_URL`. Its program must exist inside the
-  hub's image, which has no password manager; start-up refuses a program it cannot find on `PATH`.
+  without a shell, with a 30-second limit. Its environment leaves out the monitor's secret
+  variables (`SEI_PASSWORD` and `DATABASE_URL`) and the hub's (`AMQP_URL`, `NTFY_TOKEN`,
+  `SMTP_PASSWORD`, `TELEGRAM_TOKEN` and `WEBHOOK_SECRET`), their `_FILE` and `_CMD` forms, and the
+  same names behind a prefix such as `SEI__` or `DIARIO__`. Its program must exist inside the hub's
+  image, which has no password manager; start-up refuses a program it cannot find on `PATH`.
 
 A password with `$` or quotes in the hub's `.env` can reach the monitor changed by the way that file
 is read. That costs one rejected login and a pause, so look at `GET /api/monitors` right after the

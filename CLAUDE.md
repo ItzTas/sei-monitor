@@ -209,8 +209,8 @@ fields. They are still read from the process environment.
 - `SEI_USERNAME` and `SEI_ORG` (required). `SEI_ORG` is the agency acronym or numeric id.
 - `SEI_PASSWORD`, `SEI_PASSWORD_FILE` or `SEI_PASSWORD_CMD` (exactly one). The file is read at
   start-up. The command runs at every login, without a shell, with a 30 s limit and without the
-  secret variables in its environment (also behind a `PREFIX__`, and `AMQP_URL`); start-up checks
-  that its program is on `PATH`.
+  monitor's and the hub's secret variables in its environment (`password::is_secret_name`, also
+  behind a `PREFIX__`); start-up checks that its program is on `PATH`.
 - `SEI_UNITS` (unit acronyms or `all`; empty is the user's current unit), `SEI_TIMEZONE`
   (`America/Sao_Paulo`), `SEI_CONCURRENCY` (3, from 1 to 10), `POLL_INTERVAL` (`15m`, at least
   `5m`), `RETURN_WARNING_DAYS` (2, from 0 to 60), `RETENTION_DAYS` (90, from 0 to 3650, at least

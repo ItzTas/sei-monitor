@@ -268,7 +268,10 @@ async fn a_failed_prune_leaves_the_cycle_successful() {
     assert_eq!(run.processes_seen, 2);
     assert!(run.finished_at.is_some());
     let failure = logged(&[
-        ("error", "db error"),
+        (
+            "error",
+            "error returned from database: permission denied for table events",
+        ),
         ("level", "WARN"),
         ("message", "could not remove old records"),
     ]);

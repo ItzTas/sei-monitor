@@ -670,7 +670,10 @@ async fn a_held_account_row_fails_the_call_within_the_lock_timeout() {
     assert!(started.elapsed() >= LOCK_TIMEOUT, "{:?}", started.elapsed());
     assert!(matches!(error, StoreError::Server(_)), "{error:?}");
     assert_eq!(error.sql_state(), Some("55P03"));
-    assert_eq!(error.to_string(), "db error");
+    assert_eq!(
+        error.to_string(),
+        "error returned from database: canceling statement due to lock timeout"
+    );
 
     let started = Instant::now();
     let last = pooled

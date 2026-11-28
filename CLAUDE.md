@@ -447,10 +447,10 @@ Two locks guard the events:
 - **Upgrading from 2.1.** The first 2.2 start creates `seaql_migrations` and drops the Go tables.
   The monitor's role therefore needs `CREATE` on the current schema and must own those tables,
   which 2.1 never needed after its own first start. Without `CREATE` the start fails with
-  `applying the database migrations: db error: ERROR: permission denied for schema public`, and
-  without ownership with `... must be owner of table deliveries`. Either way it changes nothing,
-  but under the hub it becomes a restart loop. No try gets as far as calling SEI. Before the first
-  2.2 start, run these as the monitor's role:
+  `applying the database migrations: error returned from database: permission denied for schema
+  public`, and without ownership with `... must be owner of table deliveries`. Either way it
+  changes nothing, but under the hub it becomes a restart loop. No try gets as far as calling SEI.
+  Before the first 2.2 start, run these as the monitor's role:
 
   ```sql
   SELECT has_schema_privilege(current_user, current_schema(), 'CREATE');
@@ -494,10 +494,9 @@ Two locks guard the events:
   - `LAST_ISSUED_SEQ` and `NEWEST_EVENT_ID`, which read the `events_id_seq` sequence and the
     highest id;
   - `PRUNE_CYCLE_RUNS`, a subquery with `OFFSET`.
-- A server error prints the way tokio-postgres printed it in 2.1, `db error: ERROR: <message>`
-  with `DETAIL` and `HINT` lines when the server sends them, so `Status` and `cycle_runs.error`
-  read the same. The severity word is the English one (`ERROR`, `FATAL`) whatever the server's
-  `lc_messages`, where 2.1 showed the server's own word. The message follows `lc_messages`.
+- A server error prints as `error returned from database: <message>`, then `: <detail>` and
+  `: <hint>` when the server sends them. `Status`, `cycle_runs.error` and the log show that text.
+  The message follows the server's `lc_messages`.
 - The pool has 10 connections. Each one runs with a 20 s `statement_timeout` and a 5 s
   `lock_timeout`, asks the server for TCP keepalives (`tcp_keepalives_idle=30`,
   `tcp_keepalives_interval=10`, `tcp_keepalives_count=3`, `tcp_user_timeout=60000`, in ms), and

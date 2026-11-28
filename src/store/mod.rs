@@ -11,7 +11,7 @@ use std::error::Error;
 use std::fmt;
 
 use monitor_hub_sdk::Notifier;
-use sea_orm::sqlx::postgres::{PgDatabaseError, PgSeverity};
+use sea_orm::sqlx::postgres::PgDatabaseError;
 use sea_orm::{ConnAcquireErr, DatabaseConnection, DbErr, RuntimeErr};
 
 use crate::secret::Secret;
@@ -42,8 +42,8 @@ pub enum StoreError {
     AccountNotFound,
     #[error("the database did not answer in time: {0}")]
     Timeout(&'static str),
-    #[error("db error")]
-    Server(#[source] ServerError),
+    #[error("error returned from database: {0}")]
+    Server(ServerError),
     #[error(transparent)]
     Database(DbErr),
     #[error("{LOCK_LOST}: {0}")]
@@ -86,7 +86,6 @@ fn server_error(error: &DbErr) -> Option<ServerError> {
         .as_database_error()?
         .try_downcast_ref::<PgDatabaseError>()?;
     Some(ServerError {
-        severity: severity_name(error.severity()).to_owned(),
         code: error.code().to_owned(),
         message: error.message().to_owned(),
         detail: error.detail().map(str::to_owned),
@@ -94,29 +93,10 @@ fn server_error(error: &DbErr) -> Option<ServerError> {
     })
 }
 
-fn severity_name(severity: PgSeverity) -> &'static str {
-    let names = [
-        (PgSeverity::Panic, "PANIC"),
-        (PgSeverity::Fatal, "FATAL"),
-        (PgSeverity::Error, "ERROR"),
-        (PgSeverity::Warning, "WARNING"),
-        (PgSeverity::Notice, "NOTICE"),
-        (PgSeverity::Debug, "DEBUG"),
-        (PgSeverity::Info, "INFO"),
-        (PgSeverity::Log, "LOG"),
-    ];
-    names
-        .into_iter()
-        .find(|(known, _)| *known == severity)
-        .map(|(_, name)| name)
-        .expect("every Postgres severity has a name")
-}
-
-/// An error the Postgres server answered with. It prints as `tokio-postgres` printed one, so
-/// `Status` and `cycle_runs.error` keep showing `db error: ERROR: <message>`.
+/// An error the Postgres server answered with: its message, then its detail and hint when it
+/// sends them.
 #[derive(Debug, Clone)]
 pub struct ServerError {
-    severity: String,
     code: String,
     message: String,
     detail: Option<String>,
@@ -131,18 +111,13 @@ impl ServerError {
 
 impl fmt::Display for ServerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.severity, self.message)?;
-        if let Some(detail) = &self.detail {
-            write!(f, "\nDETAIL: {detail}")?;
-        }
-        if let Some(hint) = &self.hint {
-            write!(f, "\nHINT: {hint}")?;
+        f.write_str(&self.message)?;
+        for extra in [&self.detail, &self.hint].into_iter().flatten() {
+            write!(f, ": {extra}")?;
         }
         Ok(())
     }
 }
-
-impl Error for ServerError {}
 
 #[derive(Clone)]
 pub struct Store {
@@ -201,7 +176,7 @@ mod tests {
 
     use super::connection::{CONNECT_TIMEOUT, POOL_SIZE, database_options, with_pool_limits};
     use super::lock::connect_options;
-    use super::{Store, StoreError};
+    use super::{ServerError, Store, StoreError};
     use crate::secret::Secret;
 
     const URL: &str = "postgres://sei:hunter2@db.internal:5432/sei";
@@ -369,6 +344,44 @@ mod tests {
             assert!(text.starts_with("DATABASE_URL's "), "{text}");
             assert!(text.contains(key), "{text}");
             assert!(!text.contains(value), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_server_error_prints_its_message_then_its_detail_and_hint() {
+        let printed = |detail: Option<&str>, hint: Option<&str>| {
+            StoreError::Server(ServerError {
+                code: "2BP01".to_owned(),
+                message: "cannot drop table reports".to_owned(),
+                detail: detail.map(str::to_owned),
+                hint: hint.map(str::to_owned),
+            })
+            .to_string()
+        };
+        let cases = [
+            (
+                None,
+                None,
+                "error returned from database: cannot drop table reports",
+            ),
+            (
+                Some("view summary depends on table reports"),
+                None,
+                "error returned from database: cannot drop table reports: view summary depends on table reports",
+            ),
+            (
+                None,
+                Some("Drop the view first."),
+                "error returned from database: cannot drop table reports: Drop the view first.",
+            ),
+            (
+                Some("view summary depends on table reports"),
+                Some("Drop the view first."),
+                "error returned from database: cannot drop table reports: view summary depends on table reports: Drop the view first.",
+            ),
+        ];
+        for (detail, hint, expected) in cases {
+            assert_eq!(printed(detail, hint), expected);
         }
     }
 

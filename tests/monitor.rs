@@ -1181,8 +1181,8 @@ async fn a_database_failure_is_stored_with_its_cause() {
         .await
         .expect("last run")
         .expect("a run");
-    let expected = "db error: ERROR: permission denied for table processes";
-    assert_eq!(failure.to_string(), "db error");
+    let expected = "error returned from database: permission denied for table processes";
+    assert_eq!(failure.to_string(), expected);
     assert_eq!(run.error, expected);
     assert_eq!(h.monitor.state().cycle_error.as_deref(), Some(expected));
 }

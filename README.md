@@ -499,6 +499,12 @@ The monitor was checked against the Go release's own output. These differences a
 - A secret that is not valid UTF-8 (the password, `DATABASE_URL`, their files, the output of the
   password command) is refused without showing it. Go used the raw bytes.
 - `LOG_LEVEL` takes only the four level names. Go also took slog's offsets, such as `info-4`.
+- A database error reads `error returned from database: <message>`, followed by the server's
+  detail and hint when it sends them. Go's error carried pgx's
+  `ERROR: <message> (SQLSTATE <code>)`.
+- The password command's environment leaves out `AMQP_URL` and the secret names behind a prefix
+  such as `SEI__`, which Go passed on. Go left out `FEED_TOKEN`, `API_TOKEN` and
+  `POSTGRES_PASSWORD`, its own secrets; the monitor passes them on.
 - The pruning cutoff is computed in UTC, and never deletes an event the hub has not read.
 - The `account_login_failed` event ends with how to resume instead of Go's sentence that a
   restart resumes monitoring.
